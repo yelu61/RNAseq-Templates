@@ -14,6 +14,23 @@ read_count_table <- function(input_file, input_format = c("tsv", "csv", "excel")
   }
 }
 
+summarize_raw_input <- function(rawcount, gene_name_col, biotype_col = NULL, biotype_filter = NULL) {
+  gene_values <- rawcount[[gene_name_col]]
+  data.frame(
+    step = c("raw_rows", "missing_gene_symbol", "duplicated_gene_symbol", "target_biotype_rows"),
+    value = c(
+      nrow(rawcount),
+      sum(is.na(gene_values) | gene_values == ""),
+      sum(duplicated(gene_values[!is.na(gene_values) & gene_values != ""])),
+      if (!is.null(biotype_col) && biotype_col %in% colnames(rawcount) && !is.null(biotype_filter)) {
+        sum(rawcount[[biotype_col]] == biotype_filter, na.rm = TRUE)
+      } else {
+        NA_integer_
+      }
+    )
+  )
+}
+
 detect_count_columns <- function(rawcount, gene_name_col, count_cols = NULL, annotation_cols = NULL) {
   if (is.null(annotation_cols)) {
     annotation_cols <- c(
@@ -127,7 +144,7 @@ apply_sample_exclusion <- function(count_data, col_data, sample_exclude = charac
   list(count_data = count_data, col_data = col_data, excluded_samples = sample_exclude)
 }
 
-build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_names) {
+build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_names, duplicate_report_file = NULL) {
   count_data <- as.data.frame(rawcount[, c(gene_name_col, count_col_names)], check.names = FALSE)
   count_data[, count_col_names] <- lapply(count_data[, count_col_names, drop = FALSE], function(x) as.numeric(as.character(x)))
 
@@ -145,11 +162,25 @@ build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_
   count_data <- count_data[!is.na(count_data[[gene_name_col]]) & count_data[[gene_name_col]] != "", ]
 
   expression_cols <- setdiff(names(count_data), gene_name_col)
+  count_data$mean_count_for_dedup <- rowMeans(count_data[, expression_cols, drop = FALSE])
+  duplicated_symbols <- count_data[[gene_name_col]][duplicated(count_data[[gene_name_col]]) | duplicated(count_data[[gene_name_col]], fromLast = TRUE)]
+  if (length(duplicated_symbols) > 0 && !is.null(duplicate_report_file)) {
+    duplicate_report <- count_data[count_data[[gene_name_col]] %in% duplicated_symbols, c(gene_name_col, "mean_count_for_dedup", expression_cols), drop = FALSE]
+    duplicate_report$kept <- ave(
+      duplicate_report$mean_count_for_dedup,
+      duplicate_report[[gene_name_col]],
+      FUN = function(x) x == max(x, na.rm = TRUE)
+    )
+    dir.create(dirname(duplicate_report_file), showWarnings = FALSE, recursive = TRUE)
+    utils::write.csv(duplicate_report, duplicate_report_file, row.names = FALSE)
+  }
+
   index <- order(rowMeans(count_data[, expression_cols, drop = FALSE]), decreasing = TRUE)
   count_data <- count_data[index, ]
   count_data <- count_data[!duplicated(count_data[[gene_name_col]]), ]
   rownames(count_data) <- count_data[[gene_name_col]]
   count_data[[gene_name_col]] <- NULL
+  count_data$mean_count_for_dedup <- NULL
   colnames(count_data) <- sample_names
   as.data.frame(count_data, check.names = FALSE)
 }
@@ -176,4 +207,24 @@ filter_low_count_genes <- function(count_data, groups, min_count = 10) {
   min_replicates <- min(table(group))
   keep <- rowSums(count_data >= min_count) >= min_replicates
   list(count_data = count_data[keep, , drop = FALSE], keep = keep, min_replicates = min_replicates)
+}
+
+calculate_filter_retention <- function(raw_count_data, filtered_count_data) {
+  common_samples <- intersect(colnames(raw_count_data), colnames(filtered_count_data))
+  raw_library <- colSums(raw_count_data[, common_samples, drop = FALSE])
+  filtered_library <- colSums(filtered_count_data[, common_samples, drop = FALSE])
+  data.frame(
+    sample = common_samples,
+    raw_library_size = raw_library,
+    filtered_library_size = filtered_library,
+    retained_count_fraction = filtered_library / raw_library,
+    stringsAsFactors = FALSE
+  )
+}
+
+write_preprocessing_summary <- function(summary_file, rows) {
+  summary_df <- do.call(rbind, rows)
+  dir.create(dirname(summary_file), showWarnings = FALSE, recursive = TRUE)
+  utils::write.csv(summary_df, summary_file, row.names = FALSE)
+  summary_df
 }

@@ -1,7 +1,10 @@
 # Differential expression helpers for bulk RNA-seq templates.
 
 validate_threshold_grid <- function(threshold_grid, default_threshold = NULL) {
-  required_cols <- c("name", "padj", "log2fc")
+  if ("padj" %in% colnames(threshold_grid) && !"p_cutoff" %in% colnames(threshold_grid)) {
+    threshold_grid$p_cutoff <- threshold_grid$padj
+  }
+  required_cols <- c("name", "p_cutoff", "log2fc")
   missing_cols <- setdiff(required_cols, colnames(threshold_grid))
   if (length(missing_cols) > 0) {
     stop("THRESHOLD_GRID is missing columns: ", paste(missing_cols, collapse = ", "))
@@ -43,21 +46,39 @@ extract_deseq2_results <- function(dds, comparisons, condition_col = "condition"
   res_list
 }
 
-mark_deg_by_threshold <- function(res_df, padj_thresh, log2fc_thresh) {
+validate_pvalue_column <- function(res_df, pvalue_column = "padj") {
+  if (!pvalue_column %in% colnames(res_df)) {
+    stop("P-value column not found in DESeq2 result: ", pvalue_column)
+  }
+  if (!pvalue_column %in% c("padj", "pvalue")) {
+    warning("Using non-standard p-value column: ", pvalue_column)
+  }
+  invisible(TRUE)
+}
+
+mark_deg_by_threshold <- function(res_df, pvalue_thresh, log2fc_thresh, pvalue_column = "padj") {
+  validate_pvalue_column(res_df, pvalue_column)
   out <- res_df
+  pvals <- out[[pvalue_column]]
   out$significance <- ifelse(
-    !is.na(out$padj) & out$padj < padj_thresh & abs(out$log2FoldChange) > log2fc_thresh,
+    !is.na(pvals) & pvals < pvalue_thresh & abs(out$log2FoldChange) > log2fc_thresh,
     ifelse(out$log2FoldChange > 0, "Up", "Down"),
     "Not_Sig"
   )
   out
 }
 
-build_deg_threshold_sets <- function(res_list, threshold_grid) {
+build_deg_threshold_sets <- function(res_list, threshold_grid, pvalue_column = "padj") {
   deg_by_threshold <- list()
   for (i in seq_len(nrow(threshold_grid))) {
     th <- threshold_grid[i, ]
-    deg_by_threshold[[th$name]] <- lapply(res_list, mark_deg_by_threshold, padj_thresh = th$padj, log2fc_thresh = th$log2fc)
+    deg_by_threshold[[th$name]] <- lapply(
+      res_list,
+      mark_deg_by_threshold,
+      pvalue_thresh = th$p_cutoff,
+      log2fc_thresh = th$log2fc,
+      pvalue_column = pvalue_column
+    )
   }
   deg_by_threshold
 }
@@ -103,15 +124,16 @@ write_deg_threshold_outputs <- function(deg_by_threshold, outdir = "1-DEG") {
   summary_df
 }
 
-genes_for_enrichment <- function(res_df, padj_thresh, log2fc_thresh) {
+genes_for_enrichment <- function(res_df, pvalue_thresh, log2fc_thresh, pvalue_column = "padj") {
+  validate_pvalue_column(res_df, pvalue_column)
   sig <- res_df |>
-    dplyr::filter(!is.na(padj), padj < padj_thresh, abs(log2FoldChange) > log2fc_thresh) |>
+    dplyr::filter(!is.na(.data[[pvalue_column]]), .data[[pvalue_column]] < pvalue_thresh, abs(log2FoldChange) > log2fc_thresh) |>
     dplyr::pull(gene_name)
   up <- res_df |>
-    dplyr::filter(!is.na(padj), padj < padj_thresh, log2FoldChange > log2fc_thresh) |>
+    dplyr::filter(!is.na(.data[[pvalue_column]]), .data[[pvalue_column]] < pvalue_thresh, log2FoldChange > log2fc_thresh) |>
     dplyr::pull(gene_name)
   down <- res_df |>
-    dplyr::filter(!is.na(padj), padj < padj_thresh, log2FoldChange < -log2fc_thresh) |>
+    dplyr::filter(!is.na(.data[[pvalue_column]]), .data[[pvalue_column]] < pvalue_thresh, log2FoldChange < -log2fc_thresh) |>
     dplyr::pull(gene_name)
   list(sig = sig, up = up, down = down)
 }

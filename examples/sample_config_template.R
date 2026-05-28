@@ -20,9 +20,10 @@ COMPARISONS <- list(
   c("Treatment_vs_Control", "Treatment", "Control")
 )
 
+DEG_PVALUE_COLUMN <- "padj" # "padj" recommended; use "pvalue" only for exploratory screening
 THRESHOLD_GRID <- data.frame(
   name = c("strict", "standard", "loose"),
-  padj = c(0.01, 0.05, 0.10),
+  p_cutoff = c(0.01, 0.05, 0.10),
   log2fc = c(1.5, 1.0, 0.5),
   stringsAsFactors = FALSE
 )

@@ -77,7 +77,7 @@ run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, 
   )
 }
 
-run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organism, outdir = "2-GSEA", plotdir = "3-Visualization") {
+run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organism, pvalue_column = "padj", outdir = "2-GSEA", plotdir = "3-Visualization") {
   dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
   dir.create(plotdir, showWarnings = FALSE, recursive = TRUE)
   summary_rows <- list()
@@ -92,7 +92,7 @@ run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organi
     ora_results[[th$name]] <- list()
 
     for (comp_name in names(res_list)) {
-      genes <- genes_for_enrichment(res_list[[comp_name]], th$padj, th$log2fc)
+      genes <- genes_for_enrichment(res_list[[comp_name]], th$p_cutoff, th$log2fc, pvalue_column = pvalue_column)
       ora_results[[th$name]][[comp_name]] <- list()
 
       ego <- run_go_ora(genes$sig, org_db = org_db, universe = universe)

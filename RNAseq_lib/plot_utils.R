@@ -125,6 +125,37 @@ plot_sample_correlation_pdf <- function(sample_qc, filename) {
   invisible(sample_cor)
 }
 
+plot_count_distribution_pdf <- function(count_data, filename, max_points_per_sample = 5000) {
+  count_df <- as.data.frame(count_data, check.names = FALSE)
+  count_df$gene <- rownames(count_df)
+  count_long <- tidyr::pivot_longer(count_df, cols = -gene, names_to = "sample", values_to = "count")
+  count_long$log10_count <- log10(count_long$count + 1)
+  if (!is.null(max_points_per_sample)) {
+    count_long <- count_long |>
+      dplyr::group_by(sample) |>
+      dplyr::slice_sample(n = min(dplyr::n(), max_points_per_sample)) |>
+      dplyr::ungroup()
+  }
+  p <- ggplot2::ggplot(count_long, ggplot2::aes(x = sample, y = log10_count)) +
+    ggplot2::geom_boxplot(outlier.shape = NA, width = 0.65, fill = "#B7D7E8", color = "black") +
+    ggplot2::labs(x = NULL, y = "log10(count + 1)", title = "Raw Count Distribution by Sample") +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  save_pdf_plot(p, filename, width = max(8, 0.55 * ncol(count_data)), height = 5)
+  p
+}
+
+plot_filter_retention_pdf <- function(retention_df, filename) {
+  p <- ggplot2::ggplot(retention_df, ggplot2::aes(x = sample, y = retained_count_fraction)) +
+    ggplot2::geom_col(fill = "#7AA6C2", width = 0.75) +
+    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+    ggplot2::labs(x = NULL, y = "Retained count fraction", title = "Library Size Retained After Gene Filtering") +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  save_pdf_plot(p, filename, width = max(8, 0.55 * nrow(retention_df)), height = 5)
+  p
+}
+
 plot_deg_summary_pdf <- function(deg_summary, filename) {
   deg_long <- tidyr::pivot_longer(deg_summary, cols = c("UP", "DOWN"), names_to = "Change", values_to = "Number")
   p <- ggplot2::ggplot(deg_long, ggplot2::aes(x = Comparison, y = Number, fill = Change)) +
@@ -139,27 +170,28 @@ plot_deg_summary_pdf <- function(deg_summary, filename) {
   p
 }
 
-plot_volcano_pdf <- function(res_df, comp_name, padj_thresh, log2fc_thresh, filename) {
-  res <- res_df[!is.na(res_df$padj), ]
+plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, filename, pvalue_column = "padj") {
+  validate_pvalue_column(res_df, pvalue_column)
+  res <- res_df[!is.na(res_df[[pvalue_column]]), ]
   top_genes <- res |>
-    dplyr::filter(padj < padj_thresh, abs(log2FoldChange) > log2fc_thresh) |>
-    dplyr::arrange(padj) |>
+    dplyr::filter(.data[[pvalue_column]] < pvalue_thresh, abs(log2FoldChange) > log2fc_thresh) |>
+    dplyr::arrange(.data[[pvalue_column]]) |>
     utils::head(15) |>
     dplyr::pull(gene_name)
 
   keyvals <- rep("darkgrey", nrow(res))
   names(keyvals) <- rep("Not-significant", nrow(res))
-  keyvals[res$log2FoldChange > log2fc_thresh & res$padj < padj_thresh] <- "#d6604d"
-  names(keyvals)[res$log2FoldChange > log2fc_thresh & res$padj < padj_thresh] <- "Up-regulated"
-  keyvals[res$log2FoldChange < -log2fc_thresh & res$padj < padj_thresh] <- "#4393c3"
-  names(keyvals)[res$log2FoldChange < -log2fc_thresh & res$padj < padj_thresh] <- "Down-regulated"
+  keyvals[res$log2FoldChange > log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "#d6604d"
+  names(keyvals)[res$log2FoldChange > log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "Up-regulated"
+  keyvals[res$log2FoldChange < -log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "#4393c3"
+  names(keyvals)[res$log2FoldChange < -log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "Down-regulated"
   max_fc <- max(abs(res$log2FoldChange), na.rm = TRUE)
 
   p <- EnhancedVolcano::EnhancedVolcano(
     res,
     lab = res$gene_name,
     x = "log2FoldChange",
-    y = "padj",
+    y = pvalue_column,
     selectLab = top_genes,
     max.overlaps = 30,
     drawConnectors = TRUE,
@@ -167,10 +199,10 @@ plot_volcano_pdf <- function(res_df, comp_name, padj_thresh, log2fc_thresh, file
     boxedLabels = TRUE,
     xlim = c(-max_fc * 1.1, max_fc * 1.1),
     title = comp_name,
-    pCutoff = padj_thresh,
+    pCutoff = pvalue_thresh,
     FCcutoff = log2fc_thresh,
     xlab = bquote(~Log[2]~"fold change"),
-    ylab = bquote(~-Log[10]~italic(p-adjusted)),
+    ylab = bquote(~-Log[10]~.(pvalue_column)),
     pointSize = 1.5,
     labSize = 3.5,
     colCustom = keyvals,
