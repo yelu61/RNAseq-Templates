@@ -1,0 +1,26 @@
+.ipynb_checkpoints/
+
+# Analysis outputs
+1-DEG/
+2-GSEA/
+3-Visualization/
+*_Output/
+Analysis_summary.txt
+sessionInfo.txt
+
+# Large or generated analysis files
+*.Rdata
+*.rds
+*.pdf
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.gct
+*.txt.gz
+
+# Local/editor files
+.DS_Store
+.Rhistory
+.RData
+.Rproj.user/
