@@ -58,7 +58,7 @@ validate_sample_design <- function(sample_names, groups, group_levels, compariso
 }
 
 build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_names) {
-  count_data <- rawcount[, c(gene_name_col, count_col_names)]
+  count_data <- as.data.frame(rawcount[, c(gene_name_col, count_col_names)], check.names = FALSE)
   count_data[, count_col_names] <- lapply(count_data[, count_col_names, drop = FALSE], function(x) as.numeric(as.character(x)))
 
   if (anyNA(count_data[, count_col_names])) {
@@ -82,6 +82,14 @@ build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_
   count_data[[gene_name_col]] <- NULL
   colnames(count_data) <- sample_names
   as.data.frame(count_data, check.names = FALSE)
+}
+
+preview_count_matrix <- function(count_data, gene_name_col = "gene_name", n = 6) {
+  preview <- as.data.frame(utils::head(count_data, n), check.names = FALSE)
+  preview[[gene_name_col]] <- rownames(preview)
+  preview <- preview[, c(gene_name_col, setdiff(colnames(preview), gene_name_col)), drop = FALSE]
+  rownames(preview) <- NULL
+  preview
 }
 
 make_col_data <- function(count_data, sample_names, groups, group_levels) {
