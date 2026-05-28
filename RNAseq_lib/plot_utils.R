@@ -86,6 +86,45 @@ plot_sample_distance_pdf <- function(vsd, filename) {
   invisible(p)
 }
 
+plot_sample_qc_pdf <- function(sample_qc, filename, group_colors = NULL) {
+  qc_long <- tidyr::pivot_longer(
+    sample_qc,
+    cols = c("library_size", "detected_genes", "zero_fraction", "median_sample_correlation"),
+    names_to = "metric",
+    values_to = "value"
+  )
+  qc_long$sample <- factor(qc_long$sample, levels = sample_qc$sample)
+
+  p <- ggplot2::ggplot(qc_long, ggplot2::aes(x = sample, y = value, fill = group)) +
+    ggplot2::geom_col(width = 0.75) +
+    ggplot2::facet_wrap(~ metric, scales = "free_y", ncol = 1) +
+    ggplot2::labs(x = NULL, y = NULL, title = "Sample-level QC Metrics") +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+      legend.position = "top"
+    )
+  if (!is.null(group_colors) && "group" %in% colnames(sample_qc)) {
+    p <- p + ggplot2::scale_fill_manual(values = group_colors, na.value = "#999999")
+  }
+  save_pdf_plot(p, filename, width = max(8, 0.55 * nrow(sample_qc)), height = 10)
+  p
+}
+
+plot_sample_correlation_pdf <- function(sample_qc, filename) {
+  sample_cor <- attr(sample_qc, "sample_cor")
+  if (is.null(sample_cor)) return(invisible(NULL))
+  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  grDevices::pdf(filename, width = 7, height = 6)
+  pheatmap::pheatmap(
+    sample_cor,
+    color = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(9, "RdBu")))(255),
+    main = "Sample Spearman Correlation"
+  )
+  grDevices::dev.off()
+  invisible(sample_cor)
+}
+
 plot_deg_summary_pdf <- function(deg_summary, filename) {
   deg_long <- tidyr::pivot_longer(deg_summary, cols = c("UP", "DOWN"), names_to = "Change", values_to = "Number")
   p <- ggplot2::ggplot(deg_long, ggplot2::aes(x = Comparison, y = Number, fill = Change)) +

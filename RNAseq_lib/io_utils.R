@@ -57,6 +57,76 @@ validate_sample_design <- function(sample_names, groups, group_levels, compariso
   invisible(TRUE)
 }
 
+calculate_sample_qc <- function(count_data, col_data = NULL, group_col = "condition") {
+  qc <- data.frame(
+    sample = colnames(count_data),
+    library_size = colSums(count_data),
+    detected_genes = colSums(count_data > 0),
+    zero_fraction = colMeans(count_data == 0),
+    stringsAsFactors = FALSE
+  )
+
+  if (!is.null(col_data) && group_col %in% colnames(col_data)) {
+    qc$group <- as.character(col_data[qc$sample, group_col])
+  }
+
+  log_counts <- log2(as.matrix(count_data) + 1)
+  sample_cor <- stats::cor(log_counts, method = "spearman", use = "pairwise.complete.obs")
+  diag(sample_cor) <- NA
+  qc$median_sample_correlation <- apply(sample_cor, 2, stats::median, na.rm = TRUE)
+  qc$library_size_z <- as.numeric(scale(log10(qc$library_size + 1)))
+  qc$detected_genes_z <- as.numeric(scale(qc$detected_genes))
+  qc$median_correlation_z <- as.numeric(scale(qc$median_sample_correlation))
+
+  attr(qc, "sample_cor") <- sample_cor
+  qc
+}
+
+flag_sample_qc <- function(sample_qc,
+                           min_library_size = NULL,
+                           min_detected_genes = NULL,
+                           max_zero_fraction = NULL,
+                           min_median_correlation_z = -3) {
+  qc <- sample_qc
+  qc$qc_flag <- FALSE
+  reasons <- vector("list", nrow(qc))
+
+  add_reason <- function(mask, reason) {
+    qc$qc_flag[mask] <<- TRUE
+    reasons[mask] <<- Map(c, reasons[mask], reason)
+  }
+
+  if (!is.null(min_library_size)) {
+    add_reason(qc$library_size < min_library_size, paste0("library_size<", min_library_size))
+  }
+  if (!is.null(min_detected_genes)) {
+    add_reason(qc$detected_genes < min_detected_genes, paste0("detected_genes<", min_detected_genes))
+  }
+  if (!is.null(max_zero_fraction)) {
+    add_reason(qc$zero_fraction > max_zero_fraction, paste0("zero_fraction>", max_zero_fraction))
+  }
+  if (!is.null(min_median_correlation_z)) {
+    add_reason(qc$median_correlation_z < min_median_correlation_z, paste0("median_correlation_z<", min_median_correlation_z))
+  }
+
+  qc$qc_reason <- vapply(reasons, function(x) {
+    x <- unique(unlist(x))
+    if (length(x) == 0) "" else paste(x, collapse = ";")
+  }, character(1))
+  qc
+}
+
+apply_sample_exclusion <- function(count_data, col_data, sample_exclude = character(0)) {
+  sample_exclude <- intersect(sample_exclude, colnames(count_data))
+  keep_samples <- setdiff(colnames(count_data), sample_exclude)
+  if (length(keep_samples) < 2) {
+    stop("Fewer than 2 samples remain after applying SAMPLE_EXCLUDE.")
+  }
+  count_data <- count_data[, keep_samples, drop = FALSE]
+  col_data <- col_data[keep_samples, , drop = FALSE]
+  list(count_data = count_data, col_data = col_data, excluded_samples = sample_exclude)
+}
+
 build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_names) {
   count_data <- as.data.frame(rawcount[, c(gene_name_col, count_col_names)], check.names = FALSE)
   count_data[, count_col_names] <- lapply(count_data[, count_col_names, drop = FALSE], function(x) as.numeric(as.character(x)))
