@@ -98,29 +98,79 @@ run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organi
       ego <- run_go_ora(genes$sig, org_db = org_db, universe = universe)
       if (!is.null(ego) && nrow(as.data.frame(ego)) > 0) {
         utils::write.csv(as.data.frame(ego), file.path(th_outdir, paste0("GO_ORA_", comp_name, ".csv")), row.names = FALSE)
-        plot_enrich_dotplot(ego, file.path(th_plotdir, paste0("GO_dotplot_", comp_name, ".pdf")), paste("GO ORA -", comp_name, "-", th$name))
+        plot_enrich_suite_pdf(ego, file.path(th_plotdir, paste0("GO_ORA_", comp_name)), paste("GO ORA -", comp_name, "-", th$name))
         ora_results[[th$name]][[comp_name]]$go <- ego
         go_terms <- nrow(as.data.frame(ego))
       } else {
         go_terms <- 0
       }
 
+      ego_up <- run_go_ora(genes$up, org_db = org_db, universe = universe)
+      ego_down <- run_go_ora(genes$down, org_db = org_db, universe = universe)
+      go_up_terms <- if (!is.null(ego_up) && nrow(as.data.frame(ego_up)) > 0) nrow(as.data.frame(ego_up)) else 0
+      go_down_terms <- if (!is.null(ego_down) && nrow(as.data.frame(ego_down)) > 0) nrow(as.data.frame(ego_down)) else 0
+      if (go_up_terms > 0) {
+        utils::write.csv(as.data.frame(ego_up), file.path(th_outdir, paste0("GO_ORA_UP_", comp_name, ".csv")), row.names = FALSE)
+        plot_enrich_suite_pdf(ego_up, file.path(th_plotdir, paste0("GO_ORA_UP_", comp_name)), paste("GO ORA UP -", comp_name, "-", th$name))
+        ora_results[[th$name]][[comp_name]]$go_up <- ego_up
+      }
+      if (go_down_terms > 0) {
+        utils::write.csv(as.data.frame(ego_down), file.path(th_outdir, paste0("GO_ORA_DOWN_", comp_name, ".csv")), row.names = FALSE)
+        plot_enrich_suite_pdf(ego_down, file.path(th_plotdir, paste0("GO_ORA_DOWN_", comp_name)), paste("GO ORA DOWN -", comp_name, "-", th$name))
+        ora_results[[th$name]][[comp_name]]$go_down <- ego_down
+      }
+      if (go_up_terms > 0 || go_down_terms > 0) {
+        plot_enrich_bidirectional_barplot_pdf(
+          ego_up, ego_down,
+          file.path(th_plotdir, paste0("GO_ORA_bidirectional_", comp_name, ".pdf")),
+          paste("GO ORA UP/DOWN -", comp_name, "-", th$name)
+        )
+      }
+
       ekegg <- run_kegg_ora(genes$sig, org_db = org_db, universe = universe, organism = organism)
       if (!is.null(ekegg) && nrow(as.data.frame(ekegg)) > 0) {
         utils::write.csv(as.data.frame(ekegg), file.path(th_outdir, paste0("KEGG_ORA_", comp_name, ".csv")), row.names = FALSE)
-        plot_enrich_dotplot(ekegg, file.path(th_plotdir, paste0("KEGG_dotplot_", comp_name, ".pdf")), paste("KEGG ORA -", comp_name, "-", th$name))
+        plot_enrich_suite_pdf(ekegg, file.path(th_plotdir, paste0("KEGG_ORA_", comp_name)), paste("KEGG ORA -", comp_name, "-", th$name))
         ora_results[[th$name]][[comp_name]]$kegg <- ekegg
         kegg_terms <- nrow(as.data.frame(ekegg))
       } else {
         kegg_terms <- 0
       }
 
+      ekegg_up <- run_kegg_ora(genes$up, org_db = org_db, universe = universe, organism = organism)
+      ekegg_down <- run_kegg_ora(genes$down, org_db = org_db, universe = universe, organism = organism)
+      kegg_up_terms <- if (!is.null(ekegg_up) && nrow(as.data.frame(ekegg_up)) > 0) nrow(as.data.frame(ekegg_up)) else 0
+      kegg_down_terms <- if (!is.null(ekegg_down) && nrow(as.data.frame(ekegg_down)) > 0) nrow(as.data.frame(ekegg_down)) else 0
+      if (kegg_up_terms > 0) {
+        utils::write.csv(as.data.frame(ekegg_up), file.path(th_outdir, paste0("KEGG_ORA_UP_", comp_name, ".csv")), row.names = FALSE)
+        plot_enrich_suite_pdf(ekegg_up, file.path(th_plotdir, paste0("KEGG_ORA_UP_", comp_name)), paste("KEGG ORA UP -", comp_name, "-", th$name))
+        ora_results[[th$name]][[comp_name]]$kegg_up <- ekegg_up
+      }
+      if (kegg_down_terms > 0) {
+        utils::write.csv(as.data.frame(ekegg_down), file.path(th_outdir, paste0("KEGG_ORA_DOWN_", comp_name, ".csv")), row.names = FALSE)
+        plot_enrich_suite_pdf(ekegg_down, file.path(th_plotdir, paste0("KEGG_ORA_DOWN_", comp_name)), paste("KEGG ORA DOWN -", comp_name, "-", th$name))
+        ora_results[[th$name]][[comp_name]]$kegg_down <- ekegg_down
+      }
+      if (kegg_up_terms > 0 || kegg_down_terms > 0) {
+        plot_enrich_bidirectional_barplot_pdf(
+          ekegg_up, ekegg_down,
+          file.path(th_plotdir, paste0("KEGG_ORA_bidirectional_", comp_name, ".pdf")),
+          paste("KEGG ORA UP/DOWN -", comp_name, "-", th$name)
+        )
+      }
+
       summary_rows[[length(summary_rows) + 1]] <- data.frame(
         Threshold = th$name,
         Comparison = comp_name,
         SignificantGenes = length(genes$sig),
+        UpGenes = length(genes$up),
+        DownGenes = length(genes$down),
         GO_terms = go_terms,
+        GO_up_terms = go_up_terms,
+        GO_down_terms = go_down_terms,
         KEGG_terms = kegg_terms,
+        KEGG_up_terms = kegg_up_terms,
+        KEGG_down_terms = kegg_down_terms,
         stringsAsFactors = FALSE
       )
     }

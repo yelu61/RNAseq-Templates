@@ -42,7 +42,7 @@ Analysis_summary.txt
 sessionInfo.txt
 ```
 
-All major visualizations are saved as editable PDF files under `3-Visualization/`.
+All major visualizations are saved as editable PDF files under `3-Visualization/`. Threshold-specific ORA figures are written to `3-Visualization/<threshold>/`.
 
 ## General Bulk RNA-seq Workflow
 
@@ -55,11 +55,11 @@ All major visualizations are saved as editable PDF files under `3-Visualization/
 - DESeq2 differential expression with `lfcShrink(type = "ashr")`
 - multi-threshold DEG outputs with `THRESHOLD_GRID`
 - PCA and sample distance QC
-- volcano plots and DEG heatmaps
-- GO/KEGG ORA with expressed-gene background
-- GSEA GO/KEGG from full ranked gene lists
-- GSVA for custom gene sets
-- single-gene expression plots
+- volcano plots and annotated DEG heatmaps
+- GO/KEGG ORA with expressed-gene background, including dotplot, barplot, UP/DOWN bidirectional barplot, and optional cnetplot/emapplot
+- GSEA GO/KEGG from full ranked gene lists, including dotplot, NES barplot, ridgeplot, and running enrichment curves
+- GSVA for custom gene sets with heatmap and pairwise boxplot statistics
+- single-gene expression plots with pairwise adjusted P values and mean-difference effect labels
 - optional DoRothEA/VIPER TF activity analysis
 
 ## Multi-threshold DEG + ORA
@@ -84,6 +84,7 @@ Multi-threshold output applies to:
 - GO ORA
 - KEGG ORA
 - ORA summary plots
+- threshold-specific ORA PDFs under `3-Visualization/<threshold>/`
 
 GSEA is intentionally not repeated by DEG threshold because it uses the full ranked gene list.
 

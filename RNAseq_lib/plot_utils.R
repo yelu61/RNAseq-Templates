@@ -40,6 +40,21 @@ save_pdf_plot <- function(plot, filename, width = 7, height = 6) {
   invisible(filename)
 }
 
+wrap_term_labels <- function(x, width = 45) {
+  vapply(x, function(s) paste(strwrap(s, width = width), collapse = "\n"), character(1))
+}
+
+zscore_rows <- function(mat, cap = 2) {
+  mat <- as.matrix(mat)
+  z <- t(scale(t(mat)))
+  z[is.na(z)] <- 0
+  if (!is.null(cap)) {
+    z[z > cap] <- cap
+    z[z < -cap] <- -cap
+  }
+  z
+}
+
 plot_pca_pdf <- function(vsd, group_levels, group_colors, filename, intgroup = "condition") {
   pca_data <- DESeq2::plotPCA(vsd, intgroup = intgroup, returnData = TRUE)
   pca_data[[intgroup]] <- factor(pca_data[[intgroup]], levels = group_levels)
@@ -213,9 +228,262 @@ plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, fi
   p
 }
 
+plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NULL, group_levels = NULL,
+                                        group_colors = NULL, scale_rows = TRUE, z_cap = 2,
+                                        show_row_names = TRUE, show_column_names = FALSE,
+                                        row_font_size = 7, column_font_size = 8,
+                                        cluster_rows = TRUE, cluster_columns = TRUE,
+                                        column_split = TRUE, width = 8, height = 10,
+                                        heatmap_name = "Z-score") {
+  mat <- as.matrix(mat)
+  if (nrow(mat) == 0 || ncol(mat) == 0) return(invisible(NULL))
+  plot_mat <- if (scale_rows) zscore_rows(mat, cap = z_cap) else mat
+  col_breaks <- if (scale_rows) c(-z_cap, 0, z_cap) else stats::quantile(plot_mat, c(0.02, 0.5, 0.98), na.rm = TRUE)
+  if (length(unique(col_breaks)) < 3) {
+    center <- stats::median(plot_mat, na.rm = TRUE)
+    span <- max(abs(plot_mat - center), na.rm = TRUE)
+    if (!is.finite(span) || span == 0) span <- 1
+    col_breaks <- c(center - span, center, center + span)
+  }
+  col_fun <- circlize::colorRamp2(col_breaks, c("#2166ac", "white", "#b2182b"))
+
+  top_annotation <- NULL
+  split_vec <- NULL
+  if (!is.null(group)) {
+    group <- factor(group, levels = group_levels %||% unique(group))
+    top_annotation <- ComplexHeatmap::HeatmapAnnotation(
+      Group = group,
+      col = if (!is.null(group_colors)) list(Group = group_colors) else NULL,
+      annotation_name_side = "left"
+    )
+    if (isTRUE(column_split)) split_vec <- group
+  }
+
+  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  grDevices::pdf(filename, width = width, height = height)
+  ht <- ComplexHeatmap::Heatmap(
+    plot_mat,
+    name = heatmap_name,
+    col = col_fun,
+    top_annotation = top_annotation,
+    cluster_rows = cluster_rows,
+    cluster_columns = cluster_columns,
+    column_split = split_vec,
+    cluster_column_slices = FALSE,
+    show_row_names = show_row_names,
+    show_column_names = show_column_names,
+    row_names_gp = grid::gpar(fontsize = row_font_size),
+    column_names_gp = grid::gpar(fontsize = column_font_size),
+    column_title = title,
+    use_raster = nrow(plot_mat) > 500
+  )
+  ComplexHeatmap::draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right")
+  grDevices::dev.off()
+  invisible(ht)
+}
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
+format_p_for_label <- function(p) {
+  ifelse(is.na(p), "NA", ifelse(p < 0.001, formatC(p, format = "e", digits = 2), sprintf("%.3f", p)))
+}
+
+pairwise_effect_table <- function(data, value_col, group_col, comparisons = NULL,
+                                  facet_col = NULL, method = "t.test", p_adjust_method = "BH") {
+  df <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
+  if (is.null(comparisons)) {
+    comparisons <- utils::combn(levels(factor(df[[group_col]])), 2, simplify = FALSE)
+  }
+  facets <- if (is.null(facet_col)) NA_character_ else unique(as.character(df[[facet_col]]))
+  rows <- list()
+  for (facet in facets) {
+    sub_df <- if (is.null(facet_col)) df else df[as.character(df[[facet_col]]) == facet, , drop = FALSE]
+    value_range <- range(sub_df[[value_col]], na.rm = TRUE)
+    value_span <- diff(value_range)
+    if (!is.finite(value_span) || value_span == 0) value_span <- max(abs(value_range), na.rm = TRUE) * 0.1 + 1
+    for (i in seq_along(comparisons)) {
+      pair <- comparisons[[i]]
+      x1 <- sub_df[sub_df[[group_col]] == pair[1], value_col, drop = TRUE]
+      x2 <- sub_df[sub_df[[group_col]] == pair[2], value_col, drop = TRUE]
+      if (length(stats::na.omit(x1)) < 2 || length(stats::na.omit(x2)) < 2) next
+      p_val <- tryCatch({
+        if (method == "wilcox.test") stats::wilcox.test(x1, x2)$p.value else stats::t.test(x1, x2)$p.value
+      }, error = function(e) NA_real_)
+      rows[[length(rows) + 1]] <- data.frame(
+        group1 = pair[1],
+        group2 = pair[2],
+        p = p_val,
+        mean1 = mean(x1, na.rm = TRUE),
+        mean2 = mean(x2, na.rm = TRUE),
+        delta = mean(x2, na.rm = TRUE) - mean(x1, na.rm = TRUE),
+        y.position = max(value_range, na.rm = TRUE) + value_span * (0.12 + 0.12 * (i - 1)),
+        stringsAsFactors = FALSE
+      )
+      if (!is.null(facet_col)) rows[[length(rows)]][[facet_col]] <- facet
+    }
+  }
+  if (length(rows) == 0) return(data.frame())
+  out <- dplyr::bind_rows(rows)
+  if (!is.null(facet_col) && facet_col %in% colnames(out)) {
+    out <- out |>
+      dplyr::group_by(.data[[facet_col]]) |>
+      dplyr::mutate(p.adj = stats::p.adjust(p, method = p_adjust_method)) |>
+      dplyr::ungroup()
+  } else {
+    out$p.adj <- stats::p.adjust(out$p, method = p_adjust_method)
+  }
+  out$label <- paste0("p.adj=", format_p_for_label(out$p.adj), "\nDelta=", sprintf("%.2f", out$delta))
+  out
+}
+
+plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_col = NULL,
+                                   comparisons = NULL, method = "t.test", p_adjust_method = "BH",
+                                   title = NULL, ylab = NULL, group_colors = NULL,
+                                   show_ns = TRUE, width = 7, height = 6) {
+  plot_data <- data
+  plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(plot_data[[group_col]])))
+  stat_tbl <- pairwise_effect_table(
+    plot_data, value_col = value_col, group_col = group_col,
+    comparisons = comparisons, facet_col = facet_col,
+    method = method, p_adjust_method = p_adjust_method
+  )
+
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
+    ggplot2::geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.88, linewidth = 0.45) +
+    ggplot2::geom_jitter(width = 0.12, size = 2, color = "black", shape = 21, fill = "white", alpha = 0.9) +
+    ggplot2::labs(title = title, x = NULL, y = ylab %||% value_col) +
+    theme_publication(base_size = 11) +
+    ggplot2::theme(legend.position = "none", strip.text = ggplot2::element_text(face = "bold"))
+  if (!is.null(group_colors)) p <- p + ggplot2::scale_fill_manual(values = group_colors)
+  if (!is.null(facet_col)) p <- p + ggplot2::facet_wrap(stats::as.formula(paste("~", facet_col)), scales = "free_y")
+  if (nrow(stat_tbl) > 0) {
+    p <- p + ggpubr::stat_pvalue_manual(
+      stat_tbl,
+      label = "label",
+      hide.ns = !show_ns,
+      tip.length = 0.01,
+      bracket.size = 0.35,
+      size = 2.8
+    ) +
+      ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.28)))
+  }
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+prepare_enrich_df <- function(enrich_result, show_category = 15) {
+  if (is.null(enrich_result)) return(data.frame())
+  df <- as.data.frame(enrich_result)
+  if (nrow(df) == 0) return(df)
+  df <- df[order(df$p.adjust, df$pvalue), , drop = FALSE]
+  df <- utils::head(df, show_category)
+  df$Description_wrapped <- factor(wrap_term_labels(df$Description), levels = rev(wrap_term_labels(df$Description)))
+  if ("GeneRatio" %in% colnames(df)) {
+    df$GeneRatioNumeric <- vapply(strsplit(as.character(df$GeneRatio), "/"), function(z) as.numeric(z[1]) / as.numeric(z[2]), numeric(1))
+  } else {
+    df$GeneRatioNumeric <- df$Count / max(df$Count, na.rm = TRUE)
+  }
+  df$log10_padj <- -log10(pmax(df$p.adjust, .Machine$double.xmin))
+  df
+}
+
 plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 15, width = 8, height = 10) {
   p <- enrichplot::dotplot(enrich_result, showCategory = show_category, title = title) +
-    theme_publication(base_size = 10)
+    ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 48)) +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 9))
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_category = 15, width = 8, height = 7) {
+  df <- prepare_enrich_df(enrich_result, show_category)
+  if (nrow(df) == 0) return(invisible(NULL))
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = log10_padj, y = Description_wrapped)) +
+    ggplot2::geom_col(ggplot2::aes(fill = Count), width = 0.72, color = "grey25", linewidth = 0.2) +
+    ggplot2::geom_text(ggplot2::aes(label = Count), hjust = -0.18, size = 3.2) +
+    ggplot2::scale_fill_gradient(low = "#9ecae1", high = "#cb181d", name = "Genes") +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.12))) +
+    ggplot2::labs(x = "-log10(adjusted P)", y = NULL, title = title) +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 9), legend.position = "right")
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filename, title,
+                                                  show_category = 10, width = 9, height = 8) {
+  up_df <- prepare_enrich_df(up_result, show_category)
+  down_df <- prepare_enrich_df(down_result, show_category)
+  if (nrow(up_df) > 0) up_df$Direction <- "UP"
+  if (nrow(down_df) > 0) down_df$Direction <- "DOWN"
+  df <- dplyr::bind_rows(up_df, down_df)
+  if (nrow(df) == 0) return(invisible(NULL))
+  df$SignedScore <- ifelse(df$Direction == "UP", df$log10_padj, -df$log10_padj)
+  df$Term <- factor(df$Description_wrapped, levels = unique(df$Description_wrapped[order(df$SignedScore)]))
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = SignedScore, y = Term, fill = Direction)) +
+    ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "grey35") +
+    ggplot2::geom_col(width = 0.72, color = "grey25", linewidth = 0.2) +
+    ggplot2::scale_fill_manual(values = c("UP" = "#d6604d", "DOWN" = "#4393c3")) +
+    ggplot2::labs(x = "Signed -log10(adjusted P)", y = NULL, title = title) +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8.5), legend.position = "top")
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+plot_enrich_network_pdf <- function(enrich_result, prefix, show_category = 8) {
+  if (is.null(enrich_result) || nrow(as.data.frame(enrich_result)) == 0) return(invisible(NULL))
+  try({
+    p_cnet <- enrichplot::cnetplot(enrich_result, showCategory = show_category, circular = FALSE, colorEdge = TRUE) +
+      ggplot2::ggtitle("Gene-term network") +
+      theme_publication(base_size = 9)
+    save_pdf_plot(p_cnet, paste0(prefix, "_cnetplot.pdf"), width = 10, height = 8)
+  }, silent = TRUE)
+  try({
+    sim_obj <- enrichplot::pairwise_termsim(enrich_result)
+    p_emap <- enrichplot::emapplot(sim_obj, showCategory = show_category) +
+      ggplot2::ggtitle("Term similarity network") +
+      theme_publication(base_size = 9)
+    save_pdf_plot(p_emap, paste0(prefix, "_emapplot.pdf"), width = 9, height = 8)
+  }, silent = TRUE)
+  invisible(TRUE)
+}
+
+plot_enrich_suite_pdf <- function(enrich_result, prefix, title_prefix, show_category = 15) {
+  if (is.null(enrich_result) || nrow(as.data.frame(enrich_result)) == 0) return(invisible(NULL))
+  plot_enrich_dotplot(enrich_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"), show_category = show_category)
+  plot_enrich_barplot_pdf(enrich_result, paste0(prefix, "_barplot.pdf"), paste(title_prefix, "Top terms"), show_category = show_category)
+  plot_enrich_network_pdf(enrich_result, prefix, show_category = min(8, show_category))
+  invisible(TRUE)
+}
+
+plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, show_category = 10,
+                                            include_all = TRUE, width = 10, height = 12) {
+  if (is.null(compare_result) || nrow(as.data.frame(compare_result)) == 0) return(invisible(NULL))
+  p <- enrichplot::dotplot(compare_result, showCategory = show_category, includeAll = include_all, title = title) +
+    ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 48)) +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8.5))
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 8, height = 8) {
+  df <- as.data.frame(gsea_result)
+  if (nrow(df) == 0 || !"NES" %in% colnames(df)) return(invisible(NULL))
+  df <- df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
+  df <- utils::head(df, show_category)
+  df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
+  wrapped_terms <- wrap_term_labels(df$Description)
+  df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = NES, y = Description_wrapped, fill = Direction)) +
+    ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "grey35") +
+    ggplot2::geom_col(width = 0.72, color = "grey25", linewidth = 0.2) +
+    ggplot2::scale_fill_manual(values = c("Activated" = "#d6604d", "Suppressed" = "#4393c3")) +
+    ggplot2::labs(x = "Normalized enrichment score (NES)", y = NULL, title = title) +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8.5), legend.position = "top")
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
@@ -223,6 +491,7 @@ plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 
 plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category = 15) {
   if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) return(invisible(NULL))
   plot_enrich_dotplot(gsea_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"), show_category = show_category)
+  plot_gsea_nes_barplot_pdf(gsea_result, paste0(prefix, "_NES_barplot.pdf"), paste(title_prefix, "NES"), show_category = show_category)
   try({
     p_ridge <- enrichplot::ridgeplot(gsea_result, showCategory = show_category) +
       ggplot2::labs(title = paste(title_prefix, "Ridgeplot")) +
