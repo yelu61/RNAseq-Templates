@@ -11,7 +11,6 @@ notebooks/
   RNAseq_General.ipynb
   RNAseq_TME_Deconvolution_Template.ipynb
   RNAseq_WGCNA_Template.ipynb
-  RNAseq_Survival_Mutation_Template.ipynb
 RNAseq_lib/
   io_utils.R
   deg_utils.R
@@ -53,6 +52,7 @@ All major visualizations are saved as editable PDF files under `3-Visualization/
 - duplicate gene symbol handling
 - low-count filtering based on the smallest group size
 - DESeq2 differential expression with `lfcShrink(type = "ashr")`
+- full all-gene DESeq2 result tables preserving raw and shrunken log2FC
 - multi-threshold DEG outputs with `THRESHOLD_GRID`
 - PCA and sample distance QC
 - volcano plots and annotated DEG heatmaps
@@ -68,6 +68,8 @@ The general notebook supports threshold grids such as:
 
 ```r
 DEG_PVALUE_COLUMN <- "padj" # "padj" recommended; use "pvalue" only for exploratory screening
+DEG_LFC_COLUMN <- "log2FoldChange_shrunken" # DEG thresholding and volcano plots
+GSEA_RANK_COLUMN <- "stat" # recommended for preranked GSEA
 THRESHOLD_GRID <- data.frame(
   name     = c("strict", "standard", "loose"),
   p_cutoff = c(0.01, 0.05, 0.10),
@@ -79,6 +81,7 @@ DEFAULT_THRESHOLD <- "standard"
 
 Multi-threshold output applies to:
 
+- full all-gene result tables under `1-DEG/all_genes/` are saved once per comparison and are not threshold-filtered
 - DEG result tables
 - DEG count summaries
 - GO ORA
@@ -86,13 +89,12 @@ Multi-threshold output applies to:
 - ORA summary plots
 - threshold-specific ORA PDFs under `3-Visualization/<threshold>/`
 
-GSEA is intentionally not repeated by DEG threshold because it uses the full ranked gene list.
+GSEA is intentionally not repeated by DEG threshold because it uses the full ranked gene list. The default rank is the DESeq2 Wald statistic (`stat`), while DEG calls and volcano plots default to shrunken log2FC.
 
 ## Topic Templates
 
 - `RNAseq_TME_Deconvolution_Template.ipynb`: ssGSEA immune/stromal signatures, optional ESTIMATE, optional CIBERSORT skeleton, group comparisons, heatmaps.
 - `RNAseq_WGCNA_Template.ipynb`: expression filtering, sample QC, soft-threshold selection, module detection, module-trait correlation, hub gene export.
-- `RNAseq_Survival_Mutation_Template.ipynb`: target gene/signature survival analysis, KM plots, Cox models, optional maftools MAF overview.
 
 ## GitHub Sync
 

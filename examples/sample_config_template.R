@@ -21,6 +21,8 @@ COMPARISONS <- list(
 )
 
 DEG_PVALUE_COLUMN <- "padj" # "padj" recommended; use "pvalue" only for exploratory screening
+DEG_LFC_COLUMN <- "log2FoldChange_shrunken" # Recommended for DEG thresholding and volcano plots
+GSEA_RANK_COLUMN <- "stat" # Recommended for preranked GSEA; alternatives: DEG_LFC_COLUMN or "log2FoldChange_raw"
 THRESHOLD_GRID <- data.frame(
   name = c("strict", "standard", "loose"),
   p_cutoff = c(0.01, 0.05, 0.10),

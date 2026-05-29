@@ -185,27 +185,28 @@ plot_deg_summary_pdf <- function(deg_summary, filename) {
   p
 }
 
-plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, filename, pvalue_column = "padj") {
+plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, filename, pvalue_column = "padj", lfc_column = "log2FoldChange") {
   validate_pvalue_column(res_df, pvalue_column)
-  res <- res_df[!is.na(res_df[[pvalue_column]]), ]
+  validate_lfc_column(res_df, lfc_column)
+  res <- res_df[!is.na(res_df[[pvalue_column]]) & !is.na(res_df[[lfc_column]]), ]
   top_genes <- res |>
-    dplyr::filter(.data[[pvalue_column]] < pvalue_thresh, abs(log2FoldChange) > log2fc_thresh) |>
+    dplyr::filter(.data[[pvalue_column]] < pvalue_thresh, abs(.data[[lfc_column]]) > log2fc_thresh) |>
     dplyr::arrange(.data[[pvalue_column]]) |>
     utils::head(15) |>
     dplyr::pull(gene_name)
 
   keyvals <- rep("darkgrey", nrow(res))
   names(keyvals) <- rep("Not-significant", nrow(res))
-  keyvals[res$log2FoldChange > log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "#d6604d"
-  names(keyvals)[res$log2FoldChange > log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "Up-regulated"
-  keyvals[res$log2FoldChange < -log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "#4393c3"
-  names(keyvals)[res$log2FoldChange < -log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "Down-regulated"
-  max_fc <- max(abs(res$log2FoldChange), na.rm = TRUE)
+  keyvals[res[[lfc_column]] > log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "#d6604d"
+  names(keyvals)[res[[lfc_column]] > log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "Up-regulated"
+  keyvals[res[[lfc_column]] < -log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "#4393c3"
+  names(keyvals)[res[[lfc_column]] < -log2fc_thresh & res[[pvalue_column]] < pvalue_thresh] <- "Down-regulated"
+  max_fc <- max(abs(res[[lfc_column]]), na.rm = TRUE)
 
   p <- EnhancedVolcano::EnhancedVolcano(
     res,
     lab = res$gene_name,
-    x = "log2FoldChange",
+    x = lfc_column,
     y = pvalue_column,
     selectLab = top_genes,
     max.overlaps = 30,
