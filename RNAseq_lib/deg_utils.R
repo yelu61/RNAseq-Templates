@@ -200,6 +200,51 @@ write_deg_threshold_outputs <- function(deg_by_threshold, outdir = "1-DEG", thre
   summary_df
 }
 
+summarize_lfc_strategies <- function(res_list, threshold_grid, pvalue_column = "padj",
+                                     lfc_columns = c("log2FoldChange_raw", "log2FoldChange_shrunken")) {
+  rows <- list()
+  for (comp_name in names(res_list)) {
+    res <- res_list[[comp_name]]
+    validate_pvalue_column(res, pvalue_column)
+    for (lfc_column in intersect(lfc_columns, colnames(res))) {
+      validate_lfc_column(res, lfc_column)
+      for (i in seq_len(nrow(threshold_grid))) {
+        th <- threshold_grid[i, ]
+        marked <- mark_deg_by_threshold(
+          res,
+          pvalue_thresh = th$p_cutoff,
+          log2fc_thresh = th$log2fc,
+          pvalue_column = pvalue_column,
+          lfc_column = lfc_column
+        )
+        rows[[length(rows) + 1]] <- data.frame(
+          Threshold = th$name,
+          Comparison = comp_name,
+          pvalue_column = pvalue_column,
+          p_cutoff = th$p_cutoff,
+          lfc_column = lfc_column,
+          lfc_strategy = sub("^log2FoldChange_", "", lfc_column),
+          log2fc_cutoff = th$log2fc,
+          UP = sum(marked$significance == "Up", na.rm = TRUE),
+          DOWN = sum(marked$significance == "Down", na.rm = TRUE),
+          Total = sum(marked$significance != "Not_Sig", na.rm = TRUE),
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+  dplyr::bind_rows(rows)
+}
+
+write_lfc_strategy_summary <- function(res_list, threshold_grid, outdir = "1-DEG",
+                                       pvalue_column = "padj",
+                                       lfc_columns = c("log2FoldChange_raw", "log2FoldChange_shrunken")) {
+  dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+  summary_df <- summarize_lfc_strategies(res_list, threshold_grid, pvalue_column, lfc_columns)
+  utils::write.csv(summary_df, file.path(outdir, "DEG_lfc_strategy_summary.csv"), row.names = FALSE)
+  summary_df
+}
+
 summarize_deg_diagnostics <- function(res_list, threshold_grid, pvalue_columns = c("pvalue", "padj"), lfc_columns = c("log2FoldChange_raw", "log2FoldChange_shrunken")) {
   rows <- list()
   for (comp_name in names(res_list)) {

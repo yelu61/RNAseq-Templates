@@ -185,6 +185,31 @@ plot_deg_summary_pdf <- function(deg_summary, filename) {
   p
 }
 
+plot_lfc_strategy_summary_pdf <- function(lfc_strategy_summary, filename) {
+  if (is.null(lfc_strategy_summary) || nrow(lfc_strategy_summary) == 0) return(invisible(NULL))
+  strategy_levels <- unique(lfc_strategy_summary$lfc_strategy)
+  lfc_strategy_summary$lfc_strategy <- factor(lfc_strategy_summary$lfc_strategy, levels = strategy_levels)
+  p <- ggplot2::ggplot(
+    lfc_strategy_summary,
+    ggplot2::aes(x = Comparison, y = Total, fill = lfc_strategy)
+  ) +
+    ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.75), width = 0.68) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = Total),
+      position = ggplot2::position_dodge(width = 0.75),
+      vjust = -0.45,
+      size = 3.1,
+      fontface = "bold"
+    ) +
+    ggplot2::facet_wrap(~ Threshold, scales = "free_x") +
+    ggplot2::scale_fill_manual(values = c("raw" = "#7AA6C2", "shrunken" = "#D9896A"), drop = FALSE) +
+    ggplot2::labs(x = NULL, y = "Number of DEGs", fill = "LFC strategy", title = "Raw vs Shrunken LFC DEG Counts") +
+    theme_publication(base_size = 10) +
+    ggplot2::theme(legend.position = "top", axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+  save_pdf_plot(p, filename, width = max(8, 3 * length(unique(lfc_strategy_summary$Threshold))), height = 5)
+  p
+}
+
 plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, filename, pvalue_column = "padj", lfc_column = "log2FoldChange") {
   validate_pvalue_column(res_df, pvalue_column)
   validate_lfc_column(res_df, lfc_column)

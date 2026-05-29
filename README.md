@@ -68,8 +68,8 @@ The general notebook supports threshold grids such as:
 
 ```r
 DEG_PVALUE_COLUMN <- "padj" # "padj" recommended; use "pvalue" only for exploratory screening
-DEG_LFC_COLUMN <- "log2FoldChange_shrunken" # DEG thresholding and volcano plots
-GSEA_RANK_COLUMN <- "stat" # recommended for preranked GSEA
+DEG_LFC_COLUMN <- "log2FoldChange_shrunken" # DEG statistics/volcano/heatmap/ORA
+GSEA_RANK_COLUMN <- "stat" # recommended for preranked GSEA; independent of DEG_LFC_COLUMN
 THRESHOLD_GRID <- data.frame(
   name     = c("strict", "standard", "loose"),
   p_cutoff = c(0.01, 0.05, 0.10),
@@ -82,14 +82,15 @@ DEFAULT_THRESHOLD <- "standard"
 Multi-threshold output applies to:
 
 - full all-gene result tables under `1-DEG/all_genes/` are saved once per comparison and are not threshold-filtered
-- DEG result tables
-- DEG count summaries
+- DEG result tables using the selected `DEG_LFC_COLUMN`
+- DEG count summaries using the selected `DEG_LFC_COLUMN`
+- raw-vs-shrunken DEG count comparison in `1-DEG/DEG_lfc_strategy_summary.csv`
 - GO ORA
 - KEGG ORA
 - ORA summary plots
 - threshold-specific ORA PDFs under `3-Visualization/<threshold>/`
 
-GSEA is intentionally not repeated by DEG threshold because it uses the full ranked gene list. The default rank is the DESeq2 Wald statistic (`stat`), while DEG calls and volcano plots default to shrunken log2FC.
+GSEA is intentionally not repeated by DEG threshold because it uses the full ranked gene list. The default rank is the DESeq2 Wald statistic (`stat`), while DEG calls, volcano plots, DEG heatmaps, ORA, and compareCluster follow the selected `DEG_LFC_COLUMN`.
 
 ## Topic Templates
 
