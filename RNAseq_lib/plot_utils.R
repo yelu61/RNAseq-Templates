@@ -1,6 +1,6 @@
 # Plotting helpers for bulk RNA-seq templates. All helpers save editable PDFs.
 
-theme_publication <- function(base_size = 12, base_family = "Arial") {
+theme_publication <- function(base_size = 12, base_family = "sans") {
   ggplot2::theme_bw(base_size = base_size, base_family = base_family) +
     ggplot2::theme(
       panel.grid.major = ggplot2::element_blank(),
@@ -148,7 +148,7 @@ plot_count_distribution_pdf <- function(count_data, filename, max_points_per_sam
   if (!is.null(max_points_per_sample)) {
     count_long <- count_long |>
       dplyr::group_by(sample) |>
-      dplyr::slice_sample(n = min(dplyr::n(), max_points_per_sample)) |>
+      dplyr::slice_sample(n = max_points_per_sample) |>
       dplyr::ungroup()
   }
   p <- ggplot2::ggplot(count_long, ggplot2::aes(x = sample, y = log10_count)) +
@@ -272,10 +272,18 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     cluster_column_slices = FALSE,
     show_row_names = show_row_names,
     show_column_names = show_column_names,
+    show_row_dend = FALSE,
+    show_column_dend = FALSE,
     row_names_gp = grid::gpar(fontsize = row_font_size),
     column_names_gp = grid::gpar(fontsize = column_font_size),
     column_title = title,
-    use_raster = nrow(plot_mat) > 500
+    use_raster = nrow(plot_mat) > 500,
+    show_heatmap_legend = TRUE,
+        heatmap_legend_param = list(
+          title = expression(~'Z-score of VST'),
+          title_gp = gpar(col = "black", cex = 0.75),
+          title_position = "leftcenter-rot"
+        )
   )
   ComplexHeatmap::draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right")
   grDevices::dev.off()
