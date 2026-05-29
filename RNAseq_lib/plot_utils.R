@@ -680,21 +680,48 @@ plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, sho
   p
 }
 
-plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 8, height = 8) {
+plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 9.5, height = 8) {
   df <- as.data.frame(gsea_result)
   if (nrow(df) == 0 || !"NES" %in% colnames(df)) return(invisible(NULL))
+  if (!"p.adjust" %in% colnames(df)) df$p.adjust <- df$pvalue
   df <- df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
   df <- utils::head(df, show_category)
   df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
-  wrapped_terms <- wrap_term_labels(df$Description)
+  df$log10_padj <- -log10(pmax(df$p.adjust, .Machine$double.xmin))
+  wrapped_terms <- wrap_term_labels(df$Description, width = 54)
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
+  max_nes <- max(abs(df$NES), na.rm = TRUE)
+  df$TextX <- ifelse(df$NES >= 0, -max_nes * 0.035, max_nes * 0.035)
+  df$TextHjust <- ifelse(df$NES >= 0, 1, 0)
+  df$PointX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
+
   p <- ggplot2::ggplot(df, ggplot2::aes(x = NES, y = Description_wrapped, fill = Direction)) +
-    ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "grey35") +
-    ggplot2::geom_col(width = 0.72, color = "grey25", linewidth = 0.2) +
-    ggplot2::scale_fill_manual(values = c("Activated" = "#d6604d", "Suppressed" = "#4393c3")) +
+    ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#2F2F2F") +
+    ggplot2::geom_col(width = 0.76, alpha = 0.88, color = "white", linewidth = 0.25) +
+    ggplot2::geom_text(
+      ggplot2::aes(x = TextX, label = wrap_term_labels(Description, width = 54), hjust = TextHjust),
+      size = 3.8, color = "#1F1F1F", lineheight = 0.9
+    ) +
+    ggplot2::geom_point(
+      ggplot2::aes(x = PointX, size = log10_padj),
+      shape = 21, fill = "white", color = "#222222", stroke = 0.25,
+      inherit.aes = TRUE
+    ) +
+    ggplot2::scale_fill_manual(values = c("Activated" = "#C8473E", "Suppressed" = "#3778A8")) +
+    ggplot2::scale_size_continuous(name = "-log10(FDR)", range = c(2.2, 5.2)) +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.14, 0.14))) +
     ggplot2::labs(x = "Normalized enrichment score (NES)", y = NULL, title = title) +
-    theme_publication(base_size = 10) +
-    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8.5), legend.position = "top")
+    ggplot2::theme_classic(base_size = 12, base_family = "Times") +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.title = ggplot2::element_text(size = 12, face = "bold"),
+      axis.text.x = ggplot2::element_text(size = 11, color = "black"),
+      plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+      legend.position = "right",
+      legend.title = ggplot2::element_text(size = 11, face = "bold"),
+      legend.text = ggplot2::element_text(size = 10)
+    )
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
@@ -706,13 +733,40 @@ plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category
   try({
     p_ridge <- enrichplot::ridgeplot(gsea_result, showCategory = show_category) +
       ggplot2::labs(title = paste(title_prefix, "Ridgeplot")) +
-      theme_publication(base_size = 10)
-    save_pdf_plot(p_ridge, paste0(prefix, "_ridgeplot.pdf"), width = 9, height = 10)
+      ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 46)) +
+      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
+      ggplot2::theme(
+        axis.title = ggplot2::element_text(size = 12, face = "bold"),
+        axis.text = ggplot2::element_text(color = "black"),
+        plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+        legend.position = "right"
+      )
+    save_pdf_plot(p_ridge, paste0(prefix, "_ridgeplot.pdf"), width = 9.5, height = 10)
   }, silent = TRUE)
-  top_ids <- head(as.data.frame(gsea_result)$ID, 3)
+  gsea_df <- as.data.frame(gsea_result)
+  if ("p.adjust" %in% colnames(gsea_df)) {
+    gsea_df <- gsea_df[order(gsea_df$p.adjust, -abs(gsea_df$NES)), , drop = FALSE]
+  }
+  top_ids <- head(gsea_df$ID, 3)
   if (length(top_ids) > 0) {
-    p_running <- enrichplot::gseaplot2(gsea_result, geneSetID = top_ids, title = paste(title_prefix, "Top terms"))
+    p_running <- enrichplot::gseaplot2(gsea_result, geneSetID = top_ids, title = paste(title_prefix, "Top terms")) +
+      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
     save_pdf_plot(p_running, paste0(prefix, "_running.pdf"), width = 9, height = 7)
+  }
+  top_up <- head(gsea_df$ID[gsea_df$NES > 0], 3)
+  top_down <- head(gsea_df$ID[gsea_df$NES < 0], 3)
+  if (length(top_up) > 0) {
+    p_up <- enrichplot::gseaplot2(gsea_result, geneSetID = top_up, title = paste(title_prefix, "Top activated terms")) +
+      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
+    save_pdf_plot(p_up, paste0(prefix, "_running_top_activated.pdf"), width = 9, height = 7)
+  }
+  if (length(top_down) > 0) {
+    p_down <- enrichplot::gseaplot2(gsea_result, geneSetID = top_down, title = paste(title_prefix, "Top suppressed terms")) +
+      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
+    save_pdf_plot(p_down, paste0(prefix, "_running_top_suppressed.pdf"), width = 9, height = 7)
   }
   invisible(TRUE)
 }
