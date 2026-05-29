@@ -405,6 +405,49 @@ plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_c
   p
 }
 
+plot_group_violin_boxplot_pdf <- function(data, value_col, group_col, filename,
+                                          comparisons = NULL, method = "t.test",
+                                          p_adjust_method = "BH", title = NULL,
+                                          ylab = NULL, group_colors = NULL,
+                                          show_ns = FALSE, width = 5.8, height = 6) {
+  plot_data <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
+  plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(data[[group_col]])))
+  stat_tbl <- pairwise_effect_table(
+    plot_data, value_col = value_col, group_col = group_col,
+    comparisons = comparisons, method = method, p_adjust_method = p_adjust_method
+  )
+
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
+    ggplot2::geom_violin(trim = FALSE, width = 0.88, alpha = 0.34, color = NA) +
+    ggplot2::geom_boxplot(width = 0.22, outlier.shape = NA, fill = "white", alpha = 0.82, linewidth = 0.42, color = "#2F2F2F") +
+    ggplot2::stat_summary(fun = stats::median, geom = "point", shape = 95, size = 7, color = "#2F2F2F") +
+    ggplot2::geom_jitter(width = 0.08, size = 2.2, shape = 21, color = "#222222", stroke = 0.25, alpha = 0.9) +
+    ggplot2::labs(title = title, x = NULL, y = ylab %||% value_col) +
+    theme_publication(base_size = 12) +
+    ggplot2::theme(
+      legend.position = "none",
+      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 14),
+      panel.grid.major.y = ggplot2::element_line(color = "#E7E7E7", linewidth = 0.25),
+      axis.text.x = ggplot2::element_text(angle = 25, hjust = 1, vjust = 1)
+    )
+  if (!is.null(group_colors)) p <- p + ggplot2::scale_fill_manual(values = group_colors)
+  if (nrow(stat_tbl) > 0) {
+    p <- p + ggpubr::stat_pvalue_manual(
+      stat_tbl,
+      label = "label",
+      hide.ns = !show_ns,
+      tip.length = 0.01,
+      bracket.size = 0.35,
+      size = 3
+    ) +
+      ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.07, 0.30)))
+  } else {
+    p <- p + ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.07, 0.12)))
+  }
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
 sem_upper <- function(x) mean(x, na.rm = TRUE) + stats::sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
 sem_lower <- function(x) mean(x, na.rm = TRUE) - stats::sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
 
