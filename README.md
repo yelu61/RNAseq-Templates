@@ -56,9 +56,10 @@ All major visualizations are saved as editable PDF files under `3-Visualization/
 - multi-threshold DEG outputs with `THRESHOLD_GRID`
 - PCA and sample distance QC
 - volcano plots and annotated DEG heatmaps
+- key-gene and custom gene-set heatmaps
 - GO/KEGG ORA with expressed-gene background, including dotplot, barplot, UP/DOWN bidirectional barplot, and optional cnetplot/emapplot
 - GSEA GO/KEGG from full ranked gene lists, including dotplot, NES barplot, ridgeplot, and running enrichment curves
-- GSVA for custom gene sets with heatmap and pairwise boxplot statistics
+- GSVA for custom gene sets with heatmap, combined boxplot, and per-signature pairwise boxplot PDFs
 - single-gene expression plots with pairwise adjusted P values and mean-difference effect labels
 - optional DoRothEA/VIPER TF activity analysis
 
