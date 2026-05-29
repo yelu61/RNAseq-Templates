@@ -44,6 +44,16 @@ wrap_term_labels <- function(x, width = 45) {
   vapply(x, function(s) paste(strwrap(s, width = width), collapse = "\n"), character(1))
 }
 
+parse_ratio_numeric <- function(x) {
+  vapply(strsplit(as.character(x), "/"), function(z) {
+    if (length(z) != 2) return(NA_real_)
+    numerator <- suppressWarnings(as.numeric(z[1]))
+    denominator <- suppressWarnings(as.numeric(z[2]))
+    if (!is.finite(numerator) || !is.finite(denominator) || denominator == 0) return(NA_real_)
+    numerator / denominator
+  }, numeric(1))
+}
+
 zscore_rows <- function(mat, cap = 2) {
   mat <- as.matrix(mat)
   z <- t(scale(t(mat)))
@@ -518,11 +528,20 @@ prepare_enrich_df <- function(enrich_result, show_category = 15) {
   df <- utils::head(df, show_category)
   df$Description_wrapped <- factor(wrap_term_labels(df$Description), levels = rev(wrap_term_labels(df$Description)))
   if ("GeneRatio" %in% colnames(df)) {
-    df$GeneRatioNumeric <- vapply(strsplit(as.character(df$GeneRatio), "/"), function(z) as.numeric(z[1]) / as.numeric(z[2]), numeric(1))
+    df$GeneRatioNumeric <- parse_ratio_numeric(df$GeneRatio)
   } else {
     df$GeneRatioNumeric <- df$Count / max(df$Count, na.rm = TRUE)
   }
+  if (!"FoldEnrichment" %in% colnames(df)) {
+    if (all(c("GeneRatio", "BgRatio") %in% colnames(df))) {
+      bg_ratio <- parse_ratio_numeric(df$BgRatio)
+      df$FoldEnrichment <- df$GeneRatioNumeric / bg_ratio
+    } else {
+      df$FoldEnrichment <- df$GeneRatioNumeric
+    }
+  }
   df$log10_padj <- -log10(pmax(df$p.adjust, .Machine$double.xmin))
+  df$log10_pvalue <- -log10(pmax(df$pvalue, .Machine$double.xmin))
   df
 }
 
@@ -535,38 +554,91 @@ plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 
   p
 }
 
-plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_category = 15, width = 8, height = 7) {
+plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_category = 20, width = 8.5, height = 6,
+                                    ontology = NULL, fill_by = c("pvalue", "padj")) {
+  fill_by <- match.arg(fill_by)
   df <- prepare_enrich_df(enrich_result, show_category)
+  if (!is.null(ontology) && "ONTOLOGY" %in% colnames(df)) df <- df[df$ONTOLOGY == ontology, , drop = FALSE]
   if (nrow(df) == 0) return(invisible(NULL))
-  p <- ggplot2::ggplot(df, ggplot2::aes(x = log10_padj, y = Description_wrapped)) +
-    ggplot2::geom_col(ggplot2::aes(fill = Count), width = 0.72, color = "grey25", linewidth = 0.2) +
-    ggplot2::geom_text(ggplot2::aes(label = Count), hjust = -0.18, size = 3.2) +
-    ggplot2::scale_fill_gradient(low = "#9ecae1", high = "#cb181d", name = "Genes") +
-    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.12))) +
-    ggplot2::labs(x = "-log10(adjusted P)", y = NULL, title = title) +
-    theme_publication(base_size = 10) +
-    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 9), legend.position = "right")
+  df <- df[order(df$FoldEnrichment, decreasing = TRUE), , drop = FALSE]
+  df <- utils::head(df, show_category)
+  df$Term <- factor(wrap_term_labels(df$Description, width = 55), levels = rev(wrap_term_labels(df$Description, width = 55)))
+  max_x <- max(df$FoldEnrichment, na.rm = TRUE)
+  label_x <- max_x * 0.015
+  df$TextX <- label_x
+  fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
+  fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = FoldEnrichment, y = Term, fill = .data[[fill_col]])) +
+    ggplot2::geom_col(width = 0.78, alpha = 0.78, color = "white", linewidth = 0.25) +
+    ggplot2::geom_text(
+      ggplot2::aes(x = TextX, label = wrap_term_labels(Description, width = 58)),
+      hjust = 0, size = 4.1, color = "#222222", lineheight = 0.92
+    ) +
+    ggplot2::scale_fill_distiller(palette = "RdPu", direction = 1, name = fill_name) +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.08))) +
+    ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
+    ggplot2::theme_classic(base_size = 12, base_family = "Times") +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.title = ggplot2::element_text(size = 12, face = "bold"),
+      axis.text.x = ggplot2::element_text(size = 11, color = "black"),
+      plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+      legend.title = ggplot2::element_text(size = 12, face = "bold"),
+      legend.text = ggplot2::element_text(size = 10)
+    )
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
 
 plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filename, title,
-                                                  show_category = 10, width = 9, height = 8) {
+                                                  show_category = 15, width = 16, height = 10,
+                                                  ontology = NULL, fill_by = c("pvalue", "padj")) {
+  fill_by <- match.arg(fill_by)
   up_df <- prepare_enrich_df(up_result, show_category)
   down_df <- prepare_enrich_df(down_result, show_category)
+  if (!is.null(ontology) && "ONTOLOGY" %in% colnames(up_df)) up_df <- up_df[up_df$ONTOLOGY == ontology, , drop = FALSE]
+  if (!is.null(ontology) && "ONTOLOGY" %in% colnames(down_df)) down_df <- down_df[down_df$ONTOLOGY == ontology, , drop = FALSE]
+  up_df <- utils::head(up_df[order(up_df$FoldEnrichment, decreasing = TRUE), , drop = FALSE], show_category)
+  down_df <- utils::head(down_df[order(down_df$FoldEnrichment, decreasing = TRUE), , drop = FALSE], show_category)
   if (nrow(up_df) > 0) up_df$Direction <- "UP"
   if (nrow(down_df) > 0) down_df$Direction <- "DOWN"
   df <- dplyr::bind_rows(up_df, down_df)
   if (nrow(df) == 0) return(invisible(NULL))
-  df$SignedScore <- ifelse(df$Direction == "UP", df$log10_padj, -df$log10_padj)
-  df$Term <- factor(df$Description_wrapped, levels = unique(df$Description_wrapped[order(df$SignedScore)]))
-  p <- ggplot2::ggplot(df, ggplot2::aes(x = SignedScore, y = Term, fill = Direction)) +
-    ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "grey35") +
-    ggplot2::geom_col(width = 0.72, color = "grey25", linewidth = 0.2) +
-    ggplot2::scale_fill_manual(values = c("UP" = "#d6604d", "DOWN" = "#4393c3")) +
-    ggplot2::labs(x = "Signed -log10(adjusted P)", y = NULL, title = title) +
-    theme_publication(base_size = 10) +
-    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8.5), legend.position = "top")
+  df$SignedFoldEnrichment <- ifelse(df$Direction == "UP", df$FoldEnrichment, -df$FoldEnrichment)
+  df <- df[order(df$Direction, abs(df$FoldEnrichment), decreasing = TRUE), , drop = FALSE]
+  df$Term <- factor(wrap_term_labels(df$Description, width = 52), levels = unique(wrap_term_labels(df$Description[order(df$SignedFoldEnrichment)], width = 52)))
+  max_x <- max(abs(df$SignedFoldEnrichment), na.rm = TRUE)
+  df$TextX <- ifelse(df$Direction == "UP", -max_x * 0.025, max_x * 0.025)
+  df$TextHjust <- ifelse(df$Direction == "UP", 1, 0)
+  fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
+  fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = SignedFoldEnrichment, y = Term, fill = .data[[fill_col]])) +
+    ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#333333") +
+    ggplot2::geom_col(width = 0.78, alpha = 0.78, color = "white", linewidth = 0.25) +
+    ggplot2::geom_text(
+      ggplot2::aes(x = TextX, label = wrap_term_labels(Description, width = 52), hjust = TextHjust),
+      size = 4.1, color = "#222222", lineheight = 0.92
+    ) +
+    ggplot2::scale_fill_distiller(palette = "PuOr", direction = -1, name = fill_name) +
+    ggplot2::scale_x_continuous(
+      labels = function(x) abs(x),
+      expand = ggplot2::expansion(mult = c(0.08, 0.08))
+    ) +
+    ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
+    ggplot2::theme_classic(base_size = 12, base_family = "Times") +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.title = ggplot2::element_text(size = 12, face = "bold"),
+      axis.text.x = ggplot2::element_text(size = 11, color = "black"),
+      plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+      legend.position = "right",
+      legend.title = ggplot2::element_text(size = 12, face = "bold"),
+      legend.text = ggplot2::element_text(size = 10)
+    )
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
