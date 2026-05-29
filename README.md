@@ -43,6 +43,15 @@ sessionInfo.txt
 
 All major visualizations are saved as editable PDF files under `3-Visualization/`. Threshold-specific ORA figures are written to `3-Visualization/<threshold>/`.
 
+`RNAseq_General.ipynb` also exports reusable intermediate files for topic notebooks:
+
+```text
+1-DEG/vsd_matrix.csv
+1-DEG/colData.csv
+```
+
+The WGCNA and TME templates default to these exports, so the usual workflow is: run the general notebook first, then copy/run a topic notebook in the same project folder.
+
 ## General Bulk RNA-seq Workflow
 
 `RNAseq_General.ipynb` includes:
@@ -58,9 +67,9 @@ All major visualizations are saved as editable PDF files under `3-Visualization/
 - volcano plots and annotated DEG heatmaps
 - key-gene and custom gene-set heatmaps
 - GO/KEGG ORA with expressed-gene background, including dotplot, barplot, UP/DOWN bidirectional barplot, and optional cnetplot/emapplot
-- GSEA GO/KEGG from full ranked gene lists, including dotplot, NES barplot, ridgeplot, and running enrichment curves
-- GSVA for custom gene sets with heatmap, combined boxplot, and per-signature pairwise boxplot PDFs
-- single-gene expression plots with pairwise adjusted P values and mean-difference effect labels
+- GSEA GO/KEGG from full ranked gene lists, including dotplot, journal-style NES barplot, ridgeplot, and top activated/suppressed running enrichment curves
+- GSVA for custom gene sets with heatmap, combined boxplot, and per-signature violin/box/jitter PDFs
+- single-gene expression plots with mean bar, SEM, sample points, and layered pairwise P values
 - optional DoRothEA/VIPER TF activity analysis
 
 ## Multi-threshold DEG + ORA

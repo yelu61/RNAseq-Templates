@@ -600,8 +600,12 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   down_df <- prepare_enrich_df(down_result, show_category)
   if (!is.null(ontology) && "ONTOLOGY" %in% colnames(up_df)) up_df <- up_df[up_df$ONTOLOGY == ontology, , drop = FALSE]
   if (!is.null(ontology) && "ONTOLOGY" %in% colnames(down_df)) down_df <- down_df[down_df$ONTOLOGY == ontology, , drop = FALSE]
-  up_df <- utils::head(up_df[order(up_df$FoldEnrichment, decreasing = TRUE), , drop = FALSE], show_category)
-  down_df <- utils::head(down_df[order(down_df$FoldEnrichment, decreasing = TRUE), , drop = FALSE], show_category)
+  if (nrow(up_df) > 0 && "FoldEnrichment" %in% colnames(up_df)) {
+    up_df <- utils::head(up_df[order(up_df$FoldEnrichment, decreasing = TRUE), , drop = FALSE], show_category)
+  }
+  if (nrow(down_df) > 0 && "FoldEnrichment" %in% colnames(down_df)) {
+    down_df <- utils::head(down_df[order(down_df$FoldEnrichment, decreasing = TRUE), , drop = FALSE], show_category)
+  }
   if (nrow(up_df) > 0) up_df$Direction <- "UP"
   if (nrow(down_df) > 0) down_df$Direction <- "DOWN"
   df <- dplyr::bind_rows(up_df, down_df)
@@ -691,8 +695,8 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
   wrapped_terms <- wrap_term_labels(df$Description, width = 54)
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
   max_nes <- max(abs(df$NES), na.rm = TRUE)
-  df$TextX <- ifelse(df$NES >= 0, -max_nes * 0.035, max_nes * 0.035)
-  df$TextHjust <- ifelse(df$NES >= 0, 1, 0)
+  df$TextX <- ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
+  df$TextHjust <- ifelse(df$NES >= 0, 0, 1)
   df$PointX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = NES, y = Description_wrapped, fill = Direction)) +
