@@ -405,6 +405,68 @@ plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_c
   p
 }
 
+sem_upper <- function(x) mean(x, na.rm = TRUE) + stats::sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
+sem_lower <- function(x) mean(x, na.rm = TRUE) - stats::sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
+
+plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
+                                   comparisons = NULL, method = "t.test",
+                                   title = NULL, ylab = NULL, group_colors = NULL,
+                                   show_ns = FALSE, width = 5.5, height = 6,
+                                   y_from_zero = TRUE) {
+  plot_data <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
+  plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(data[[group_col]])))
+  if (is.null(comparisons)) {
+    comparisons <- utils::combn(levels(plot_data[[group_col]]), 2, simplify = FALSE)
+  }
+
+  stat_tbl <- tryCatch(
+    ggpubr::compare_means(
+      stats::as.formula(paste(value_col, "~", group_col)),
+      data = plot_data,
+      method = method,
+      comparisons = comparisons
+    ),
+    error = function(e) data.frame()
+  )
+  if (nrow(stat_tbl) > 0) {
+    ymax <- max(plot_data[[value_col]], na.rm = TRUE)
+    ymin <- min(plot_data[[value_col]], na.rm = TRUE)
+    span <- ymax - ymin
+    if (!is.finite(span) || span == 0) span <- max(abs(plot_data[[value_col]]), na.rm = TRUE) * 0.1 + 1
+    stat_tbl$y.position <- ymax + span * (0.10 + (seq_len(nrow(stat_tbl)) - 1) * 0.12)
+  }
+
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
+    ggplot2::stat_summary(geom = "bar", fun = mean, width = 0.6, color = "white", alpha = 0.95) +
+    ggplot2::stat_summary(geom = "errorbar", fun.min = sem_lower, fun.max = sem_upper, width = 0.2, linewidth = 0.45, color = "black") +
+    ggplot2::geom_jitter(width = 0.12, size = 2.1, color = "black", alpha = 0.85, shape = 21, fill = "white") +
+    ggplot2::labs(title = title, x = NULL, y = ylab %||% value_col) +
+    ggplot2::theme_test(base_size = 13) +
+    ggplot2::theme(
+      legend.position = "none",
+      axis.text = ggplot2::element_text(color = "black"),
+      plot.title = ggplot2::element_text(hjust = 0.5, size = 15, face = "bold")
+    )
+  if (!is.null(group_colors)) p <- p + ggplot2::scale_fill_manual(values = group_colors)
+  if (nrow(stat_tbl) > 0) {
+    p <- p + ggpubr::stat_pvalue_manual(
+      stat_tbl,
+      label = "p.format",
+      y.position = "y.position",
+      hide.ns = !show_ns,
+      tip.length = 0.01,
+      bracket.size = 0.38
+    )
+  }
+  if (isTRUE(y_from_zero)) {
+    p <- p + ggplot2::scale_y_continuous(limits = c(0, NA), expand = ggplot2::expansion(mult = c(0, 0.15)))
+  } else {
+    p <- p + ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.18)))
+  }
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
 prepare_enrich_df <- function(enrich_result, show_category = 15) {
   if (is.null(enrich_result)) return(data.frame())
   df <- as.data.frame(enrich_result)
