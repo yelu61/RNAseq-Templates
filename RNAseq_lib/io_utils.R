@@ -2,9 +2,17 @@
 
 read_count_table <- function(input_file, input_format = c("tsv", "csv", "excel")) {
   input_format <- match.arg(input_format)
+  if (!file.exists(input_file)) {
+    stop("Input file not found: ", input_file,
+         "\nPlease check:\n",
+         "  1. The file path in INPUT_FILE is correct\n",
+         "  2. The file exists in the expected folder (e.g., ./0-Data/)\n",
+         "  3. The filename is spelled correctly, including extension")
+  }
   if (input_format == "excel") {
     if (!requireNamespace("openxlsx", quietly = TRUE)) {
-      stop("Package 'openxlsx' is required for Excel input.")
+      stop("Package 'openxlsx' is required for Excel input.\n",
+           "Run: install.packages('openxlsx')")
     }
     openxlsx::read.xlsx(input_file)
   } else if (input_format == "csv") {
@@ -59,17 +67,21 @@ detect_count_columns <- function(rawcount, gene_name_col, count_cols = NULL, ann
 
 validate_sample_design <- function(sample_names, groups, group_levels, comparisons, count_col_names) {
   if (length(sample_names) != length(count_col_names)) {
-    stop("SAMPLE_NAMES length (", length(sample_names), ") must equal count columns (", length(count_col_names), ").")
+    stop("SAMPLE_NAMES length (", length(sample_names), ") must equal count columns (", length(count_col_names), ").",
+         "\nPlease check that SAMPLE_NAMES has one name for every sample column in your count table.")
   }
   if (length(groups) != length(sample_names)) {
-    stop("GROUPS length (", length(groups), ") must equal SAMPLE_NAMES length (", length(sample_names), ").")
+    stop("GROUPS length (", length(groups), ") must equal SAMPLE_NAMES length (", length(sample_names), ").",
+         "\nPlease check that every sample has a group assignment.")
   }
   if (!all(groups %in% group_levels)) {
-    stop("GROUPS contains values not present in GROUP_LEVELS: ", paste(setdiff(unique(groups), group_levels), collapse = ", "))
+    stop("GROUPS contains values not present in GROUP_LEVELS: ", paste(setdiff(unique(groups), group_levels), collapse = ", "),
+         "\nPlease check that every value in GROUPS also appears in GROUP_LEVELS.")
   }
   comparison_groups <- unique(unlist(lapply(comparisons, function(x) x[2:3])))
   if (!all(comparison_groups %in% group_levels)) {
-    stop("COMPARISONS contains group names not present in GROUP_LEVELS: ", paste(setdiff(comparison_groups, group_levels), collapse = ", "))
+    stop("COMPARISONS contains group names not present in GROUP_LEVELS: ", paste(setdiff(comparison_groups, group_levels), collapse = ", "),
+         "\nPlease check that the second and third values in each COMPARISONS entry match names in GROUP_LEVELS.")
   }
   invisible(TRUE)
 }
@@ -155,13 +167,16 @@ build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_
   count_data[, count_col_names] <- lapply(count_data[, count_col_names, drop = FALSE], function(x) as.numeric(as.character(x)))
 
   if (anyNA(count_data[, count_col_names])) {
-    stop("Count columns contain non-numeric or missing values after conversion.")
+    stop("Count columns contain non-numeric or missing values after conversion.",
+         "\nPlease check that all count columns contain numeric values only.")
   }
   if (any(count_data[, count_col_names] < 0)) {
-    stop("Count matrix contains negative values.")
+    stop("Count matrix contains negative values.\n",
+         "RNA-seq counts must be >= 0.")
   }
   if (any(count_data[, count_col_names] %% 1 != 0)) {
-    stop("DESeq2 requires raw integer counts; non-integer values detected.")
+    stop("DESeq2 requires raw integer counts; non-integer values detected.",
+         "\nPlease make sure your input is raw count data, not TPM/FPKM/normalized values.")
   }
 
   count_data[, count_col_names] <- lapply(count_data[, count_col_names, drop = FALSE], as.integer)

@@ -26,10 +26,29 @@ RNAseq_lib/
   survival_utils.R
 examples/
   sample_config_template.R
+  demo_data/                    # demo count table and metadata
+  demo_RNAseq_General/          # pre-configured notebook ready to run
+GETTING_STARTED.md              # zero-programming-experience guide
 install_dependencies.R
 ```
 
 `RNAseq_TCGA_GEO_Template.ipynb` is now included. It supports both TCGAbiolinks-based TCGA download and local GEO/TCGA expression matrices, with Tumor vs Normal DEG, single-gene expression, survival KM curves, and ORA/GSEA. Public data mining can later be split into a separate `PublicData-Templates` repository if it grows further.
+
+## Quick Start (No Programming Experience Needed)
+
+1. Install **R** and **RStudio** ([instructions in GETTING_STARTED.md](GETTING_STARTED.md)).
+2. Install all analysis dependencies:
+   ```r
+   Rscript install_dependencies.R
+   ```
+3. Open the pre-configured demo notebook:
+   ```
+   examples/demo_RNAseq_General/RNAseq_General.ipynb
+   ```
+4. Click **Cell → Run All** and wait 2–5 minutes.
+5. Check the generated `1-DEG/`, `2-GSEA/`, and `3-Visualization/` folders.
+
+For a step-by-step guide, see [GETTING_STARTED.md](GETTING_STARTED.md).
 
 ## Recommended Usage
 

@@ -30,14 +30,24 @@ run_deseq2_model <- function(count_data, col_data, design_formula) {
 
 extract_deseq2_results <- function(dds, comparisons, condition_col = "condition", alpha = 0.05, shrink_type = "ashr") {
   res_list <- list()
+  if (length(comparisons) == 0) {
+    stop("COMPARISONS is empty.\n",
+         "Please define at least one comparison, e.g. COMPARISONS <- list(c('Treatment_vs_Control', 'Treatment', 'Control'))")
+  }
   for (comp in comparisons) {
+    if (length(comp) != 3) {
+      stop("Each COMPARISONS entry must have exactly 3 elements: c('comparison_name', 'treatment_group', 'control_group').")
+    }
     comp_name <- comp[1]
     treat <- comp[2]
     ctrl <- comp[3]
     message("Processing DESeq2 contrast: ", comp_name, " (", treat, " vs ", ctrl, ")")
 
     raw_res <- DESeq2::results(dds, contrast = c(condition_col, treat, ctrl), alpha = alpha)
-    raw_df <- as.data.frame(raw_res)
+    if (all(is.na(raw_res$pvalue))) {
+      warning("DESeq2 returned all NA p-values for comparison: ", comp_name,
+              "\nCommon causes: too few samples, all counts zero, or groups swapped.")
+    }
 
     out <- data.frame(
       baseMean = raw_df$baseMean,
