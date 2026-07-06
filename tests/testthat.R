@@ -1,0 +1,17 @@
+library(testthat)
+
+# Locate the helper library relative to the repository root.
+# When running tests interactively, fall back to the current working directory.
+repo_root <- tryCatch(
+  rprojroot::find_root(rprojroot::is_git_root),
+  error = function(e) getwd()
+)
+lib_dir <- file.path(repo_root, "RNAseq_lib")
+
+source(file.path(lib_dir, "plot_utils.R"))
+source(file.path(lib_dir, "io_utils.R"))
+source(file.path(lib_dir, "deg_utils.R"))
+source(file.path(lib_dir, "enrichment_utils.R"))
+
+# Run all tests under tests/testthat/
+test_dir(file.path(repo_root, "tests", "testthat"))
