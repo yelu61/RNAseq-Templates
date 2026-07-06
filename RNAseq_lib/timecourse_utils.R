@@ -160,10 +160,139 @@ run_mfuzz_cluster_ora <- function(cluster_df, org_db, universe = NULL,
   results
 }
 
-# Write cluster assignments and memberships to CSV.
+# Time-point vs baseline DESeq2.
+# Fits a single DESeq2 model and extracts contrasts for every non-baseline time point vs baseline.
+run_timepoint_vs_baseline_deseq2 <- function(count_data, col_data, time_col = "time",
+                                              baseline_time = NULL, condition_col = NULL,
+                                              subject_col = NULL, design_formula = NULL,
+                                              alpha = 0.05, shrink_type = "ashr") {
+  if (!requireNamespace("DESeq2", quietly = TRUE)) {
+    stop("Package 'DESeq2' is required for time-point DEG analysis.")
+  }
+  if (!time_col %in% colnames(col_data)) {
+    stop("time_col not found in col_data: ", time_col)
+  }
+
+  time_levels <- levels(factor(col_data[[time_col]]))
+  if (is.null(baseline_time)) {
+    baseline_time <- time_levels[1]
+    message("Using earliest time level as baseline: ", baseline_time)
+  }
+  if (!baseline_time %in% time_levels) {
+    stop("baseline_time ", baseline_time, " not found in time levels: ", paste(time_levels, collapse = ", "))
+  }
+  non_baseline <- setdiff(time_levels, baseline_time)
+  if (length(non_baseline) == 0) {
+    stop("Only one time level found; cannot compare time points vs baseline.")
+  }
+
+  col_data[[time_col]] <- factor(col_data[[time_col]], levels = time_levels)
+  if (!is.null(condition_col) && condition_col %in% colnames(col_data)) {
+    col_data[[condition_col]] <- factor(col_data[[condition_col]])
+  }
+  if (!is.null(subject_col) && subject_col %in% colnames(col_data)) {
+    col_data[[subject_col]] <- factor(col_data[[subject_col]])
+  }
+
+  if (is.null(design_formula)) {
+    if (!is.null(subject_col) && subject_col %in% colnames(col_data)) {
+      design_formula <- stats::as.formula(paste0("~ ", subject_col, " + ", time_col))
+      message("Using paired design formula: ", deparse(design_formula))
+    } else if (!is.null(condition_col) && condition_col %in% colnames(col_data)) {
+      design_formula <- stats::as.formula(paste0("~ ", condition_col, " + ", time_col))
+      message("Using design formula: ", deparse(design_formula))
+    } else {
+      design_formula <- stats::as.formula(paste0("~ ", time_col))
+      message("Using design formula: ", deparse(design_formula))
+    }
+  }
+
+  dds <- DESeq2::DESeqDataSetFromMatrix(
+    countData = count_data,
+    colData = col_data,
+    design = design_formula
+  )
+  dds <- DESeq2::DESeq(dds)
+
+  comparisons <- lapply(non_baseline, function(tp) {
+    c(paste0("time_", tp, "_vs_", baseline_time), tp, baseline_time)
+  })
+  res_list <- extract_deseq2_results(
+    dds = dds,
+    comparisons = comparisons,
+    condition_col = time_col,
+    alpha = alpha,
+    shrink_type = shrink_type
+  )
+  res_list
+}
+
+# Summarize DEG counts per time-point vs baseline.
+summarize_timepoint_deg <- function(res_list, padj_cutoff = 0.05, lfc_cutoff = 0.5,
+                                     pvalue_column = "padj", lfc_column = "log2FoldChange") {
+  rows <- lapply(names(res_list), function(comp_name) {
+    res <- res_list[[comp_name]]
+    up <- sum(!is.na(res[[pvalue_column]]) & res[[pvalue_column]] < padj_cutoff & res[[lfc_column]] > lfc_cutoff, na.rm = TRUE)
+    down <- sum(!is.na(res[[pvalue_column]]) & res[[pvalue_column]] < padj_cutoff & res[[lfc_column]] < -lfc_cutoff, na.rm = TRUE)
+    data.frame(Comparison = comp_name, UP = up, DOWN = down, Total = up + down, stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows)
+}
+
+# Write all-gene and threshold-specific time-point DEG results.
+write_timepoint_deg_results <- function(res_list, outdir,
+                                         threshold_grid = NULL,
+                                         pvalue_column = "padj", lfc_column = "log2FoldChange") {
+  dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+  write_all_gene_deg_results(res_list, outdir = outdir)
+  summary_df <- summarize_timepoint_deg(res_list, pvalue_column = pvalue_column, lfc_column = lfc_column)
+  utils::write.csv(summary_df, file.path(outdir, "Timepoint_DEG_summary.csv"), row.names = FALSE)
+
+  if (!is.null(threshold_grid)) {
+    deg_by_threshold <- build_deg_threshold_sets(
+      res_list,
+      threshold_grid,
+      pvalue_column = pvalue_column,
+      lfc_column = lfc_column
+    )
+    write_deg_threshold_outputs(
+      deg_by_threshold,
+      outdir = outdir,
+      threshold_grid = threshold_grid,
+      pvalue_column = pvalue_column,
+      lfc_column = lfc_column
+    )
+  }
+  invisible(summary_df)
+}
+
+# Plot time-point DEG summary barplot.
+plot_timepoint_deg_summary_pdf <- function(summary_df, filename,
+                                            width = 8, height = 6) {
+  if (is.null(summary_df) || nrow(summary_df) == 0) return(invisible(NULL))
+  df <- tidyr::pivot_longer(
+    summary_df,
+    cols = c("UP", "DOWN"),
+    names_to = "Direction",
+    values_to = "Count"
+  )
+  df$Direction <- factor(df$Direction, levels = c("UP", "DOWN"))
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = Comparison, y = Count, fill = Direction)) +
+    ggplot2::geom_col(position = "dodge", width = 0.7) +
+    ggplot2::scale_fill_manual(values = c("UP" = "#d6604d", "DOWN" = "#4393c3")) +
+    ggplot2::labs(x = NULL, y = "Number of DEGs", title = "Time-point vs Baseline DEGs") +
+    theme_publication(base_size = 12) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+# Write Mfuzz cluster assignments and memberships to CSV.
 write_mfuzz_cluster_table <- function(cluster_df, filename) {
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
   utils::write.csv(cluster_df, filename, row.names = FALSE)
+  invisible(filename)
 }
 
 # Summarize cluster sizes.
