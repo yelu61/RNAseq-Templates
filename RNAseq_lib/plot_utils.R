@@ -36,7 +36,8 @@ make_group_colors <- function(group_levels) {
 
 save_pdf_plot <- function(plot, filename, width = 7, height = 6) {
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  ggplot2::ggsave(filename, plot = plot, width = width, height = height, device = grDevices::cairo_pdf)
+  device <- if (capabilities("cairo")) grDevices::cairo_pdf else grDevices::pdf
+  ggplot2::ggsave(filename, plot = plot, width = width, height = height, device = device)
   invisible(filename)
 }
 
@@ -139,6 +140,7 @@ plot_sample_qc_pdf <- function(sample_qc, filename, group_colors = NULL) {
 plot_sample_correlation_pdf <- function(sample_qc, filename) {
   sample_cor <- attr(sample_qc, "sample_cor")
   if (is.null(sample_cor)) return(invisible(NULL))
+  diag(sample_cor) <- 1
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
   grDevices::pdf(filename, width = 7, height = 6)
   pheatmap::pheatmap(
@@ -317,7 +319,7 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     show_heatmap_legend = TRUE,
         heatmap_legend_param = list(
           title = expression(~'Z-score of VST'),
-          title_gp = gpar(col = "black", cex = 0.75),
+          title_gp = grid::gpar(col = "black", cex = 0.75),
           title_position = "leftcenter-rot"
         )
   )

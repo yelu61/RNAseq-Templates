@@ -145,7 +145,13 @@ apply_sample_exclusion <- function(count_data, col_data, sample_exclude = charac
 }
 
 build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_names, duplicate_report_file = NULL) {
-  count_data <- as.data.frame(rawcount[, c(gene_name_col, count_col_names)], check.names = FALSE)
+  rawcount <- as.data.frame(rawcount, check.names = FALSE)
+  if (!gene_name_col %in% colnames(rawcount)) {
+    stop("Gene name column not found: ", gene_name_col)
+  }
+  rawcount[[gene_name_col]] <- as.character(rawcount[[gene_name_col]])
+
+  count_data <- rawcount[, c(gene_name_col, count_col_names), drop = FALSE]
   count_data[, count_col_names] <- lapply(count_data[, count_col_names, drop = FALSE], function(x) as.numeric(as.character(x)))
 
   if (anyNA(count_data[, count_col_names])) {

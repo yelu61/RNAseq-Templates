@@ -320,3 +320,114 @@ ranked_gene_list <- function(res_df, rank_column = "stat") {
   gene_list <- gene_list[!is.na(gene_list)]
   sort(gene_list, decreasing = TRUE)
 }
+
+# DEG overlap visualization helpers.
+
+# Build a list of gene sets from DEG result tables.
+# res_list: named list of DEG data frames
+# direction: "sig" (both), "up", or "down"
+build_deg_gene_sets <- function(res_list, pvalue_thresh, log2fc_thresh,
+                                pvalue_column = "padj", lfc_column = "log2FoldChange",
+                                direction = "sig") {
+  sets <- list()
+  for (comp_name in names(res_list)) {
+    genes <- genes_for_enrichment(
+      res_list[[comp_name]], pvalue_thresh, log2fc_thresh,
+      pvalue_column = pvalue_column, lfc_column = lfc_column
+    )
+    selected <- genes[[direction]]
+    if (length(selected) > 0) {
+      sets[[comp_name]] <- selected
+    }
+  }
+  sets
+}
+
+# Build UpSet input data frame from a named list of gene sets.
+prepare_upset_df <- function(gene_sets) {
+  all_genes <- unique(unlist(gene_sets))
+  if (length(all_genes) == 0) return(NULL)
+  df <- as.data.frame(matrix(0, nrow = length(all_genes), ncol = length(gene_sets)))
+  rownames(df) <- all_genes
+  colnames(df) <- names(gene_sets)
+  for (set_name in names(gene_sets)) {
+    df[gene_sets[[set_name]], set_name] <- 1
+  }
+  df
+}
+
+# Plot UpSet diagram of DEG sets.
+plot_deg_upset_pdf <- function(gene_sets, filename, title = "DEG Set Overlaps",
+                               nintersects = 40, width = 12, height = 7) {
+  if (!requireNamespace("UpSetR", quietly = TRUE)) {
+    stop("Package 'UpSetR' is required for UpSet plots.")
+  }
+  upset_df <- prepare_upset_df(gene_sets)
+  if (is.null(upset_df) || nrow(upset_df) == 0) return(invisible(NULL))
+  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  grDevices::pdf(filename, width = width, height = height)
+  UpSetR::upset(
+    upset_df,
+    nsets = ncol(upset_df),
+    nintersects = nintersects,
+    order.by = c("freq", "degree"),
+    decreasing = c(TRUE, TRUE),
+    main.bar.color = "#4E79A7",
+    sets.bar.color = "#F28E2B",
+    sets.x.label = "Set size",
+    mainbar.y.label = "Intersection size",
+    text.scale = c(1.3, 1.3, 1, 1, 1.3, 1.3)
+  )
+  grDevices::dev.off()
+  invisible(filename)
+}
+
+# Compute pairwise Jaccard overlap matrix for a list of gene sets.
+jaccard_overlap_matrix <- function(gene_sets) {
+  set_names <- names(gene_sets)
+  n <- length(set_names)
+  mat <- matrix(NA_real_, nrow = n, ncol = n, dimnames = list(set_names, set_names))
+  for (i in seq_len(n)) {
+    for (j in seq_len(n)) {
+      a <- gene_sets[[i]]
+      b <- gene_sets[[j]]
+      union_len <- length(union(a, b))
+      mat[i, j] <- if (union_len == 0) 0 else length(intersect(a, b)) / union_len
+    }
+  }
+  mat
+}
+
+# Plot overlap heatmap of DEG sets.
+plot_deg_overlap_heatmap_pdf <- function(gene_sets, filename,
+                                         title = "Pairwise DEG Set Overlap (Jaccard)",
+                                         width = 8, height = 7) {
+  mat <- jaccard_overlap_matrix(gene_sets)
+  if (nrow(mat) == 0) return(invisible(NULL))
+  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  grDevices::pdf(filename, width = width, height = height)
+  pheatmap::pheatmap(
+    mat,
+    color = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(100),
+    display_numbers = TRUE,
+    number_format = "%.2f",
+    main = title,
+    cluster_rows = TRUE,
+    cluster_cols = TRUE
+  )
+  grDevices::dev.off()
+  invisible(mat)
+}
+
+# Extract genes shared by all sets or specific intersections.
+extract_intersection_genes <- function(gene_sets, set_names = NULL, mode = c("all", "any")) {
+  mode <- match.arg(mode)
+  if (is.null(set_names)) set_names <- names(gene_sets)
+  selected <- gene_sets[set_names]
+  if (length(selected) == 0) return(character(0))
+  if (mode == "all") {
+    Reduce(intersect, selected)
+  } else {
+    unique(unlist(selected))
+  }
+}

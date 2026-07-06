@@ -11,16 +11,25 @@ notebooks/
   RNAseq_General.ipynb
   RNAseq_TME_Deconvolution_Template.ipynb
   RNAseq_WGCNA_Template.ipynb
+  RNAseq_TCGA_GEO_Template.ipynb
+  RNAseq_limma_voom_Template.ipynb
+  RNAseq_TimeCourse_Template.ipynb
 RNAseq_lib/
   io_utils.R
   deg_utils.R
   enrichment_utils.R
   plot_utils.R
+  tme_utils.R
+  tcga_utils.R
+  limma_voom_utils.R
+  timecourse_utils.R
+  survival_utils.R
 examples/
   sample_config_template.R
+install_dependencies.R
 ```
 
-`RNAseq_TCGA_GEO_Template.ipynb` is intentionally not included in this first repository version. Public data mining can later become an optional module or a separate `PublicData-Templates` repository.
+`RNAseq_TCGA_GEO_Template.ipynb` is now included. It supports both TCGAbiolinks-based TCGA download and local GEO/TCGA expression matrices, with Tumor vs Normal DEG, single-gene expression, survival KM curves, and ORA/GSEA. Public data mining can later be split into a separate `PublicData-Templates` repository if it grows further.
 
 ## Recommended Usage
 
@@ -71,6 +80,7 @@ The WGCNA and TME templates default to these exports, so the usual workflow is: 
 - GSVA for custom gene sets with heatmap, combined boxplot, and per-signature violin/box/jitter PDFs
 - single-gene expression plots with mean bar, SEM, sample points, and layered pairwise P values
 - optional DoRothEA/VIPER TF activity analysis
+- DEG set overlap visualization (UpSet plot + Jaccard heatmap) across comparisons and thresholds
 
 ## Multi-threshold DEG + ORA
 
@@ -104,8 +114,11 @@ GSEA is intentionally not repeated by DEG threshold because it uses the full ran
 
 ## Topic Templates
 
-- `RNAseq_TME_Deconvolution_Template.ipynb`: ssGSEA immune/stromal signatures, optional ESTIMATE, optional CIBERSORT skeleton, group comparisons, heatmaps.
+- `RNAseq_TME_Deconvolution_Template.ipynb`: ssGSEA immune/stromal signatures, native ESTIMATE, **IOBR multi-algorithm deconvolution (CIBERSORT/EPIC/xCell/ESTIMATE)**, optional native CIBERSORT, group comparisons, and heatmaps.
 - `RNAseq_WGCNA_Template.ipynb`: expression filtering, sample QC, soft-threshold selection, module detection, module-trait correlation, hub gene export.
+- `RNAseq_TCGA_GEO_Template.ipynb`: TCGA data download via TCGAbiolinks or local GEO matrices, counts/TPM preparation, Tumor vs Normal DESeq2 DEG, single-gene expression, **KM survival (median/quartile), univariate and multivariate Cox regression**, ORA/GSEA.
+- `RNAseq_limma_voom_Template.ipynb`: `edgeR` + `limma-voom` alternative DEG workflow with optional batch correction and multi-contrast analysis.
+- `RNAseq_TimeCourse_Template.ipynb`: Mfuzz soft clustering of time-series expression, trend plots, cluster heatmaps, and per-cluster ORA.
 
 ## GitHub Sync
 
@@ -122,3 +135,4 @@ git push -u origin main
 - This is not a formal R package. The helper library is deliberately lightweight so notebooks remain readable.
 - For publication figures, edit the saved PDFs from `3-Visualization/`.
 - For project-specific models with batch, paired design, or covariates, edit `DESIGN_FORMULA`, for example `~ batch + condition`.
+- Run `Rscript install_dependencies.R` once to install all required CRAN, Bioconductor, and GitHub packages.
