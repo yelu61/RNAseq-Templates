@@ -180,3 +180,53 @@ run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organi
   utils::write.csv(summary_df, file.path(outdir, "ORA_threshold_summary.csv"), row.names = FALSE)
   list(results = ora_results, summary = summary_df)
 }
+
+# Convert a clusterProfiler enrichResult/gseaResult (or compareClusterResult)
+# to a plain data frame with standard columns.
+enrich_result_to_df <- function(enrich_result) {
+  if (is.null(enrich_result)) return(data.frame())
+  df <- tryCatch(as.data.frame(enrich_result), error = function(e) data.frame())
+  if (nrow(df) == 0) return(df)
+  required <- c("ID", "Description", "p.adjust")
+  missing <- setdiff(required, colnames(df))
+  if (length(missing) > 0) {
+    stop("enrich_result is missing required columns: ", paste(missing, collapse = ", "))
+  }
+  if (!"Count" %in% colnames(df) && "setSize" %in% colnames(df)) {
+    df$Count <- df$setSize
+  }
+  if (!"Count" %in% colnames(df)) {
+    df$Count <- NA_integer_
+  }
+  if (!"ONTOLOGY" %in% colnames(df)) {
+    # For enrichResult objects with a single ontology, fill from the object slot.
+    ontology <- tryCatch(slot(enrich_result, "ontology"), error = function(e) NA_character_)
+    df$ONTOLOGY <- if (length(ontology) == 1 && !is.na(ontology)) ontology else NA_character_
+  }
+  df
+}
+
+# Build a combined enrichment data frame across multiple comparisons.
+# result_map: named list where each element is an enrichResult/gseaResult or data frame.
+build_multi_comparison_enrich_df <- function(result_map,
+                                             comparison_col = "comparison",
+                                             direction_col = NULL,
+                                             ontology_filter = NULL) {
+  rows <- list()
+  for (comp_name in names(result_map)) {
+    obj <- result_map[[comp_name]]
+    df <- enrich_result_to_df(obj)
+    if (nrow(df) == 0) next
+    df[[comparison_col]] <- comp_name
+    if (!is.null(direction_col)) {
+      df[[direction_col]] <- NA_character_
+    }
+    rows[[length(rows) + 1]] <- df
+  }
+  out <- dplyr::bind_rows(rows)
+  if (nrow(out) == 0) return(out)
+  if (!is.null(ontology_filter) && "ONTOLOGY" %in% colnames(out)) {
+    out <- out[out$ONTOLOGY %in% ontology_filter, , drop = FALSE]
+  }
+  out
+}

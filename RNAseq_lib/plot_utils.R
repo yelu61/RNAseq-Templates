@@ -763,16 +763,391 @@ plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category
   top_up <- head(gsea_df$ID[gsea_df$NES > 0], 3)
   top_down <- head(gsea_df$ID[gsea_df$NES < 0], 3)
   if (length(top_up) > 0) {
-    p_up <- enrichplot::gseaplot2(gsea_result, geneSetID = top_up, title = paste(title_prefix, "Top activated terms")) +
-      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
-      ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
+    p_up <- plot_gsea_term_figure_pdf(gsea_result, top_up, title = paste(title_prefix, "Top activated terms"))
     save_pdf_plot(p_up, paste0(prefix, "_running_top_activated.pdf"), width = 9, height = 7)
   }
   if (length(top_down) > 0) {
-    p_down <- enrichplot::gseaplot2(gsea_result, geneSetID = top_down, title = paste(title_prefix, "Top suppressed terms")) +
-      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
-      ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
+    p_down <- plot_gsea_term_figure_pdf(gsea_result, top_down, title = paste(title_prefix, "Top suppressed terms"))
     save_pdf_plot(p_down, paste0(prefix, "_running_top_suppressed.pdf"), width = 9, height = 7)
   }
   invisible(TRUE)
+}
+
+# Publication-quality single-term GSEA running-enrichment figure.
+# Refines enrichplot::gseaplot2 output with NES-aware colors, clean title/subtitle,
+# and panel-level styling suitable for manuscripts.
+plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
+                                       filename = NULL,
+                                       title = NULL,
+                                       subtitle = NULL,
+                                       contrast_label = NULL,
+                                       width = 10, height = 7.5,
+                                       panel_heights = c(1.5, 0.25, 0.4),
+                                       pvalue_table = FALSE,
+                                       base_family = "Times") {
+  if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) return(invisible(NULL))
+  gsea_df <- as.data.frame(gsea_result)
+  if (is.character(gene_set_id)) {
+    term_stats <- gsea_df[gsea_df$ID == gene_set_id, , drop = FALSE]
+  } else if (is.numeric(gene_set_id)) {
+    term_stats <- gsea_df[gene_set_id, , drop = FALSE]
+  } else {
+    stop("gene_set_id must be a term ID string or row index.")
+  }
+  if (nrow(term_stats) == 0) {
+    warning("gene_set_id not found in gsea_result: ", gene_set_id)
+    return(invisible(NULL))
+  }
+
+  nes <- term_stats$NES[[1]]
+  pval <- term_stats$pvalue[[1]]
+  padj <- term_stats$p.adjust[[1]]
+  term_desc <- term_stats$Description[[1]]
+
+  fmt_p <- function(x) {
+    x <- as.numeric(x)
+    ifelse(x < 0.001, sprintf("%.2e", x), sprintf("%.4f", x))
+  }
+  stats_text <- sprintf("NES = %.3f | p = %s | adj p = %s", nes, fmt_p(pval), fmt_p(padj))
+
+  colors_pos <- list(es = "#b2182b", heatmap_low = "#f4a582", heatmap_high = "#ca0020")
+  colors_neg <- list(es = "#2166ac", heatmap_low = "#92c5de", heatmap_high = "#0571b0")
+  heatmap_mid <- "#f7f7f7"
+  cols <- if (nes >= 0) colors_pos else colors_neg
+
+  title_text <- if (!is.null(title)) title else stringr::str_wrap(term_desc, width = 80)
+  if (is.null(subtitle)) {
+    subtitle_parts <- stats_text
+    if (!is.null(contrast_label)) subtitle_parts <- paste0(contrast_label, "\n", subtitle_parts)
+    subtitle_text <- subtitle_parts
+  } else {
+    subtitle_text <- subtitle
+  }
+
+  p <- enrichplot::gseaplot2(gsea_result, geneSetID = gene_set_id, pvalue_table = pvalue_table, color = cols$es, title = "")
+
+  p <- lapply(p, function(x) {
+    x + ggplot2::theme(
+      text = ggplot2::element_text(family = base_family),
+      axis.text = ggplot2::element_text(size = 10, color = "grey20", family = base_family),
+      axis.title = ggplot2::element_text(size = 11, color = "grey20", family = base_family),
+      axis.ticks = ggplot2::element_line(color = "grey40"),
+      panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.3),
+      panel.grid.minor = ggplot2::element_blank()
+    )
+  })
+
+  panel1_yrange <- range(ggplot2::ggplot_build(p[[1]])$data[[1]]$y, na.rm = TRUE)
+  panel1_pad <- diff(panel1_yrange) * 0.05
+  p[[1]] <- p[[1]] +
+    ggplot2::scale_y_continuous(
+      limits = c(panel1_yrange[1] - panel1_pad, panel1_yrange[2] + panel1_pad),
+      breaks = pretty(c(panel1_yrange[1] - panel1_pad, panel1_yrange[2] + panel1_pad), n = 5),
+      expand = c(0, 0)
+    ) +
+    ggplot2::labs(y = "Running enrichment score") +
+    ggplot2::theme(plot.margin = ggplot2::margin(20, 20, 6, 12))
+
+  p[[2]] <- p[[2]] +
+    ggplot2::scale_fill_gradient2(low = cols$heatmap_low, mid = heatmap_mid, high = cols$heatmap_high, midpoint = 0) +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank()
+    )
+
+  p[[3]] <- p[[3]] +
+    ggplot2::scale_y_continuous(breaks = c(-10, -5, 0, 5, 10)) +
+    ggplot2::coord_cartesian(ylim = c(-10, 10)) +
+    ggplot2::labs(y = "Ranking metric", x = "Rank in ordered gene list") +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_text(size = 9),
+      axis.title.y = ggplot2::element_text(size = 10),
+      plot.margin = ggplot2::margin(6, 20, 12, 12)
+    )
+
+  p[[1]] <- p[[1]] +
+    ggplot2::labs(title = title_text, subtitle = subtitle_text) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(size = 17, face = "bold", hjust = 0.5, color = "black", margin = ggplot2::margin(b = 5)),
+      plot.subtitle = ggplot2::element_text(size = 12, hjust = 0.5, color = "grey45", margin = ggplot2::margin(b = 8), lineheight = 1.25)
+    )
+
+  attr(p, "params") <- list(ncol = 1, heights = panel_heights)
+  class(p) <- c("gglist", "list")
+
+  if (!is.null(filename)) {
+    dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+    device <- if (capabilities("cairo")) grDevices::cairo_pdf else grDevices::pdf
+    ggplot2::ggsave(filename, plot = p, width = width, height = height, device = device, limitsize = FALSE)
+  }
+  p
+}
+
+# Plot publication-grade single-term GSEA figures for selected terms.
+# term_df must contain columns: ID (or Description), and optionally a grouping column.
+plot_gsea_term_figures_from_df <- function(gsea_result, term_df,
+                                           outdir,
+                                           contrast_label = NULL,
+                                           id_col = "ID",
+                                           width = 10, height = 7.5,
+                                           prefix = "gseaplot2") {
+  if (nrow(term_df) == 0) return(invisible(NULL))
+  if (!id_col %in% colnames(term_df) && !"Description" %in% colnames(term_df)) {
+    stop("term_df must contain 'ID' or 'Description' column")
+  }
+  if (!id_col %in% colnames(term_df)) id_col <- "Description"
+  gsea_df <- as.data.frame(gsea_result)
+
+  for (i in seq_len(nrow(term_df))) {
+    term_id <- term_df[[id_col]][[i]]
+    if (id_col == "Description") {
+      term_id <- gsea_df$ID[match(term_id, gsea_df$Description)]
+    }
+    if (is.na(term_id)) next
+    term_desc <- gsea_df$Description[match(term_id, gsea_df$ID)]
+    safe_name <- gsub("[^a-zA-Z0-9_-]", "_", tolower(term_desc))
+    filename <- file.path(outdir, paste0(prefix, "_", safe_name, ".pdf"))
+    plot_gsea_term_figure_pdf(
+      gsea_result, term_id,
+      filename = filename,
+      contrast_label = contrast_label,
+      width = width, height = height
+    )
+  }
+  invisible(TRUE)
+}
+
+# Publication-quality enrichment theme dot-heatmap.
+# Inspired by theme-based GO ORA dot-heatmaps used in manuscript figures.
+
+# Default theme dictionary for common cancer / immunology GO-BP themes.
+default_enrichment_themes <- function() {
+  data.frame(
+    figure_group = c(
+      rep("Immune & Inflammation", 8),
+      rep("Cellular Processes", 6),
+      rep("Metabolism & Bioenergetics", 3),
+      rep("Development & Tissue", 3),
+      rep("Genome Regulation", 3)
+    ),
+    theme = c(
+      "Interferon Response", "Antigen Presentation", "Cytotoxicity / Killing",
+      "T/NK Activation", "Cytokine / Chemokine", "Inflammation",
+      "Leukocyte Migration / Adhesion", "TNF-NFkappaB Signaling",
+      "Apoptosis", "Cell Cycle / Proliferation", "DNA Damage Response",
+      "Barrier / Junction", "Focal Adhesion / ECM", "Synapse / Neural",
+      "Glycolysis", "OXPHOS", "Lipid Metabolism",
+      "Angiogenesis", "Wnt Signaling", "EMT / Migration",
+      "Chromatin / Epigenetic", "Transcription / RNA processing", "Ribosome / Translation"
+    ),
+    keywords = c(
+      "interferon|response to interferon-alpha|response to interferon-gamma|interferon-mediated signaling",
+      "antigen processing and presentation|mhc class|mhc protein complex|peptide antigen assembly",
+      "natural killer cell mediated|cell killing|leukocyte mediated cytotoxicity|cytotoxicity",
+      "t cell activation|leukocyte activation|lymphocyte activation|adaptive immune response|natural killer cell activation",
+      "cytokine|cytokine-mediated signaling|chemokine|interleukin production",
+      "inflammatory response|regulation of inflammatory response|acute inflammatory response",
+      "leukocyte cell-cell adhesion|leukocyte migration|regulation of leukocyte migration|monocyte migration|granulocyte migration",
+      "tumor necrosis factor|nf-kappab|canonical nf-kappab|i-kappab kinase",
+      "apoptotic|intrinsic apoptotic|execution phase of apoptosis|regulation of apoptotic",
+      "cell cycle|mitotic|proliferation|dna replication|chromosome segregation",
+      "dna damage|dna repair|double-strand break|cellular response to dna damage",
+      "tight junction|adherens junction|cell-cell junction|cell junction organization",
+      "focal adhesion|extracellular matrix|ecm|cell adhesion",
+      "synapse|synaptic|neurotransmitter|axon|dendrite",
+      "glycolytic|glycolysis|glucose metabolic|hexose metabolic",
+      "oxidative phosphorylation|atp synthesis|aerobic respiration|electron transport chain|respiratory electron transport",
+      "lipid metabolic|fatty acid|cholesterol|lipid biosynthetic",
+      "angiogenesis|vasculature development|blood vessel development",
+      "wnt signaling|canonical wnt|beta-catenin",
+      "epithelial to mesenchymal|mesenchymal|cell migration|motility",
+      "chromatin organization|heterochromatin|histone|epigenetic|nucleosome",
+      "transcription|rna processing|rna splicing|gene expression",
+      "cytoplasmic translation|mitochondrial translation|ribosome|translation"
+    ),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Shorten GO/KEGG term labels for publication figures.
+clean_term_label <- function(x) {
+  x <-
+    stringr::str_replace_all(x, stringr::regex("positive regulation of", ignore_case = TRUE), "+reg") |>
+    stringr::str_replace_all(stringr::regex("negative regulation of", ignore_case = TRUE), "-reg") |>
+    stringr::str_replace_all(stringr::regex("regulation of", ignore_case = TRUE), "reg") |>
+    stringr::str_replace_all(stringr::regex("antigen processing and presentation", ignore_case = TRUE), "Ag processing & presentation") |>
+    stringr::str_replace_all(stringr::regex("natural killer cell mediated", ignore_case = TRUE), "NK-mediated") |>
+    stringr::str_replace_all(stringr::regex("leukocyte mediated cytotoxicity", ignore_case = TRUE), "leukocyte cytotoxicity") |>
+    stringr::str_replace_all(stringr::regex("cytokine-mediated signaling pathway", ignore_case = TRUE), "cytokine-mediated signaling") |>
+    stringr::str_replace_all(stringr::regex("tumor necrosis factor", ignore_case = TRUE), "TNF") |>
+    stringr::str_replace_all(stringr::regex("canonical nf-kappab signal transduction", ignore_case = TRUE), "canonical NF-kappaB signaling") |>
+    stringr::str_replace_all(stringr::regex("oxidative phosphorylation", ignore_case = TRUE), "OXPHOS") |>
+    stringr::str_replace_all(stringr::regex("cytoplasmic translation", ignore_case = TRUE), "cyto translation") |>
+    stringr::str_replace_all(stringr::regex("mitochondrial translation", ignore_case = TRUE), "mito translation") |>
+    stringr::str_replace_all(stringr::regex("extracellular matrix", ignore_case = TRUE), "ECM") |>
+    stringr::str_replace_all(stringr::regex("response to", ignore_case = TRUE), "resp. to") |>
+    stringr::str_squish()
+  x
+}
+
+# Match enrichment terms to a theme dictionary using case-insensitive regex.
+match_enrichment_themes <- function(df, theme_defs, description_col = "Description") {
+  if (nrow(df) == 0) return(df)
+  if (!description_col %in% colnames(df)) {
+    stop("Description column not found: ", description_col)
+  }
+  desc_lower <- tolower(as.character(df[[description_col]]))
+  hits <- list()
+  for (i in seq_len(nrow(theme_defs))) {
+    pattern <- theme_defs$keywords[[i]]
+    idx <- which(stringr::str_detect(desc_lower, stringr::regex(pattern, ignore_case = TRUE)))
+    if (length(idx) == 0) next
+    hit_df <- df[idx, , drop = FALSE]
+    hit_df$figure_group <- theme_defs$figure_group[[i]]
+    hit_df$theme <- theme_defs$theme[[i]]
+    hits[[length(hits) + 1]] <- hit_df
+  }
+  if (length(hits) == 0) return(df[0, , drop = FALSE])
+  dplyr::bind_rows(hits)
+}
+
+# Prepare a data frame for theme dot-heatmap: pick top terms per theme by p.adjust and Count.
+prepare_theme_dotplot_df <- function(theme_hits,
+                                      comparison_col = "comparison",
+                                      top_n = 6,
+                                      p_value_col = "p.adjust",
+                                      count_col = "Count") {
+  if (nrow(theme_hits) == 0) return(theme_hits)
+  required <- c("figure_group", "theme", "Description", comparison_col, p_value_col, count_col)
+  missing <- setdiff(required, colnames(theme_hits))
+  if (length(missing) > 0) {
+    stop("theme_hits is missing columns: ", paste(missing, collapse = ", "))
+  }
+  theme_hits$neg_log10_padj <- -log10(pmax(as.numeric(theme_hits[[p_value_col]]), .Machine$double.xmin))
+
+  top_terms <- theme_hits |>
+    dplyr::group_by(.data$figure_group, .data$theme, .data$Description) |>
+    dplyr::summarise(
+      best_padj = min(as.numeric(.data[[p_value_col]]), na.rm = TRUE),
+      max_count = max(as.numeric(.data[[count_col]]), na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    dplyr::arrange(.data$figure_group, .data$theme, .data$best_padj, dplyr::desc(.data$max_count)) |>
+    dplyr::group_by(.data$figure_group, .data$theme) |>
+    dplyr::slice_head(n = top_n) |>
+    dplyr::ungroup()
+
+  plot_df <- theme_hits |>
+    dplyr::semi_join(top_terms, by = c("figure_group", "theme", "Description")) |>
+    dplyr::left_join(
+      top_terms |> dplyr::select("figure_group", "theme", "Description", "best_padj"),
+      by = c("figure_group", "theme", "Description")
+    )
+
+  plot_df$figure_group <- factor(plot_df$figure_group, levels = unique(plot_df$figure_group))
+  plot_df$theme <- factor(plot_df$theme, levels = unique(plot_df$theme))
+  if (is.character(plot_df[[comparison_col]])) {
+    plot_df[[comparison_col]] <- factor(plot_df[[comparison_col]], levels = unique(plot_df[[comparison_col]]))
+  }
+  plot_df$label <- clean_term_label(plot_df$Description)
+  plot_df$label <- forcats::fct_reorder(plot_df$label, plot_df$best_padj, .desc = TRUE)
+  plot_df
+}
+
+# Draw a publication-quality theme dot-heatmap and save as PDF.
+plot_theme_dotheatmap_pdf <- function(plot_df,
+                                       filename,
+                                       title = "Enrichment Theme Dot-heatmap",
+                                       subtitle = NULL,
+                                       comparison_col = "comparison",
+                                       count_col = "Count",
+                                       width = 12,
+                                       height = NULL,
+                                       fill_name = expression(-log[10]("adj. P")),
+                                       size_name = "Gene count") {
+  if (nrow(plot_df) == 0) {
+    warning("Empty plot data; skipping ", filename)
+    return(invisible(NULL))
+  }
+  use_group_in_strip <- dplyr::n_distinct(plot_df$figure_group) > 1
+  plot_df$facet_label <- if (use_group_in_strip) {
+    paste(plot_df$figure_group, plot_df$theme, sep = ": ")
+  } else {
+    as.character(plot_df$theme)
+  }
+  plot_df$facet_label <- factor(plot_df$facet_label, levels = unique(plot_df$facet_label))
+
+  p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = .data[[comparison_col]], y = .data$label)) +
+    ggplot2::geom_point(
+      ggplot2::aes(size = .data[[count_col]], fill = .data$neg_log10_padj),
+      shape = 21, color = "grey20", stroke = 0.25, alpha = 0.92
+    ) +
+    ggplot2::scale_x_discrete(drop = FALSE) +
+    ggplot2::scale_y_discrete(position = "right") +
+    ggplot2::scale_fill_gradientn(
+      colors = c("#E8EDF1", "#94C5B2", "#3E8E7E", "#B74949"),
+      name = fill_name
+    ) +
+    ggplot2::scale_size_continuous(range = c(1.8, 8.5), name = size_name) +
+    ggplot2::facet_grid(
+      facet_label ~ ., scales = "free_y", space = "free_y", switch = "y"
+    ) +
+    ggplot2::labs(title = title, subtitle = subtitle, x = NULL, y = NULL) +
+    ggplot2::theme_bw(base_size = 11) +
+    ggplot2::theme(
+      legend.position = "right",
+      panel.grid.major.x = ggplot2::element_line(color = "grey90", linewidth = 0.3),
+      panel.grid.major.y = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      strip.placement = "outside",
+      strip.background.y = ggplot2::element_rect(fill = "#464C55", color = NA),
+      strip.text.y.left = ggplot2::element_text(angle = 0, face = "bold", color = "white", size = 9.5),
+      axis.text.x = ggplot2::element_text(angle = 35, hjust = 1, vjust = 1, size = 10),
+      axis.text.y = ggplot2::element_text(size = 9, hjust = 0),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.title = ggplot2::element_text(face = "bold", size = 15),
+      plot.subtitle = ggplot2::element_text(size = 10, color = "grey35"),
+      plot.margin = ggplot2::margin(8, 12, 8, 12)
+    )
+
+  if (is.null(height)) {
+    height <- max(8, 0.32 * dplyr::n_distinct(plot_df$label) + 0.6 * dplyr::n_distinct(plot_df$facet_label))
+  }
+  save_pdf_plot(p, filename, width = width, height = height)
+  p
+}
+
+# Wrapper: build a theme dot-heatmap directly from enrichment result objects or data frames.
+plot_theme_dotheatmap_from_results <- function(result_map,
+                                              filename,
+                                              title = "Enrichment Theme Dot-heatmap",
+                                              subtitle = NULL,
+                                              theme_defs = default_enrichment_themes(),
+                                              ontology_filter = "BP",
+                                              top_n = 6,
+                                              comparison_col = "comparison",
+                                              width = 12,
+                                              height = NULL) {
+  df <- build_multi_comparison_enrich_df(
+    result_map,
+    comparison_col = comparison_col,
+    ontology_filter = ontology_filter
+  )
+  if (nrow(df) == 0) {
+    warning("No enrichment terms to plot.")
+    return(invisible(NULL))
+  }
+  themed <- match_enrichment_themes(df, theme_defs)
+  if (nrow(themed) == 0) {
+    warning("No terms matched the theme dictionary.")
+    return(invisible(NULL))
+  }
+  plot_df <- prepare_theme_dotplot_df(themed, comparison_col = comparison_col, top_n = top_n)
+  plot_theme_dotheatmap_pdf(
+    plot_df, filename, title = title, subtitle = subtitle,
+    comparison_col = comparison_col, width = width, height = height
+  )
 }
