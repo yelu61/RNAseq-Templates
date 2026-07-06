@@ -1,4 +1,19 @@
 # Plotting helpers for bulk RNA-seq templates. All helpers save editable PDFs.
+# For color conventions and figure sizing see references/VISUALIZATION_STYLE_GUIDE.md.
+
+# Standard palette constants used across templates.
+RNAseq_PALETTE <- list(
+  up_regulated    = "#d6604d",
+  down_regulated  = "#4393c3",
+  not_significant = "#999999",
+  group_two       = c("#6F6F6F", "#E07B54"),
+  group_three     = c("#6F6F6F", "#E07B54", "#6D65A3"),
+  heatmap_up      = "#b2182b",
+  heatmap_down    = "#2166ac",
+  heatmap_mid     = "#f7f7f7",
+  gsea_activated  = "#C8473E",
+  gsea_suppressed = "#3778A8"
+)
 
 theme_publication <- function(base_size = 12, base_family = "sans") {
   ggplot2::theme_bw(base_size = base_size, base_family = base_family) +
@@ -561,7 +576,10 @@ plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_categor
   fill_by <- match.arg(fill_by)
   df <- prepare_enrich_df(enrich_result, show_category)
   if (!is.null(ontology) && "ONTOLOGY" %in% colnames(df)) df <- df[df$ONTOLOGY == ontology, , drop = FALSE]
-  if (nrow(df) == 0) return(invisible(NULL))
+  if (nrow(df) == 0) {
+    message("Skipping barplot: no significant enrichment terms for ", title)
+    return(invisible(NULL))
+  }
   df <- df[order(df$FoldEnrichment, decreasing = TRUE), , drop = FALSE]
   df <- utils::head(df, show_category)
   df$Term <- factor(wrap_term_labels(df$Description, width = 55), levels = rev(wrap_term_labels(df$Description, width = 55)))
@@ -611,7 +629,10 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   if (nrow(up_df) > 0) up_df$Direction <- "UP"
   if (nrow(down_df) > 0) down_df$Direction <- "DOWN"
   df <- dplyr::bind_rows(up_df, down_df)
-  if (nrow(df) == 0) return(invisible(NULL))
+  if (nrow(df) == 0) {
+    message("Skipping bidirectional barplot: no significant enrichment terms for ", title)
+    return(invisible(NULL))
+  }
   df$SignedFoldEnrichment <- ifelse(df$Direction == "UP", df$FoldEnrichment, -df$FoldEnrichment)
   df <- df[order(df$Direction, abs(df$FoldEnrichment), decreasing = TRUE), , drop = FALSE]
   df$Term <- factor(wrap_term_labels(df$Description, width = 52), levels = unique(wrap_term_labels(df$Description[order(df$SignedFoldEnrichment)], width = 52)))
@@ -650,7 +671,10 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
 }
 
 plot_enrich_network_pdf <- function(enrich_result, prefix, show_category = 8) {
-  if (is.null(enrich_result) || nrow(as.data.frame(enrich_result)) == 0) return(invisible(NULL))
+  if (is.null(enrich_result) || nrow(as.data.frame(enrich_result)) == 0) {
+    message("Skipping network plot: no significant enrichment terms for ", prefix)
+    return(invisible(NULL))
+  }
   try({
     p_cnet <- enrichplot::cnetplot(enrich_result, showCategory = show_category, circular = FALSE, colorEdge = TRUE) +
       ggplot2::ggtitle("Gene-term network") +
@@ -668,7 +692,10 @@ plot_enrich_network_pdf <- function(enrich_result, prefix, show_category = 8) {
 }
 
 plot_enrich_suite_pdf <- function(enrich_result, prefix, title_prefix, show_category = 15) {
-  if (is.null(enrich_result) || nrow(as.data.frame(enrich_result)) == 0) return(invisible(NULL))
+  if (is.null(enrich_result) || nrow(as.data.frame(enrich_result)) == 0) {
+    message("Skipping enrichment plot suite: no significant terms for ", title_prefix)
+    return(invisible(NULL))
+  }
   plot_enrich_dotplot(enrich_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"), show_category = show_category)
   plot_enrich_barplot_pdf(enrich_result, paste0(prefix, "_barplot.pdf"), paste(title_prefix, "Top terms"), show_category = show_category)
   plot_enrich_network_pdf(enrich_result, prefix, show_category = min(8, show_category))
@@ -677,7 +704,10 @@ plot_enrich_suite_pdf <- function(enrich_result, prefix, title_prefix, show_cate
 
 plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, show_category = 10,
                                             include_all = TRUE, width = 10, height = 12) {
-  if (is.null(compare_result) || nrow(as.data.frame(compare_result)) == 0) return(invisible(NULL))
+  if (is.null(compare_result) || nrow(as.data.frame(compare_result)) == 0) {
+    message("Skipping compareCluster dotplot: no significant terms for ", title)
+    return(invisible(NULL))
+  }
   p <- enrichplot::dotplot(compare_result, showCategory = show_category, includeAll = include_all, title = title) +
     ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 48)) +
     theme_publication(base_size = 10) +
@@ -688,7 +718,10 @@ plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, sho
 
 plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 9.5, height = 8) {
   df <- as.data.frame(gsea_result)
-  if (nrow(df) == 0 || !"NES" %in% colnames(df)) return(invisible(NULL))
+  if (nrow(df) == 0 || !"NES" %in% colnames(df)) {
+    message("Skipping GSEA NES barplot: no significant terms for ", title)
+    return(invisible(NULL))
+  }
   if (!"p.adjust" %in% colnames(df)) df$p.adjust <- df$pvalue
   df <- df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
   df <- utils::head(df, show_category)
@@ -733,7 +766,10 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
 }
 
 plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category = 15) {
-  if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) return(invisible(NULL))
+  if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) {
+    message("Skipping GSEA plot suite: no significant terms for ", title_prefix)
+    return(invisible(NULL))
+  }
   plot_enrich_dotplot(gsea_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"), show_category = show_category)
   plot_gsea_nes_barplot_pdf(gsea_result, paste0(prefix, "_NES_barplot.pdf"), paste(title_prefix, "NES"), show_category = show_category)
   try({
@@ -785,7 +821,10 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
                                        panel_heights = c(1.5, 0.25, 0.4),
                                        pvalue_table = FALSE,
                                        base_family = "Times") {
-  if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) return(invisible(NULL))
+  if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) {
+    message("Skipping single-term GSEA figure: no significant terms")
+    return(invisible(NULL))
+  }
   gsea_df <- as.data.frame(gsea_result)
   if (is.character(gene_set_id)) {
     term_stats <- gsea_df[gsea_df$ID == gene_set_id, , drop = FALSE]
@@ -1069,7 +1108,7 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
                                        fill_name = expression(-log[10]("adj. P")),
                                        size_name = "Gene count") {
   if (nrow(plot_df) == 0) {
-    warning("Empty plot data; skipping ", filename)
+    message("Skipping theme dot-heatmap: no plot data for ", title)
     return(invisible(NULL))
   }
   use_group_in_strip <- dplyr::n_distinct(plot_df$figure_group) > 1

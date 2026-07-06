@@ -26,7 +26,10 @@ make_entrez_ranked_list <- function(gene_list, org_db) {
 
 run_go_ora <- function(symbols, org_db, universe, ont = "ALL", p_cutoff = 0.05, q_cutoff = 0.2, min_genes = 5) {
   mapped <- map_symbols_to_entrez(symbols, org_db)
-  if (nrow(mapped) < min_genes) return(NULL)
+  if (nrow(mapped) < min_genes) {
+    message("GO ORA skipped: only ", nrow(mapped), " mapped Entrez IDs (min_genes = ", min_genes, ")")
+    return(NULL)
+  }
   clusterProfiler::enrichGO(
     gene = mapped$ENTREZID,
     universe = universe,
@@ -41,7 +44,10 @@ run_go_ora <- function(symbols, org_db, universe, ont = "ALL", p_cutoff = 0.05, 
 
 run_kegg_ora <- function(symbols, org_db, universe, organism, p_cutoff = 0.05, min_genes = 5) {
   mapped <- map_symbols_to_entrez(symbols, org_db)
-  if (nrow(mapped) < min_genes) return(NULL)
+  if (nrow(mapped) < min_genes) {
+    message("KEGG ORA skipped: only ", nrow(mapped), " mapped Entrez IDs (min_genes = ", min_genes, ")")
+    return(NULL)
+  }
   clusterProfiler::enrichKEGG(
     gene = mapped$ENTREZID,
     universe = universe,
@@ -52,7 +58,10 @@ run_kegg_ora <- function(symbols, org_db, universe, organism, p_cutoff = 0.05, m
 }
 
 run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05) {
-  if (length(entrez_list) < min_size) return(NULL)
+  if (length(entrez_list) < min_size) {
+    message("GO GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
+    return(NULL)
+  }
   clusterProfiler::gseGO(
     geneList = entrez_list,
     OrgDb = org_db,
@@ -66,7 +75,10 @@ run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_siz
 }
 
 run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, p_cutoff = 0.05) {
-  if (length(entrez_list) < min_size) return(NULL)
+  if (length(entrez_list) < min_size) {
+    message("KEGG GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
+    return(NULL)
+  }
   clusterProfiler::gseKEGG(
     geneList = entrez_list,
     organism = organism,

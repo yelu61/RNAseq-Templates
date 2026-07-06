@@ -44,6 +44,7 @@ extract_deseq2_results <- function(dds, comparisons, condition_col = "condition"
     message("Processing DESeq2 contrast: ", comp_name, " (", treat, " vs ", ctrl, ")")
 
     raw_res <- DESeq2::results(dds, contrast = c(condition_col, treat, ctrl), alpha = alpha)
+    raw_df <- as.data.frame(raw_res)
     if (all(is.na(raw_res$pvalue))) {
       warning("DESeq2 returned all NA p-values for comparison: ", comp_name,
               "\nCommon causes: too few samples, all counts zero, or groups swapped.")

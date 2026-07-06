@@ -14,7 +14,11 @@ options(repos = c(CRAN = "https://cloud.r-project.org/"))
   "corrplot",       # correlation plots
   "openxlsx",       # Excel input/output
   "UpSetR",         # DEG overlap visualization
-  "estimate"        # ESTIMATE scores (R-Forge)
+  "estimate",       # ESTIMATE scores (R-Forge)
+  "ashr",           # DESeq2 lfcShrink type = "ashr"
+  "ggrepel",        # volcano plot labels
+  "data.table",     # used by notebooks and GEOquery
+  "matrixStats"     # rowMads / rowSds in visualization
 )
 
 bioc_packages <- c(
@@ -36,7 +40,11 @@ bioc_packages <- c(
   "survival",
   "survminer",
   "org.Hs.eg.db",
-  "org.Mm.eg.db"
+  "org.Mm.eg.db",
+  "msigdbr",        # MSigDB gene sets
+  "DOSE",           # enrichment visualization dependency
+  "BiocParallel",   # parallel backends
+  "GEOquery"        # GEO SeriesMatrix download (optional but pre-installed)
 )
 
 # Install CRAN packages

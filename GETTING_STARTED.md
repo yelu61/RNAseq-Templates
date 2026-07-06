@@ -210,9 +210,23 @@ BiocManager::install("包名")
 
 ---
 
+## 验证安装
+
+安装完成后，建议运行仓库自带的 smoke test 确认环境和核心流程正常：
+
+```r
+Rscript examples/run_demo_smoke_test.R
+```
+
+如果显示 `Smoke test PASSED`，说明所有依赖和核心分析流程都可以正常工作。
+
+> 注意：demo 数据使用真实小鼠基因 symbol。如果 enrichment 步骤产生的显著条目较少，某些阈值下可能没有 GO/KEGG ORA 结果文件；smoke test 会检查 ORA 汇总表是否存在，而不是要求某个特定阈值目录下一定产生结果。
+
+---
+
 ## 下一步
 
-跑通通用流程后，根据你的分析目的选择专题模板：
+跑通通用流程后，根据你的分析目的选择专题模板。更详细的对比和决策流程请参考 [references/TEMPLATE_SELECTION.md](references/TEMPLATE_SELECTION.md)。
 
 | 分析目的 | 使用模板 |
 |----------|----------|
@@ -222,6 +236,12 @@ BiocManager::install("包名")
 | 共表达网络/WGCNA | `RNAseq_WGCNA_Template.ipynb` |
 | TCGA/GEO 公共数据挖掘 | `RNAseq_TCGA_GEO_Template.ipynb` |
 | limma-voom 替代 DESeq2 | `RNAseq_limma_voom_Template.ipynb` |
+
+---
+
+## 常见问题
+
+更完整的故障排查请查看 [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md)。
 
 ---
 

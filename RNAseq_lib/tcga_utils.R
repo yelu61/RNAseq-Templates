@@ -50,6 +50,25 @@ symbolize_and_dedup <- function(mat, id_map,
     dplyr::select(-dplyr::all_of(symbol_col))
 }
 
+# Build an id→symbol map from a SummarizedExperiment object's rowData.
+build_id_map_from_se <- function(se, id_col = "gene_id", symbol_col = "gene_name", type_col = "gene_type") {
+  if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
+    stop("Package 'SummarizedExperiment' is required.")
+  }
+  rd <- SummarizedExperiment::rowData(se)
+  out_cols <- intersect(c(id_col, symbol_col, type_col), colnames(rd))
+  if (length(out_cols) == 0) {
+    stop("rowData does not contain expected columns: ", paste(c(id_col, symbol_col, type_col), collapse = ", "),
+         "\nAvailable: ", paste(colnames(rd), collapse = ", "))
+  }
+  df <- as.data.frame(rd[, out_cols, drop = FALSE], stringsAsFactors = FALSE)
+  if (symbol_col %in% colnames(df) && id_col %in% colnames(df)) {
+    df <- df[!is.na(df[[id_col]]) & df[[id_col]] != "" &
+                 !is.na(df[[symbol_col]]) & df[[symbol_col]] != "", , drop = FALSE]
+  }
+  df
+}
+
 # Extract and clean TCGA clinical metadata from a SummarizedExperiment object.
 extract_tcga_clinical <- function(se) {
   if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
@@ -107,6 +126,56 @@ prepare_tcga_survival <- function(clinical,
     out <- out[toupper(out[[tissue_col]]) == "TUMOR", ]
   }
   out
+}
+
+# Plot Kaplan-Meier curves for clinical variables.
+run_clinical_km <- function(surv_df, clinical_df, var_cols,
+                            outdir = ".", time_unit = "month",
+                            method = "t.test", show_ns = FALSE) {
+  if (!requireNamespace("survival", quietly = TRUE) || !requireNamespace("survminer", quietly = TRUE)) {
+    stop("Packages 'survival' and 'survminer' are required for KM plots.")
+  }
+  dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+  results <- data.frame(variable = character(), type = character(), n = integer(), stringsAsFactors = FALSE)
+
+  for (var in var_cols) {
+    if (!var %in% colnames(clinical_df)) {
+      warning("Clinical variable not found: ", var)
+      next
+    }
+    if (!"barcode" %in% colnames(clinical_df)) {
+      stop("clinical_df must contain a 'barcode' column to match surv_df.")
+    }
+
+    tmp <- clinical_df[, c("barcode", var), drop = FALSE]
+    tmp <- tmp[!is.na(tmp[[var]]) & tmp[[var]] != "", , drop = FALSE]
+    merged <- merge(surv_df, tmp, by = "barcode", all.x = FALSE)
+    if (nrow(merged) < 5) {
+      warning("Too few samples with non-missing ", var, " for KM plot.")
+      next
+    }
+
+    if (is.numeric(merged[[var]]) && dplyr::n_distinct(merged[[var]]) > 2) {
+      merged[[var]] <- stratify_by_quantile(merged[[var]], n_groups = 2, labels = c("Low", "High"))
+      type <- "continuous_split"
+    } else {
+      merged[[var]] <- factor(merged[[var]])
+      type <- "categorical"
+    }
+
+    plot_km_by_group_pdf(
+      merged,
+      group_col = var,
+      filename = file.path(outdir, paste0("KM_clinical_", var, ".pdf")),
+      title = paste("KM survival by", var),
+      time_unit = time_unit
+    )
+
+    results <- rbind(results, data.frame(variable = var, type = type, n = nrow(merged), stringsAsFactors = FALSE))
+  }
+
+  utils::write.csv(results, file.path(outdir, "clinical_KM_summary.csv"), row.names = FALSE)
+  invisible(results)
 }
 
 # Plot Kaplan-Meier curve for a continuous variable split by median.

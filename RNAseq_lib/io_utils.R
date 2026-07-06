@@ -249,3 +249,74 @@ write_preprocessing_summary <- function(summary_file, rows) {
   utils::write.csv(summary_df, summary_file, row.names = FALSE)
   summary_df
 }
+
+# Export multi-threshold DEG results to an Excel workbook.
+# Each threshold becomes a sheet; each sheet contains all comparisons with a Comparison column.
+# An additional "Summary" sheet reports DEG counts per threshold/comparison.
+write_deg_excel <- function(deg_by_threshold, outdir = "1-DEG", filename = "DEG_results.xlsx") {
+  if (!requireNamespace("openxlsx", quietly = TRUE)) {
+    stop("Package 'openxlsx' is required for Excel export.\nRun: install.packages('openxlsx')")
+  }
+  dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+  out_path <- file.path(outdir, filename)
+
+  wb <- openxlsx::createWorkbook()
+
+  # Summary sheet
+  summary_rows <- list()
+  for (th_name in names(deg_by_threshold)) {
+    for (comp_name in names(deg_by_threshold[[th_name]])) {
+      res <- deg_by_threshold[[th_name]][[comp_name]]
+      up <- sum(res$significance == "Up", na.rm = TRUE)
+      down <- sum(res$significance == "Down", na.rm = TRUE)
+      summary_rows[[length(summary_rows) + 1]] <- data.frame(
+        Threshold = th_name,
+        Comparison = comp_name,
+        UP = up,
+        DOWN = down,
+        Total = up + down,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  openxlsx::addWorksheet(wb, "Summary")
+  openxlsx::writeData(wb, "Summary", do.call(rbind, summary_rows))
+
+  # One sheet per threshold
+  for (th_name in names(deg_by_threshold)) {
+    sheet_name <- substr(th_name, 1, 31)
+    openxlsx::addWorksheet(wb, sheet_name)
+    first <- TRUE
+    for (comp_name in names(deg_by_threshold[[th_name]])) {
+      res <- deg_by_threshold[[th_name]][[comp_name]]
+      res$Comparison <- comp_name
+      if (first) {
+        openxlsx::writeData(wb, sheet_name, res)
+        first <- FALSE
+      } else {
+        openxlsx::writeData(wb, sheet_name, res, startRow = nrow(openxlsx::readWorkbook(wb, sheet = sheet_name)) + 2, colNames = FALSE)
+      }
+    }
+  }
+
+  openxlsx::saveWorkbook(wb, out_path, overwrite = TRUE)
+  invisible(out_path)
+}
+
+# Export all-gene DESeq2 results for all comparisons to an Excel workbook.
+write_all_genes_excel <- function(res_list, outdir = "1-DEG", filename = "DESeq2_all_genes.xlsx") {
+  if (!requireNamespace("openxlsx", quietly = TRUE)) {
+    stop("Package 'openxlsx' is required for Excel export.")
+  }
+  dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+  out_path <- file.path(outdir, filename)
+
+  wb <- openxlsx::createWorkbook()
+  for (comp_name in names(res_list)) {
+    sheet_name <- substr(comp_name, 1, 31)
+    openxlsx::addWorksheet(wb, sheet_name)
+    openxlsx::writeData(wb, sheet_name, res_list[[comp_name]])
+  }
+  openxlsx::saveWorkbook(wb, out_path, overwrite = TRUE)
+  invisible(out_path)
+}
