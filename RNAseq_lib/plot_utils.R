@@ -198,17 +198,20 @@ plot_filter_retention_pdf <- function(retention_df, filename) {
   p
 }
 
-plot_deg_summary_pdf <- function(deg_summary, filename) {
+plot_deg_summary_pdf <- function(deg_summary, filename, threshold_col = "Threshold") {
+  has_threshold <- threshold_col %in% colnames(deg_summary)
   deg_long <- tidyr::pivot_longer(deg_summary, cols = c("UP", "DOWN"), names_to = "Change", values_to = "Number")
   p <- ggplot2::ggplot(deg_long, ggplot2::aes(x = Comparison, y = Number, fill = Change)) +
     ggplot2::geom_col(position = "dodge", width = 0.7) +
     ggplot2::geom_text(ggplot2::aes(label = Number), position = ggplot2::position_dodge(width = 0.7), vjust = -0.5, size = 3.5, fontface = "bold") +
-    ggplot2::facet_wrap(~ Threshold, scales = "free_x") +
     ggplot2::scale_fill_manual(values = c("UP" = "#d6604d", "DOWN" = "#4393c3")) +
-    ggplot2::labs(x = NULL, y = "Number of DEGs", title = "DEG Statistics Across Thresholds") +
+    ggplot2::labs(x = NULL, y = "Number of DEGs", title = "DEG Statistics") +
     theme_publication(base_size = 10) +
     ggplot2::theme(legend.position = "top", axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
-  save_pdf_plot(p, filename, width = max(8, 3 * length(unique(deg_summary$Threshold))), height = 5)
+  if (has_threshold) {
+    p <- p + ggplot2::facet_wrap(~ .data[[threshold_col]], scales = "free_x")
+  }
+  save_pdf_plot(p, filename, width = max(8, ifelse(has_threshold, 3 * length(unique(deg_summary[[threshold_col]])), 6)), height = 5)
   p
 }
 

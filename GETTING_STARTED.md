@@ -63,12 +63,14 @@ source("install_dependencies.R")
    ```
    examples → demo_RNAseq_General → RNAseq_General.ipynb
    ```
+   或者：
+   ```
+   examples → demo_RNAseq_limma_voom → RNAseq_limma_voom_Template.ipynb
+   examples → demo_RNAseq_WGCNA → RNAseq_WGCNA_Template.ipynb
+   ```
 2. 如果提示需要安装 Jupyter/IRkernel，按照提示安装即可
 3. 打开后，点击菜单 **Cell → Run All**
-4. 等待几分钟，左侧会生成三个文件夹：
-   - `1-DEG/`：差异表达结果
-   - `2-GSEA/`：富集分析结果
-   - `3-Visualization/`：所有 PDF 图片
+4. 等待几分钟，左侧会生成输出文件夹。
 
 如果演示能跑通，说明环境没有问题。
 

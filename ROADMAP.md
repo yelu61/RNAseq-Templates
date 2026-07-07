@@ -41,7 +41,10 @@ This project provides notebook-first bulk RNA-seq analysis templates with a shar
 - [ ] Add interactive HTML report generation (using R Markdown or Quarto)
 - [ ] Add single-cell reference integration / deconvolution (e.g., Bisque, CIBERSORTx)
 - [ ] Support additional model organisms (rat, zebrafish) via configurable `org.*.eg.db`
-- [ ] Provide example datasets for each topic template
+- [x] Provide example datasets for each topic template (General, limma-voom, WGCNA done; TME, TimeCourse, TCGA/GEO planned)
+- [ ] Add runnable demos for RNAseq_TME_Deconvolution_Template.ipynb
+- [ ] Add runnable demos for RNAseq_TimeCourse_Template.ipynb
+- [ ] Add runnable demos for RNAseq_TCGA_GEO_Template.ipynb (local-file mode)
 
 ## How to contribute
 

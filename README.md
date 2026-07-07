@@ -33,7 +33,9 @@ examples/
   sample_config_template.R
   run_demo_smoke_test.R   # automated demo validation
   demo_data/              # demo count table and metadata
-  demo_RNAseq_General/    # pre-configured notebook ready to run
+  demo_RNAseq_General/    # pre-configured General notebook ready to run
+  demo_RNAseq_limma_voom/ # pre-configured limma-voom notebook ready to run
+  demo_RNAseq_WGCNA/      # pre-configured WGCNA notebook ready to run
 references/
   PARAMETER_REFERENCE.md  # parameter glossary
   FUNCTION_CATALOG.md     # helper function index

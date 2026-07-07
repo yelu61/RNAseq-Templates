@@ -21,8 +21,12 @@ All notable changes to RNAseq-Templates are documented in this file.
 - `.github/workflows/smoke-test.yml`: GitHub Actions workflow to run the smoke test and unit tests on push/PR.
 - `tests/testthat/` and `tests/testthat.R`: initial unit-test skeleton covering deg, io, and enrichment helpers.
 - `examples/regenerate_demo_data.R`: helper to regenerate demo count table with real mouse symbols.
+- `examples/demo_RNAseq_limma_voom/` and `examples/demo_RNAseq_WGCNA/`: pre-configured runnable demos for the limma-voom and WGCNA templates.
 
 ### Changed
+
+- `RNAseq_lib/plot_utils.R`: `plot_deg_summary_pdf()` now tolerates single-threshold summaries (no `Threshold` column).
+- `notebooks/RNAseq_WGCNA_Template.ipynb`: force first column to character when `GENE_COLUMN` is NULL, and convert expression matrix to numeric matrix before WGCNA input, preventing failures with numeric-looking gene symbols.
 
 - `RNAseq_lib/deg_utils.R`: fixed `extract_deseq2_results()` referencing `raw_df` before it was defined.
 - `notebooks/RNAseq_limma_voom_Template.ipynb`: replaced broken `BATCH_COLUMN` logic with explicit `BATCH_VECTOR` parameter.
