@@ -81,8 +81,32 @@
 | `EXPR_FILE` | character | `"./1-DEG/vsd_matrix.csv"` | VST 表达矩阵 |
 | `META_FILE` | character | `"./1-DEG/colData.csv"` | 元数据 |
 | `GROUP_COLUMN` | character | `"condition"` | 分组列 |
-| `TME_METHODS` | character vector | IOBR 方法 | 如 `c("cibersort", "epic", "xcell", "estimate")` |
-| `ESTIMATE_ONLY` | logical | `FALSE` | 是否只运行 ESTIMATE |
+| `EXPR_IS_LOG` | logical | `TRUE` | 表达矩阵是否为 log2(TPM+1)/VST 等 log 尺度；TME 工具需要非 log 输入，会自动还原 |
+| `GENE_COLUMN` | character/NULL | `NULL` | 基因名列名；NULL 使用行名/第一列 |
+| `SAMPLE_COLUMN` | character | `"sample"` | 样本名列 |
+| `GROUP_LEVELS` | character vector/NULL | `NULL` | 分组水平顺序 |
+| `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；小鼠数据会经 `biomaRt::getLDS` 把 MGI symbol 转为 HGNC symbol 后再进行反卷积 |
+| `GROUP_COLORS` | named character vector/NULL | `NULL` | 自定义分组颜色，例如 `c("Control"="#6F6F6F", "Treatment"="#E07B54")`；NULL 时自动生成 |
+| `RUN_ESTIMATE` | logical | `TRUE` | 是否运行 native ESTIMATE |
+| `RUN_IOBR` | logical | `TRUE` | 是否运行 IOBR |
+| `IOBR_METHODS` | character vector | `c("estimate", "cibersort", "epic", "xcell")` | 要运行的 IOBR 方法 |
+| `IOBR_PERM` | numeric | `1000` | CIBERSORT permutation 次数 |
+| `IOBR_ARRAYS` | logical | `FALSE` | RNA-seq 设为 FALSE；microarray 设为 TRUE |
+| `RUN_CIBERSORT` | logical | `FALSE` | 是否运行 native CIBERSORT（需自备 `CIBERSORT.R` 和 `LM22.txt`） |
+| `CIBERSORT_SCRIPT` | character | `"./CIBERSORT.R"` | native CIBERSORT 脚本路径 |
+| `CIBERSORT_SIGNATURE` | character | `"./LM22.txt"` | CIBERSORT signature 文件路径 |
+
+### 各 TME 方法输入要求
+
+| 方法 | 需要的输入 | 备注 |
+|------|-----------|------|
+| ESTIMATE (native) | 非 log 归一化表达；行名 = HGNC symbol | 与人类基质/免疫 signature 取交集 |
+| CIBERSORT (native) | 非 log 归一化表达；第一列 = HGNC symbol | `LM22.txt` 为人类 reference |
+| IOBR `estimate` | 非 log TPM-like；行名 = HGNC symbol | 包装自 ESTIMATE |
+| IOBR `cibersort` | 非 log TPM-like；行名 = HGNC symbol | RNA-seq 设 `arrays = FALSE` |
+| IOBR `epic` | 非 log TPM-like；行名 = HGNC symbol | 输出细胞比例，总和 ≤ 1 |
+| IOBR `xcell` | 非 log TPM-like；行名 = HGNC symbol | 输出富集分数，非比例 |
+| ssGSEA | log 或非 log 均可；行名与 signature 匹配 | 内置免疫 signature 为人类基因符号 |
 
 ## `RNAseq_WGCNA_Template.ipynb`
 

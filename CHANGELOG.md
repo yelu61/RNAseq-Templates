@@ -6,6 +6,37 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Added
 
+- **Mouse TME deconvolution support** in `RNAseq_TME_Deconvolution_Template.ipynb` and `RNAseq_lib/tme_utils.R`:
+  - New `SPECIES` parameter (`"human"` / `"mouse"`) in the TME notebook.
+  - `convert_mouse_symbols_to_human()` uses `biomaRt::getLDS` to map MGI symbols to HGNC symbols.
+  - `prepare_tme_expression()` unifies log reversal + optional mouse-to-human conversion.
+  - `deduplicate_expression_by_symbol()` keeps the highest-mean duplicate after ortholog conversion.
+  - `validate_tme_input()` checks numeric/non-negative values, rownames, and warns on Ensembl IDs.
+  - All TME methods (native ESTIMATE, native CIBERSORT, IOBR `estimate`/`cibersort`/`epic`/`xcell`, and ssGSEA immune signatures) now route through the prepared human-symbol matrix.
+- **TME visualization improvements**:
+  - New `GROUP_COLORS` parameter for user-defined group colors; falls back to `make_group_colors()`.
+  - `calc_tme_barplot_size()` and `calc_tme_boxplot_size()` auto-adjust figure size by sample/cell-type counts.
+  - New `plot_tme_per_celltype_pdf()` generates one focused violin/box PDF per cell type for CIBERSORT and EPIC.
+  - New `plot_tme_heatmap_pdf()` wrapper produces xCell and IOBR ESTIMATE heatmaps with consistent group annotation colors.
+  - All boxplots (ESTIMATE, CIBERSORT, EPIC, ssGSEA) now apply `group_colors` consistently.
+- Metadata loader now renames duplicated `sample` columns in `colData.csv` to avoid downstream subsetting errors.
+- `tests/testthat/test-tme_utils.R`: unit tests for TME helpers.
+- `install_dependencies.R`: added `biomaRt` for mouse-to-human ortholog lookup.
+- `references/PARAMETER_REFERENCE.md`: documented TME parameters and per-method input requirements.
+- `references/FUNCTION_CATALOG.md`: documented new TME helpers.
+
+### Changed
+
+- `notebooks/RNAseq_TME_Deconvolution_Template.ipynb`:
+  - Replaced per-method `undo_log_expr()` calls with a single `prepare_tme_expression()` step.
+  - Native ESTIMATE, IOBR, native CIBERSORT, and ssGSEA now all use the prepared `expr_tme` / `expr_for_ssgsea` matrix.
+  - Visualization block now uses dynamic sizing, per-cell-type outputs, and IOBR ESTIMATE heatmap.
+
+### Fixed
+
+- TME template no longer silently assumes human gene symbols; mouse data is now explicitly converted before deconvolution.
+- TME plots no longer ignore user color preferences; `GROUP_COLORS` is propagated throughout.
+
 - `examples/run_demo_smoke_test.R`: automated smoke test that runs the General notebook core pipeline on demo data and validates outputs.
 - `RNAseq_lib/batch_utils.R`: batch-effect PCA (`plot_pca_by_batch_pdf`), batch variance-explained summary (`summarize_pve_by_batch`), and PVE barplot (`plot_batch_pve_pdf`).
 - `RNAseq_lib/design_utils.R`: paired/repeated-measures design helpers (`make_paired_col_data`, `build_paired_design_formula`, `validate_paired_design`).

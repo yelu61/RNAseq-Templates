@@ -12,6 +12,7 @@ source(file.path(lib_dir, "plot_utils.R"))
 source(file.path(lib_dir, "io_utils.R"))
 source(file.path(lib_dir, "deg_utils.R"))
 source(file.path(lib_dir, "enrichment_utils.R"))
+source(file.path(lib_dir, "tme_utils.R"))
 
 # Run all tests under tests/testthat/
 test_dir(file.path(repo_root, "tests", "testthat"))

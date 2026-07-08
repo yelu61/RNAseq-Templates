@@ -44,7 +44,8 @@ bioc_packages <- c(
   "msigdbr",        # MSigDB gene sets
   "DOSE",           # enrichment visualization dependency
   "BiocParallel",   # parallel backends
-  "GEOquery"        # GEO SeriesMatrix download (optional but pre-installed)
+  "GEOquery",        # GEO SeriesMatrix download (optional but pre-installed)
+  "biomaRt"          # mouse-to-human ortholog lookup for TME deconvolution
 )
 
 # Install CRAN packages

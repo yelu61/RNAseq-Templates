@@ -220,6 +220,39 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `plot_theme_dotheatmap_pdf(...)` / `plot_theme_dotheatmap_from_results(...)`  
   Theme dot-heatmap.
 
+## `tme_utils.R` — TME deconvolution helpers
+
+- `undo_log_expr(expr, is_log, log_base)`  
+  Reverse log transformation for TME tools that expect non-log input.
+- `validate_tme_input(expr)`  
+  Validate expression matrix: numeric, non-negative, rownames present; warn on Ensembl IDs.
+- `deduplicate_expression_by_symbol(expr, symbol_col)`  
+  Deduplicate rows by gene symbol, keeping the row with highest mean expression.
+- `convert_mouse_symbols_to_human(expr, mouse_attr, human_attr, host, verbose)`  
+  Convert mouse MGI symbols to human HGNC symbols via `biomaRt::getLDS`.
+- `prepare_tme_expression(expr, is_log, species, log_base, verbose)`  
+  One-stop preparation: undo log + optional mouse-to-human conversion.
+- `calc_tme_barplot_size(n_samples, ...)` / `calc_tme_boxplot_size(n_celltypes, ...)`  
+  Automatic figure-size calculation based on sample/cell-type counts.
+- `run_iobr_deconvolution(expr, methods, perm, arrays, id_column)`  
+  Run IOBR methods (`cibersort`, `epic`, `xcell`, `estimate`).
+- `combine_tme_results(result_list, id_column)`  
+  Inner-join IOBR result tables by sample ID.
+- `melt_tme_results(tme_df, id_column, group_df, sample_col, group_col)`  
+  Convert wide IOBR result to long format for plotting.
+- `melt_estimate_scores(estimate_df, id_column, group_df, sample_col, group_col)`  
+  Convert ESTIMATE scores to long format.
+- `plot_tme_barplot_pdf(long_df, group_col, sample_col, filename, ...)`  
+  Stacked barplot of TME cell fractions/scores.
+- `plot_tme_boxplot_pdf(long_df, group_col, value_col, filename, ...)`  
+  Faceted box/violin plots per cell type with pairwise statistics.
+- `plot_tme_per_celltype_pdf(long_df, group_col, value_col, filename_prefix, ...)`  
+  One PDF per cell type for focused single-cell-type figures.
+- `plot_tme_heatmap_pdf(tme_df, meta, group_col, sample_col, filename, ...)`  
+  pheatmap wrapper for xCell / ESTIMATE scores with group annotation colors.
+- `plot_estimate_boxplot_pdf(long_df, group_col, filename, ...)`  
+  ESTIMATE score boxplots by group.
+
 ## `survival_utils.R` — survival analysis
 
 - `validate_surv_df(surv_df, time_col, status_col)`  
