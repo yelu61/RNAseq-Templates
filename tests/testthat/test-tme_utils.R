@@ -1,5 +1,11 @@
 # Tests for tme_utils.R helpers
 
+repo_root <- tryCatch(
+  rprojroot::find_root(rprojroot::is_git_root),
+  error = function(e) getwd()
+)
+cibersort_script_path <- file.path(repo_root, "references", "CIBERSORT", "CIBERSORT.R")
+
 test_that("undo_log_expr reverses log2 transformation", {
   mat <- matrix(c(0, 1, 2, 3), nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
   out <- undo_log_expr(mat, is_log = TRUE, log_base = 2)
@@ -135,4 +141,262 @@ test_that("plot_tme_heatmap_pdf accepts group_colors and writes PDF", {
   )
   expect_true(file.exists(tmp))
   unlink(tmp)
+})
+
+# -----------------------------------------------------------------------------
+# Native CIBERSORT wrapper tests
+# -----------------------------------------------------------------------------
+
+make_tiny_signature_and_mixture <- function() {
+  sig <- matrix(
+    c(100, 50, 20, 10, 5,
+      5, 10, 20, 50, 100),
+    nrow = 5, byrow = FALSE
+  )
+  rownames(sig) <- c("A", "B", "C", "D", "E")
+  colnames(sig) <- c("CT1", "CT2")
+
+  mix <- matrix(
+    c(80, 40, 20, 20, 10,
+      20, 20, 20, 40, 80),
+    nrow = 5, byrow = FALSE
+  )
+  rownames(mix) <- c("A", "B", "C", "D", "E")
+  colnames(mix) <- c("S1", "S2")
+
+  list(signature = sig, mixture = mix)
+}
+
+test_that("run_native_cibersort runs with a matrix signature", {
+  skip_if_not_installed("e1071")
+  skip_if_not_installed("preprocessCore")
+  skip_if_not_installed("future")
+  skip_if_not_installed("furrr")
+  skip_if_not_installed("purrr")
+
+  dat <- make_tiny_signature_and_mixture()
+  res <- run_native_cibersort(
+    dat$mixture,
+    signature_file = dat$signature,
+    cibersort_script = cibersort_script_path,
+    is_log = FALSE,
+    perm = 0,
+    QN = FALSE,
+    verbose = FALSE
+  )
+
+  expect_equal(nrow(res), 2)
+  expect_true("ID" %in% colnames(res))
+  expect_true(all(c("CT1", "CT2", "P-value", "Correlation", "RMSE") %in% colnames(res)))
+  expect_type(res$CT1, "double")
+  expect_equal(res$ID, c("S1", "S2"))
+})
+
+test_that("run_native_cibersort reads bundled LM22.txt", {
+  skip_if_not_installed("e1071")
+  skip_if_not_installed("preprocessCore")
+  skip_if_not_installed("future")
+  skip_if_not_installed("furrr")
+  skip_if_not_installed("purrr")
+
+  sig_file <- file.path(repo_root, "references", "CIBERSORT", "LM22.txt")
+  skip_if_not(file.exists(sig_file), "Bundled LM22.txt not found")
+
+  sig <- read_cibersort_signature(sig_file)
+  expect_equal(ncol(sig), 22)
+  expect_true(is.matrix(sig))
+})
+
+test_that("run_native_cibersort reads bundled mouse signature", {
+  sig_file <- file.path(repo_root, "references", "CIBERSORT", "cibersort_mouse_22.csv")
+  skip_if_not(file.exists(sig_file), "Bundled cibersort_mouse_22.csv not found")
+
+  sig <- read_cibersort_signature(sig_file)
+  expect_equal(ncol(sig), 25)
+  expect_true(is.matrix(sig))
+})
+
+test_that("run_native_cibersort errors on missing script", {
+  expect_error(
+    run_native_cibersort(matrix(1:4, nrow = 2), cibersort_script = "not_a_file.R"),
+    "CIBERSORT script not found"
+  )
+})
+
+# -----------------------------------------------------------------------------
+# Native vs IOBR comparison tests
+# -----------------------------------------------------------------------------
+
+test_that("compare_native_iobr_cibersort computes concordance metrics", {
+  dat <- make_tiny_signature_and_mixture()
+  native <- run_native_cibersort(
+    dat$mixture,
+    signature_file = dat$signature,
+    cibersort_script = cibersort_script_path,
+    is_log = FALSE,
+    perm = 0,
+    QN = FALSE,
+    verbose = FALSE
+  )
+  iobr <- data.frame(
+    ID = c("S1", "S2"),
+    CT1 = c(0.98, 0.08),
+    CT2 = c(0.02, 0.92),
+    stringsAsFactors = FALSE
+  )
+
+  cmp <- compare_native_iobr_cibersort(native, iobr, id_column = "ID")
+
+  expect_true(all(c("summary", "long") %in% names(cmp)))
+  expect_equal(nrow(cmp$summary), 2)
+  expect_true(all(c("cell_type", "n", "correlation", "rmse", "mae", "paired_t_pvalue") %in% colnames(cmp$summary)))
+  expect_equal(nrow(cmp$long), 4)
+  expect_true(all(c("sample", "cell_type", "native", "iobr", "difference") %in% colnames(cmp$long)))
+})
+
+test_that("compare_native_iobr_cibersort matches relaxed cell-type names", {
+  native <- data.frame(
+    ID = c("S1", "S2"),
+    `B.cells.naive` = c(0.1, 0.2),
+    `T.cells.CD8` = c(0.3, 0.4),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  iobr <- data.frame(
+    ID = c("S1", "S2"),
+    `B cells naive` = c(0.12, 0.22),
+    `T cells CD8` = c(0.31, 0.39),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  cmp <- compare_native_iobr_cibersort(native, iobr, id_column = "ID")
+  expect_equal(sort(cmp$summary$cell_type), c("b cells naive", "t cells cd8"))
+})
+
+test_that("compare_native_iobr_cibersort errors on mismatched IDs", {
+  native <- data.frame(ID = "A", CT1 = 0.5, CT2 = 0.5)
+  iobr <- data.frame(ID = "B", CT1 = 0.5, CT2 = 0.5)
+  expect_error(compare_native_iobr_cibersort(native, iobr), "No common sample IDs")
+})
+
+test_that("plot_cibersort_correlation_pdf writes PDF", {
+  long_df <- data.frame(
+    sample = c("S1", "S2"),
+    cell_type = "CT1",
+    native = c(0.9, 0.1),
+    iobr = c(0.85, 0.15),
+    difference = c(0.05, -0.05),
+    stringsAsFactors = FALSE
+  )
+  tmp <- tempfile(fileext = ".pdf")
+  expect_silent(plot_cibersort_correlation_pdf(long_df, filename = tmp, width = 6, height = 5))
+  expect_true(file.exists(tmp))
+  unlink(tmp)
+})
+
+test_that("plot_cibersort_difference_pdf writes PDF", {
+  long_df <- data.frame(
+    sample = c("S1", "S2"),
+    cell_type = "CT1",
+    native = c(0.9, 0.1),
+    iobr = c(0.85, 0.15),
+    difference = c(0.05, -0.05),
+    stringsAsFactors = FALSE
+  )
+  tmp <- tempfile(fileext = ".pdf")
+  expect_silent(plot_cibersort_difference_pdf(long_df, filename = tmp, width = 6, height = 5))
+  expect_true(file.exists(tmp))
+  unlink(tmp)
+})
+
+# -----------------------------------------------------------------------------
+# Broad-category aggregation tests
+# -----------------------------------------------------------------------------
+
+test_that("get_cibersort_category_map covers human LM22 cell types", {
+  map <- get_cibersort_category_map("human")
+  expect_equal(sort(unique(map$category)),
+               sort(c("B cells", "CD4 T cells", "CD8 T cells", "Other T cells",
+                      "NK cells", "Monocytes", "Macrophages", "Dendritic cells",
+                      "Mast cells",
+                      "Eosinophils", "Neutrophils")))
+  expect_true(all(c("B cells naive", "T cells CD8", "Monocytes") %in% map$cell_type))
+})
+
+test_that("get_cibersort_category_map covers mouse signature cell types", {
+  map <- get_cibersort_category_map("mouse")
+  expect_true(all(c("B Cells Naive", "T Cells CD8 Actived", "M1 Macrophage",
+                    "NK.Actived", "Monocyte") %in% map$cell_type))
+})
+
+test_that("get_xcell_category_map returns IOBR-compatible keys", {
+  map <- get_xcell_category_map()
+  expect_true("B-cells" %in% map$cell_type)
+  expect_true("CD4+_T-cells" %in% map$cell_type)
+  expect_true("Fibroblasts" %in% map$cell_type)
+  expect_true("Fibroblasts" %in% map$category)
+  expect_true("Endothelials" %in% map$category)
+})
+
+test_that("aggregate_tme_by_category sums CIBERSORT fractions", {
+  cib_df <- data.frame(
+    ID = c("S1", "S2"),
+    `B cells naive` = c(0.1, 0.2),
+    `B cells memory` = c(0.05, 0.1),
+    `Plasma cells` = c(0.0, 0.05),
+    `T cells CD8` = c(0.2, 0.3),
+    `T cells CD4 naive` = c(0.05, 0.1),
+    `NK cells resting` = c(0.1, 0.05),
+    `Monocytes` = c(0.2, 0.1),
+    `Macrophages M1` = c(0.1, 0.05),
+    `Eosinophils` = c(0.05, 0.03),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  map <- get_cibersort_category_map("human")
+  agg <- aggregate_tme_by_category(cib_df, id_column = "ID", category_map = map, method = "sum")
+
+  expect_true("B cells" %in% colnames(agg$wide))
+  expect_equal(agg$wide[["B cells"]], c(0.15, 0.35))
+  expect_false(anyNA(agg$wide))
+})
+
+test_that("aggregate_tme_by_category means xCell scores", {
+  xcell_df <- data.frame(
+    ID = c("S1", "S2"),
+    `B-cells_xCell` = c(0.1, 0.2),
+    `CD4+_T-cells_xCell` = c(0.2, 0.3),
+    `CD8+_T-cells_xCell` = c(0.15, 0.25),
+    `Macrophages_xCell` = c(0.1, 0.05),
+    `Fibroblasts_xCell` = c(0.3, 0.4),
+    `ImmuneScore_xCell` = c(0.5, 0.6),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  map <- get_xcell_category_map()
+  agg <- aggregate_tme_by_category(xcell_df, id_column = "ID", category_map = map, method = "mean")
+
+  expect_true("B cells" %in% colnames(agg$wide))
+  expect_true("Fibroblasts" %in% colnames(agg$wide))
+  expect_false("ImmuneScore" %in% colnames(agg$wide))
+  expect_equal(agg$wide$`CD4 T cells`, c(0.2, 0.3))
+})
+
+test_that("aggregate_tme_by_category warns on unmatched cell types", {
+  df <- data.frame(ID = "S1", `B cells naive` = 0.2, `Unknown cell` = 0.5, check.names = FALSE)
+  map <- get_cibersort_category_map("human")
+  expect_warning(
+    aggregate_tme_by_category(df, id_column = "ID", category_map = map, method = "sum"),
+    "Unknown cell"
+  )
+})
+
+test_that("aggregate_tme_by_category errors when nothing matches", {
+  df <- data.frame(ID = "S1", `Foo` = 0.5, `Bar` = 0.5, check.names = FALSE)
+  map <- get_cibersort_category_map("human")
+  expect_error(
+    aggregate_tme_by_category(df, id_column = "ID", category_map = map, method = "sum"),
+    "No cell-type columns could be matched"
+  )
 })

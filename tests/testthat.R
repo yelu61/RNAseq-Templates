@@ -6,12 +6,14 @@ repo_root <- tryCatch(
   rprojroot::find_root(rprojroot::is_git_root),
   error = function(e) getwd()
 )
+setwd(repo_root)
 lib_dir <- file.path(repo_root, "RNAseq_lib")
 
 source(file.path(lib_dir, "plot_utils.R"))
 source(file.path(lib_dir, "io_utils.R"))
 source(file.path(lib_dir, "deg_utils.R"))
 source(file.path(lib_dir, "enrichment_utils.R"))
+source(file.path(lib_dir, "design_utils.R"))
 source(file.path(lib_dir, "tme_utils.R"))
 
 # Run all tests under tests/testthat/

@@ -30,7 +30,7 @@ run_go_ora <- function(symbols, org_db, universe, ont = "ALL", p_cutoff = 0.05, 
     message("GO ORA skipped: only ", nrow(mapped), " mapped Entrez IDs (min_genes = ", min_genes, ")")
     return(NULL)
   }
-  clusterProfiler::enrichGO(
+  tryCatch(clusterProfiler::enrichGO(
     gene = mapped$ENTREZID,
     universe = universe,
     OrgDb = org_db,
@@ -39,7 +39,10 @@ run_go_ora <- function(symbols, org_db, universe, ont = "ALL", p_cutoff = 0.05, 
     pvalueCutoff = p_cutoff,
     qvalueCutoff = q_cutoff,
     readable = TRUE
-  )
+  ), error = function(e) {
+    message("GO ORA skipped because enrichGO failed: ", conditionMessage(e))
+    NULL
+  })
 }
 
 run_kegg_ora <- function(symbols, org_db, universe, organism, p_cutoff = 0.05, min_genes = 5) {
@@ -48,13 +51,16 @@ run_kegg_ora <- function(symbols, org_db, universe, organism, p_cutoff = 0.05, m
     message("KEGG ORA skipped: only ", nrow(mapped), " mapped Entrez IDs (min_genes = ", min_genes, ")")
     return(NULL)
   }
-  clusterProfiler::enrichKEGG(
+  tryCatch(clusterProfiler::enrichKEGG(
     gene = mapped$ENTREZID,
     universe = universe,
     organism = organism,
     pAdjustMethod = "BH",
     pvalueCutoff = p_cutoff
-  )
+  ), error = function(e) {
+    message("KEGG ORA skipped because enrichKEGG failed: ", conditionMessage(e))
+    NULL
+  })
 }
 
 run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05) {
@@ -62,7 +68,7 @@ run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_siz
     message("GO GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
     return(NULL)
   }
-  clusterProfiler::gseGO(
+  tryCatch(clusterProfiler::gseGO(
     geneList = entrez_list,
     OrgDb = org_db,
     keyType = "ENTREZID",
@@ -71,7 +77,10 @@ run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_siz
     maxGSSize = max_size,
     pAdjustMethod = "BH",
     pvalueCutoff = p_cutoff
-  )
+  ), error = function(e) {
+    message("GO GSEA skipped because gseGO failed: ", conditionMessage(e))
+    NULL
+  })
 }
 
 run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, p_cutoff = 0.05) {
@@ -79,14 +88,17 @@ run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, 
     message("KEGG GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
     return(NULL)
   }
-  clusterProfiler::gseKEGG(
+  tryCatch(clusterProfiler::gseKEGG(
     geneList = entrez_list,
     organism = organism,
     minGSSize = min_size,
     maxGSSize = max_size,
     pAdjustMethod = "BH",
     pvalueCutoff = p_cutoff
-  )
+  ), error = function(e) {
+    message("KEGG GSEA skipped because gseKEGG failed: ", conditionMessage(e))
+    NULL
+  })
 }
 
 run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organism, pvalue_column = "padj", lfc_column = "log2FoldChange", outdir = "2-GSEA", plotdir = "3-Visualization") {

@@ -483,6 +483,7 @@ sem_lower <- function(x) mean(x, na.rm = TRUE) - stats::sd(x, na.rm = TRUE) / sq
 
 plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
                                    comparisons = NULL, method = "t.test",
+                                   p_adjust_method = "BH",
                                    title = NULL, ylab = NULL, group_colors = NULL,
                                    show_ns = FALSE, width = 5.5, height = 6,
                                    y_from_zero = TRUE) {
@@ -497,11 +498,16 @@ plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
       stats::as.formula(paste(value_col, "~", group_col)),
       data = plot_data,
       method = method,
-      comparisons = comparisons
+      comparisons = comparisons,
+      p.adjust.method = p_adjust_method
     ),
     error = function(e) data.frame()
   )
   if (nrow(stat_tbl) > 0) {
+    if (!"p.adj" %in% colnames(stat_tbl)) {
+      stat_tbl$p.adj <- stats::p.adjust(stat_tbl$p, method = p_adjust_method)
+    }
+    stat_tbl$p.adj.format <- format_p_for_label(stat_tbl$p.adj)
     ymax <- max(plot_data[[value_col]], na.rm = TRUE)
     ymin <- min(plot_data[[value_col]], na.rm = TRUE)
     span <- ymax - ymin
@@ -524,7 +530,7 @@ plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
   if (nrow(stat_tbl) > 0) {
     p <- p + ggpubr::stat_pvalue_manual(
       stat_tbl,
-      label = "p.format",
+      label = "p.adj.format",
       y.position = "y.position",
       hide.ns = !show_ns,
       tip.length = 0.01,

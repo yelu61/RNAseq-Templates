@@ -15,15 +15,16 @@
 | `SAMPLE_NAMES` | character vector | — | 样本名，必须与 count 列名一致 |
 | `GROUPS` | character vector | — | 每个样本所属分组 |
 | `GROUP_LEVELS` | character vector | — | 分组水平（控制顺序和参考组） |
-| `BATCH_VECTOR` | character vector/NULL | `NULL` | 批次向量，用于批次效应诊断 |
+| `BATCH_VECTOR` | character vector/NULL | `NULL` | 批次向量，用于批次效应诊断；若提供但 `DESIGN_FORMULA` 未含 `batch` 会 warning |
 | `PAIR_ID` | character vector/NULL | `NULL` | 配对 ID，设置后自动改为配对设计公式 |
 | `SAMPLE_EXCLUDE` | character vector | `character(0)` | 要排除的样本名 |
 | `COMPARISONS` | list of 3-element vectors | — | 每个比较：`c(name, treatment, control)` |
 | `THRESHOLD_GRID` | data.frame | strict/standard/loose | 多阈值 DEG 网格，必须含 `name/p_cutoff/log2fc` |
 | `DEFAULT_THRESHOLD` | character | `"standard"` | 默认阈值名，必须是 THRESHOLD_GRID$name 之一 |
 | `DEG_PVALUE_COLUMN` | character | `"padj"` | 用于 DEG 判断的 P 值列 |
-| `DEG_LFC_COLUMN` | character | `"log2FoldChange_shrunken"` | 用于 DEG 判断的 LFC 列 |
+| `DEG_LFC_COLUMN` | character | `"log2FoldChange_raw"` | 用于 DEG 判断的 LFC 列；可改为 shrunken 做更保守展示 |
 | `GSEA_RANK_COLUMN` | character | `"stat"` | GSEA 排序列 |
+| `PAIRWISE_P_ADJUST_METHOD` | character | `"BH"` | GSVA/单基因两两比较图的 P 值校正方法 |
 | `MIN_COUNT` | numeric | `10` | 低表达过滤阈值 |
 | `DESIGN_FORMULA` | formula | `~ condition` | DESeq2 设计公式；配对时改为 `~ PAIR_ID + condition` |
 | `RUN_TF_ANALYSIS` | logical | `FALSE` | 是否运行 DoRothEA/VIPER TF 活性分析 |
@@ -92,18 +93,21 @@
 | `IOBR_METHODS` | character vector | `c("estimate", "cibersort", "epic", "xcell")` | 要运行的 IOBR 方法 |
 | `IOBR_PERM` | numeric | `1000` | CIBERSORT permutation 次数 |
 | `IOBR_ARRAYS` | logical | `FALSE` | RNA-seq 设为 FALSE；microarray 设为 TRUE |
-| `RUN_CIBERSORT` | logical | `FALSE` | 是否运行 native CIBERSORT（需自备 `CIBERSORT.R` 和 `LM22.txt`） |
-| `CIBERSORT_SCRIPT` | character | `"./CIBERSORT.R"` | native CIBERSORT 脚本路径 |
-| `CIBERSORT_SIGNATURE` | character | `"./LM22.txt"` | CIBERSORT signature 文件路径 |
+| `RUN_CIBERSORT` | logical | `FALSE` | 是否运行 native CIBERSORT（项目已内置 `references/CIBERSORT/` 资源） |
+| `CIBERSORT_SCRIPT` | character | `NULL`（自动定位） | native CIBERSORT 脚本路径；`NULL` 时从项目 git 根目录自动定位 `references/CIBERSORT/CIBERSORT.R` |
+| `CIBERSORT_SIGNATURE` | character | `NULL`（自动定位） | CIBERSORT signature 文件路径；`NULL` 时按 `SPECIES` 自动选择 `LM22.txt`（human）或 `cibersort_mouse_22.csv`（mouse） |
+| `CIBERSORT_PERM` | numeric | `1000` | CIBERSORT permutation 次数（native 与 IOBR 一致） |
+| `CIBERSORT_QN` | logical | `TRUE` | 是否对混合表达矩阵做分位数归一化（QN） |
+| `RUN_CIBERSORT_COMPARISON` | logical | `TRUE` | 当 `RUN_CIBERSORT` 与 `RUN_IOBR` 均含 `"cibersort"` 时，是否自动生成 native vs IOBR 对比表和 PDF（输出到 `OUTDIR`） |
 
 ### 各 TME 方法输入要求
 
 | 方法 | 需要的输入 | 备注 |
 |------|-----------|------|
 | ESTIMATE (native) | 非 log 归一化表达；行名 = HGNC symbol | 与人类基质/免疫 signature 取交集 |
-| CIBERSORT (native) | 非 log 归一化表达；第一列 = HGNC symbol | `LM22.txt` 为人类 reference |
+| CIBERSORT (native) | 非 log 归一化表达；行名 = HGNC symbol（human）或 MGI symbol（mouse） | 内置 `LM22.txt` 为人类 reference；`cibersort_mouse_22.csv` 为小鼠 reference，可直接配合小鼠基因符号使用 |
 | IOBR `estimate` | 非 log TPM-like；行名 = HGNC symbol | 包装自 ESTIMATE |
-| IOBR `cibersort` | 非 log TPM-like；行名 = HGNC symbol | RNA-seq 设 `arrays = FALSE` |
+| IOBR `cibersort` | 非 log TPM-like；行名 = HGNC symbol | RNA-seq 设 `arrays = FALSE`；小鼠数据需先经 `prepare_tme_expression(species="mouse")` 转换为 HGNC symbol |
 | IOBR `epic` | 非 log TPM-like；行名 = HGNC symbol | 输出细胞比例，总和 ≤ 1 |
 | IOBR `xcell` | 非 log TPM-like；行名 = HGNC symbol | 输出富集分数，非比例 |
 | ssGSEA | log 或非 log 均可；行名与 signature 匹配 | 内置免疫 signature 为人类基因符号 |

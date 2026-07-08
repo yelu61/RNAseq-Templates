@@ -44,6 +44,7 @@ source(file.path(lib_dir, "plot_utils.R"))
 source(file.path(lib_dir, "io_utils.R"))
 source(file.path(lib_dir, "deg_utils.R"))
 source(file.path(lib_dir, "enrichment_utils.R"))
+source(file.path(lib_dir, "design_utils.R"))
 
 # Load organism annotation package
 suppressPackageStartupMessages(library(org.Mm.eg.db))
@@ -76,8 +77,10 @@ DEFAULT_THRESHOLD <- "standard"
 MIN_COUNT <- 10
 DESIGN_FORMULA <- ~ condition
 DEG_PVALUE_COLUMN <- "padj"
-DEG_LFC_COLUMN <- "log2FoldChange_shrunken"
+DEG_LFC_COLUMN <- "log2FoldChange_raw"
 GSEA_RANK_COLUMN <- "stat"
+PAIRWISE_TEST_METHOD <- "t.test"
+PAIRWISE_P_ADJUST_METHOD <- "BH"
 
 MIN_LIBRARY_SIZE <- NULL
 MIN_DETECTED_GENES <- NULL
@@ -89,15 +92,17 @@ OUTDIR <- file.path(repo_root, "examples/demo_RNAseq_General")
 setwd(OUTDIR)
 
 # Ensure output directories exist
+dir.create("0-Config", showWarnings = FALSE, recursive = TRUE)
 dir.create("1-DEG", showWarnings = FALSE, recursive = TRUE)
 dir.create("2-GSEA", showWarnings = FALSE, recursive = TRUE)
 dir.create("3-Visualization", showWarnings = FALSE, recursive = TRUE)
 
 # Clean previous outputs
-unlink(c("1-DEG", "2-GSEA", "3-Visualization", "Analysis_summary.txt", "sessionInfo.txt"),
+unlink(c("0-Config", "1-DEG", "2-GSEA", "3-Visualization", "Analysis_summary.txt", "sessionInfo.txt"),
        recursive = TRUE, force = TRUE)
 
 # Re-create after cleaning
+dir.create("0-Config", showWarnings = FALSE, recursive = TRUE)
 dir.create("1-DEG", showWarnings = FALSE, recursive = TRUE)
 dir.create("2-GSEA", showWarnings = FALSE, recursive = TRUE)
 dir.create("3-Visualization", showWarnings = FALSE, recursive = TRUE)
@@ -109,6 +114,17 @@ custom_gene_sets <- list(
 KEY_GENES <- c("Tnf", "Il1b", "Il6", "Cxcl10", "Nos2")
 RUN_TF_ANALYSIS <- FALSE
 RUN_COMPARECLUSTER <- FALSE
+validate_batch_design(NULL, DESIGN_FORMULA, sample_names = SAMPLE_NAMES)
+
+writeLines(c(
+  "# RNAseq_General demo smoke-test configuration snapshot",
+  paste0("# Saved: ", Sys.time()),
+  paste0("DEG_PVALUE_COLUMN <- ", deparse(DEG_PVALUE_COLUMN)),
+  paste0("DEG_LFC_COLUMN <- ", deparse(DEG_LFC_COLUMN)),
+  paste0("GSEA_RANK_COLUMN <- ", deparse(GSEA_RANK_COLUMN)),
+  paste0("PAIRWISE_TEST_METHOD <- ", deparse(PAIRWISE_TEST_METHOD)),
+  paste0("PAIRWISE_P_ADJUST_METHOD <- ", deparse(PAIRWISE_P_ADJUST_METHOD))
+), "0-Config/analysis_config_used.R")
 
 # ---- Preprocessing ----
 rawcount <- read_count_table(INPUT_FILE, INPUT_FORMAT)
@@ -232,6 +248,7 @@ writeLines(capture.output(sessionInfo()), "./sessionInfo.txt")
 # ---- Assertions ----
 # Core pipeline files that must always be produced.
 expected_files <- c(
+  "0-Config/analysis_config_used.R",
   "1-DEG/DEG_threshold_summary.csv",
   "1-DEG/all_genes/DESeq2_all_genes_Treatment_vs_Control.csv",
   "1-DEG/standard/DEG_results_Treatment_vs_Control.csv",

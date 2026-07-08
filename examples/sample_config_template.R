@@ -21,7 +21,7 @@ COMPARISONS <- list(
 )
 
 DEG_PVALUE_COLUMN <- "padj" # "padj" recommended; use "pvalue" only for exploratory screening
-DEG_LFC_COLUMN <- "log2FoldChange_shrunken" # Controls DEG statistics/volcano/heatmap/ORA; alternative: "log2FoldChange_raw"
+DEG_LFC_COLUMN <- "log2FoldChange_raw" # Controls DEG statistics/volcano/heatmap/ORA; use "log2FoldChange_shrunken" for conservative reporting calls
 GSEA_RANK_COLUMN <- "stat" # Recommended for preranked GSEA; independent of DEG_LFC_COLUMN
 THRESHOLD_GRID <- data.frame(
   name = c("strict", "standard", "loose"),
@@ -34,6 +34,7 @@ DEFAULT_THRESHOLD <- "standard"
 MIN_COUNT <- 10
 DESIGN_FORMULA <- ~ condition
 PAIRWISE_TEST_METHOD <- "t.test"
+PAIRWISE_P_ADJUST_METHOD <- "BH"
 
 custom_gene_sets <- list(
   IFN_response = c("Ifng", "Cxcl9", "Cxcl10", "Stat1", "Irf1"),

@@ -54,3 +54,41 @@ validate_paired_design <- function(sample_names, groups, pair_id, group_levels =
   }
   invisible(TRUE)
 }
+
+formula_term_labels <- function(design_formula) {
+  if (is.null(design_formula)) return(character(0))
+  labels <- attr(stats::terms(design_formula), "term.labels")
+  if (is.null(labels)) character(0) else labels
+}
+
+validate_batch_design <- function(batch_vector = NULL, design_formula = ~ condition,
+                                  sample_names = NULL,
+                                  batch_term = "batch") {
+  if (is.null(batch_vector)) {
+    return(invisible(TRUE))
+  }
+  if (length(batch_vector) == 0) {
+    stop("BATCH_VECTOR is empty. Use NULL when there is no batch variable.")
+  }
+  if (any(is.na(batch_vector) | batch_vector == "")) {
+    stop("BATCH_VECTOR contains NA or empty values.")
+  }
+  if (!is.null(sample_names) && length(batch_vector) != length(sample_names)) {
+    stop("BATCH_VECTOR length (", length(batch_vector),
+         ") must equal SAMPLE_NAMES length (", length(sample_names), ").")
+  }
+  if (length(unique(batch_vector)) < 2) {
+    warning("BATCH_VECTOR has fewer than two unique batches; batch adjustment is not meaningful.")
+    return(invisible(TRUE))
+  }
+
+  terms <- formula_term_labels(design_formula)
+  if (!batch_term %in% terms) {
+    warning(
+      "BATCH_VECTOR is provided but DESIGN_FORMULA does not include '", batch_term, "'.\n",
+      "Batch diagnostics will still be shown, but DEG testing will not adjust for batch.\n",
+      "Use DESIGN_FORMULA <- ~ ", batch_term, " + condition if batch is a real design covariate."
+    )
+  }
+  invisible(TRUE)
+}
