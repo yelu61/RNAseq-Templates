@@ -15,6 +15,8 @@ source(file.path(lib_dir, "deg_utils.R"))
 source(file.path(lib_dir, "enrichment_utils.R"))
 source(file.path(lib_dir, "design_utils.R"))
 source(file.path(lib_dir, "tme_utils.R"))
+source(file.path(lib_dir, "data_utils.R"))
+source(file.path(lib_dir, "limma_voom_utils.R"))
 
 # Run all tests under tests/testthat/
 test_dir(file.path(repo_root, "tests", "testthat"))

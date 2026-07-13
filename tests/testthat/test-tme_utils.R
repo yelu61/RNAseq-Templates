@@ -143,6 +143,46 @@ test_that("plot_tme_heatmap_pdf accepts group_colors and writes PDF", {
   unlink(tmp)
 })
 
+test_that("plot_estimate_boxplot_pdf writes combined and individual PDFs", {
+  long_df <- data.frame(
+    sample = rep(c("S1", "S2", "S3", "S4"), each = 2),
+    condition = rep(c("A", "B"), each = 4),
+    score_type = rep(c("StromalScore", "ImmuneScore"), 4),
+    score = c(100, 200, 150, 250, 120, 220, 140, 260),
+    stringsAsFactors = FALSE
+  )
+  tmp_dir <- tempfile()
+  dir.create(tmp_dir)
+  tmp_combined <- file.path(tmp_dir, "combined.pdf")
+  expect_silent(
+    plot_estimate_boxplot_pdf(
+      long_df, group_col = "condition",
+      filename = tmp_combined, width = 10, height = 6,
+      group_colors = c("A" = "#6F6F6F", "B" = "#E07B54"),
+      ncol = 4,
+      save_individual = TRUE,
+      individual_prefix = file.path(tmp_dir, "estimate")
+    )
+  )
+  expect_true(file.exists(tmp_combined))
+  expect_equal(length(list.files(tmp_dir, pattern = "^estimate_.*\\.pdf$")), 2)
+  unlink(tmp_dir, recursive = TRUE)
+})
+
+test_that("melt_estimate_scores handles IOBR suffixes", {
+  iobr_df <- data.frame(
+    sample = c("S1", "S2"),
+    StromalScore_estimate = c(100, 150),
+    ImmuneScore_estimate = c(200, 250),
+    ESTIMATEScore_estimate = c(300, 400),
+    TumorPurity_estimate = c(0.5, 0.6),
+    stringsAsFactors = FALSE
+  )
+  long <- melt_estimate_scores(iobr_df, id_column = "sample", sample_col = "sample", group_col = "condition")
+  expect_equal(sort(unique(long$score_type)), c("ESTIMATEScore", "ImmuneScore", "StromalScore", "TumorPurity"))
+  expect_equal(nrow(long), 8)
+})
+
 # -----------------------------------------------------------------------------
 # Native CIBERSORT wrapper tests
 # -----------------------------------------------------------------------------

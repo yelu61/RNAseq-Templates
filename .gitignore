@@ -4,6 +4,7 @@
 1-DEG/
 2-GSEA/
 3-Visualization/
+0-Config/
 *_Output/
 Analysis_summary.txt
 sessionInfo.txt

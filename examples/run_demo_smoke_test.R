@@ -45,6 +45,7 @@ source(file.path(lib_dir, "io_utils.R"))
 source(file.path(lib_dir, "deg_utils.R"))
 source(file.path(lib_dir, "enrichment_utils.R"))
 source(file.path(lib_dir, "design_utils.R"))
+source(file.path(lib_dir, "data_utils.R"))
 
 # Load organism annotation package
 suppressPackageStartupMessages(library(org.Mm.eg.db))
@@ -141,6 +142,7 @@ validate_sample_design(SAMPLE_NAMES, GROUPS, GROUP_LEVELS, COMPARISONS, count_co
 
 countData <- build_count_matrix(rawcount, GENE_NAME_COL, count_col_names, SAMPLE_NAMES,
                                 duplicate_report_file = "./1-DEG/Duplicated_gene_symbols.csv")
+validate_count_matrix(countData)
 countData_before_gene_filter <- countData
 
 group <- factor(GROUPS, levels = GROUP_LEVELS)

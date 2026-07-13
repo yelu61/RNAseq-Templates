@@ -39,7 +39,7 @@ What is your experimental design?
 
 1. **General pipeline first, then topic template**
    - Run `RNAseq_General.ipynb` to generate `1-DEG/vsd_matrix.csv` and `1-DEG/colData.csv`.
-   - Then run `RNAseq_TME_Deconvolution_Template.ipynb` or `RNAseq_WGCNA_Template.ipynb` in the same folder.
+   - WGCNA uses the VST export. TME reuses metadata but computes TPM from the original raw counts plus gene lengths; it never treats VST as TPM.
 
 2. **Time-course from raw counts**
    - Run `RNAseq_General.ipynb` once for QC and VST export.

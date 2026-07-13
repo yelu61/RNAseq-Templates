@@ -167,7 +167,7 @@ convert_mouse_symbols_to_human <- function(expr,
 # - Reverses log transformation if requested.
 # - If species == "mouse", converts MGI symbols to HGNC symbols via biomaRt.
 prepare_tme_expression <- function(expr,
-                                   is_log = TRUE,
+                                   is_log = FALSE,
                                    species = c("human", "mouse"),
                                    log_base = 2,
                                    verbose = TRUE) {
@@ -322,7 +322,7 @@ plot_tme_boxplot_pdf <- function(long_df, group_col = "condition", value_col = "
                                   filename, title = "TME Cell Fraction by Group",
                                   comparisons = NULL, method = "t.test", show_ns = FALSE,
                                   width = 14, height = 10,
-                                  group_colors = NULL) {
+                                  group_colors = NULL, p_adjust_method = "BH") {
   if (nrow(long_df) == 0 || !all(c(group_col, value_col, "cell_type") %in% colnames(long_df))) {
     return(invisible(NULL))
   }
@@ -356,6 +356,7 @@ plot_tme_boxplot_pdf <- function(long_df, group_col = "condition", value_col = "
     p <- p + ggpubr::stat_compare_means(
       comparisons = comparisons,
       method = method,
+      p.adjust.method = p_adjust_method,
       hide.ns = !show_ns,
       tip.length = 0.015,
       bracket.size = 0.35,
@@ -439,6 +440,9 @@ plot_tme_per_celltype_pdf <- function(long_df, group_col = "condition", value_co
 }
 
 # Plot a TME score heatmap (xCell or ESTIMATE) with consistent group annotation.
+# Samples are ordered by group, then clustered within each group, so replicates
+# of the same condition appear together while still preserving within-group
+# hierarchical structure.
 plot_tme_heatmap_pdf <- function(tme_df, meta,
                                   group_col = "condition", sample_col = "sample",
                                   group_colors = NULL,
@@ -468,11 +472,44 @@ plot_tme_heatmap_pdf <- function(tme_df, meta,
     annotation_colors <- list(Group = group_colors[levels(ann$Group)])
   }
 
+  # Build a group-ordered, within-group clustered column order.
+  # Do this by hierarchical clustering within each group slice and concatenating.
+  order_grouped_columns <- function(m, group_vec, group_levels = NULL) {
+    if (is.null(group_levels)) group_levels <- unique(group_vec)
+    ordered_cols <- character(0)
+    for (g in group_levels) {
+      idx <- which(group_vec == g)
+      if (length(idx) == 0) next
+      if (length(idx) == 1) {
+        ordered_cols <- c(ordered_cols, colnames(m)[idx])
+      } else {
+        sub_m <- m[, idx, drop = FALSE]
+        # Remove constant rows before clustering to avoid dist failures
+        sd_rows <- apply(sub_m, 1, stats::sd, na.rm = TRUE)
+        sub_m_var <- sub_m[sd_rows > 0 | is.na(sd_rows), , drop = FALSE]
+        if (ncol(sub_m_var) >= 2 && nrow(sub_m_var) >= 2) {
+          d <- stats::dist(t(sub_m_var))
+          hc <- stats::hclust(d)
+          ordered_cols <- c(ordered_cols, colnames(sub_m)[hc$order])
+        } else {
+          ordered_cols <- c(ordered_cols, colnames(sub_m))
+        }
+      }
+    }
+    ordered_cols
+  }
+
+  group_vec <- ann$Group
+  names(group_vec) <- rownames(ann)
+  col_order <- order_grouped_columns(t(mat), group_vec, levels(ann$Group))
+  mat <- mat[col_order, , drop = FALSE]
+  ann <- ann[col_order, , drop = FALSE]
+
   pheatmap::pheatmap(t(mat),
                      annotation_col = ann,
                      annotation_colors = annotation_colors,
                      scale = scale,
-                     cluster_cols = TRUE,
+                     cluster_cols = FALSE,
                      cluster_rows = TRUE,
                      main = title,
                      filename = filename,
@@ -482,14 +519,23 @@ plot_tme_heatmap_pdf <- function(tme_df, meta,
 }
 
 # Extract ESTIMATE-like scores from an IOBR estimate result and make them long-format.
+# IOBR appends the method name as a suffix (e.g. "StromalScore_estimate"); native
+# ESTIMATE does not. Accept both naming styles and strip any method suffix.
 melt_estimate_scores <- function(estimate_df, id_column = "ID", group_df = NULL,
                                  sample_col = "sample", group_col = "condition") {
-  score_cols <- intersect(c("StromalScore", "ImmuneScore", "ESTIMATEScore", "TumorPurity"), colnames(estimate_df))
+  score_cols <- intersect(c(
+    "StromalScore", "ImmuneScore", "ESTIMATEScore", "TumorPurity",
+    "StromalScore_estimate", "ImmuneScore_estimate",
+    "ESTIMATEScore_estimate", "TumorPurity_estimate"
+  ), colnames(estimate_df))
   if (length(score_cols) == 0) return(NULL)
   long <- estimate_df |>
-    dplyr::rename(!!sample_col := .data[[id_column]]) |>
+    dplyr::rename(!!sample_col := dplyr::all_of(id_column)) |>
     tidyr::pivot_longer(cols = dplyr::all_of(score_cols), names_to = "score_type", values_to = "score") |>
-    dplyr::mutate(score = as.numeric(.data$score))
+    dplyr::mutate(
+      score = as.numeric(.data$score),
+      score_type = gsub("_estimate$", "", .data$score_type)
+    )
   if (!is.null(group_df) && all(c(sample_col, group_col) %in% colnames(group_df))) {
     long <- long |>
       dplyr::left_join(group_df[, c(sample_col, group_col), drop = FALSE], by = sample_col)
@@ -501,17 +547,21 @@ melt_estimate_scores <- function(estimate_df, id_column = "ID", group_df = NULL,
 plot_estimate_boxplot_pdf <- function(long_df, group_col = "condition", filename,
                                       title = "ESTIMATE Scores by Group", method = "t.test",
                                       show_ns = FALSE, width = 10, height = 6,
-                                      group_colors = NULL) {
+                                      group_colors = NULL, ncol = 4,
+                                      save_individual = FALSE, individual_prefix = NULL,
+                                      p_adjust_method = "BH") {
   if (is.null(long_df) || nrow(long_df) == 0) return(invisible(NULL))
   plot_data <- long_df
   plot_data[[group_col]] <- factor(plot_data[[group_col]])
   group_levels <- levels(plot_data[[group_col]])
   comparisons <- if (length(group_levels) >= 2) utils::combn(group_levels, 2, simplify = FALSE) else list()
 
+  if (is.null(ncol)) ncol <- min(4, length(unique(plot_data$score_type)))
+
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data$score, fill = .data[[group_col]])) +
     ggplot2::geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.85, linewidth = 0.4) +
     ggplot2::geom_jitter(width = 0.12, size = 2, shape = 21, color = "#222222", stroke = 0.25, fill = "white", alpha = 0.9) +
-    ggplot2::facet_wrap(~ score_type, scales = "free_y") +
+    ggplot2::facet_wrap(~ score_type, scales = "free_y", ncol = ncol) +
     ggplot2::labs(x = NULL, y = "Score", title = title) +
     theme_publication(base_size = 11) +
     ggplot2::theme(
@@ -525,6 +575,7 @@ plot_estimate_boxplot_pdf <- function(long_df, group_col = "condition", filename
     p <- p + ggpubr::stat_compare_means(
       comparisons = comparisons,
       method = method,
+      p.adjust.method = p_adjust_method,
       hide.ns = !show_ns,
       tip.length = 0.015,
       bracket.size = 0.4,
@@ -532,6 +583,40 @@ plot_estimate_boxplot_pdf <- function(long_df, group_col = "condition", filename
     )
   }
   save_pdf_plot(p, filename, width = width, height = height)
+
+  if (isTRUE(save_individual) && !is.null(individual_prefix)) {
+    score_types <- unique(as.character(plot_data$score_type))
+    for (st in score_types) {
+      sub <- plot_data[plot_data$score_type == st, , drop = FALSE]
+      sub_comparisons <- if (length(group_levels) >= 2) utils::combn(group_levels, 2, simplify = FALSE) else list()
+      p_st <- ggplot2::ggplot(sub, ggplot2::aes(x = .data[[group_col]], y = .data$score, fill = .data[[group_col]])) +
+        ggplot2::geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.85, linewidth = 0.4) +
+        ggplot2::geom_jitter(width = 0.12, size = 2.5, shape = 21, color = "#222222", stroke = 0.25, fill = "white", alpha = 0.9) +
+        ggplot2::labs(x = NULL, y = "Score", title = paste(title, "-", st)) +
+        theme_publication(base_size = 12) +
+        ggplot2::theme(
+          axis.text.x = ggplot2::element_text(angle = 30, hjust = 1),
+          legend.position = "none"
+        )
+      if (!is.null(group_colors)) {
+        p_st <- p_st + ggplot2::scale_fill_manual(values = group_colors)
+      }
+      if (length(sub_comparisons) > 0) {
+        p_st <- p_st + ggpubr::stat_compare_means(
+          comparisons = sub_comparisons,
+          method = method,
+          p.adjust.method = p_adjust_method,
+          hide.ns = !show_ns,
+          tip.length = 0.015,
+          bracket.size = 0.4,
+          size = 3
+        )
+      }
+      out_file <- paste0(individual_prefix, "_", gsub("[^[:alnum:]_-]", "_", st), ".pdf")
+      save_pdf_plot(p_st, out_file, width = 5.5, height = 6)
+    }
+  }
+
   p
 }
 
@@ -600,9 +685,9 @@ read_cibersort_signature <- function(signature_file) {
 run_native_cibersort <- function(expr,
                                   signature_file = .default_cibersort_signature("human"),
                                   cibersort_script = .default_cibersort_script(),
-                                  is_log = TRUE,
+                                  is_log = FALSE,
                                   perm = 1000,
-                                  QN = TRUE,
+                                  QN = FALSE,
                                   id_column = "ID",
                                   verbose = TRUE) {
   if (!file.exists(cibersort_script)) {
@@ -905,6 +990,7 @@ get_cibersort_category_map <- function(species = c("human", "mouse")) {
       "T cells CD4 memory resting" = "CD4 T cells",
       "T cells CD4 memory activated" = "CD4 T cells",
       "T cells CD4 follicular helper" = "CD4 T cells",
+      "T cells follicular helper" = "CD4 T cells",
       "T cells regulatory (Tregs)" = "CD4 T cells",
       "T cells gamma delta" = "Other T cells",
       "NK cells resting" = "NK cells",
@@ -920,6 +1006,10 @@ get_cibersort_category_map <- function(species = c("human", "mouse")) {
       "Eosinophils" = "Eosinophils",
       "Neutrophils" = "Neutrophils"
     )
+    # IOBR returns LM22 columns with underscores instead of spaces; keep both
+    # the canonical spaced names and the IOBR-style underscored names.
+    mapping_underscore <- stats::setNames(mapping, gsub(" ", "_", names(mapping)))
+    mapping <- c(mapping, mapping_underscore)
   } else {
     mapping <- c(
       "B Cells Naive" = "B cells",

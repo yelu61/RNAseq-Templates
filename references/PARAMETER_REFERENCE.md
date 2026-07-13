@@ -37,6 +37,7 @@
 |--------|------|--------|------|
 | `INPUT_FILE` / `INPUT_FORMAT` | — | — | 同 General |
 | `SAMPLE_NAMES` / `GROUPS` / `GROUP_LEVELS` | — | — | 同 General |
+| `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；决定富集分析使用的 org.db 和 KEGG organism code |
 | `BATCH_VECTOR` | character vector/NULL | `NULL` | 批次向量，传给 `limma::removeBatchEffect` |
 | `COMPARISONS` | list | — | 同 General |
 | `DEG_PADJ_CUTOFF` | numeric | `0.05` | DEG 阈值 |
@@ -50,6 +51,8 @@
 |--------|------|--------|------|
 | `EXPR_FILE` | character | `"./1-DEG/vsd_matrix.csv"` | VST 表达矩阵，用于 Mfuzz |
 | `META_FILE` | character | `"./1-DEG/colData.csv"` | 样本元数据，含 time / condition |
+| `GENE_COLUMN` | character/NULL | `NULL` | 基因名列名；NULL 使用行名/第一列 |
+| `SAMPLE_COLUMN` | character | `"sample"` | 样本名列 |
 | `TIME_COLUMN` | character | `"time"` | 时间列名 |
 | `GROUP_COLUMN` | character/NULL | `"condition"` | 分组列名，可选 |
 | `TIME_LEVELS` | character vector/NULL | `NULL` | 时间水平顺序 |
@@ -69,7 +72,10 @@
 | `DOWNLOAD_FROM_GEO` | logical | `FALSE` | 是否从 GEO 下载 SeriesMatrix |
 | `GEO_ACCESSION` | character | `"GSE12345"` | GEO accession |
 | `TCGA_PROJECT` | character | `"TCGA-STAD"` | TCGA project ID |
+| `GDC_COUNTS_ASSAY` | character/NULL | `NULL` | GDC SummarizedExperiment 中 count assay 名称；NULL 自动检测 |
+| `GDC_TPM_ASSAY` | character/NULL | `NULL` | GDC SummarizedExperiment 中 TPM assay 名称；NULL 自动检测 |
 | `LOCAL_COUNTS_FILE` / `LOCAL_TPM_FILE` / `LOCAL_CLINICAL_FILE` | character | — | 本地文件模式 |
+| `LOCAL_GENE_COLUMN` | character/NULL | `NULL` | 本地矩阵的基因 ID 列；数值型 Entrez ID 必须显式填写 |
 | `GENE_ID_MAP_FILE` | character/NULL | `NULL` | TCGA ENSEMBL→symbol 映射文件，NULL 自动从 SE 提取 |
 | `GENES_FOR_SURVIVAL` | character vector | `c("ICAM1")` | 做 KM/Cox 的基因 |
 | `CLINICAL_VARS_FOR_KM` | character vector | `c("ajcc_pathologic_stage")` | 临床变量 KM，连续变量自动二分组 |
@@ -79,15 +85,21 @@
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `EXPR_FILE` | character | `"./1-DEG/vsd_matrix.csv"` | VST 表达矩阵 |
+| `INPUT_MODE` | character | `"raw_counts"` | 推荐默认；`expression` 仅用于已有 TPM/log2(TPM+1) |
+| `RAW_COUNTS_FILE` | character | `"./0-Data/featureCounts_merged_count.annot.tsv"` | 原始整数 count 表；默认输入 |
+| `RAW_COUNTS_FORMAT` | character | `"tsv"` | `tsv`、`csv` 或 `excel` |
+| `EXPR_FILE` | character | `"./0-Data/TPM_matrix.csv"` | 仅在 expression 模式使用；不能提供 VST/rlog |
+| `EXPR_UNIT` | character | `"tpm"` | `tpm` 或 `log2_tpm`；必须显式声明 |
 | `META_FILE` | character | `"./1-DEG/colData.csv"` | 元数据 |
-| `GROUP_COLUMN` | character | `"condition"` | 分组列 |
-| `EXPR_IS_LOG` | logical | `TRUE` | 表达矩阵是否为 log2(TPM+1)/VST 等 log 尺度；TME 工具需要非 log 输入，会自动还原 |
-| `GENE_COLUMN` | character/NULL | `NULL` | 基因名列名；NULL 使用行名/第一列 |
+| `GENE_COLUMN` | character/NULL | `"gene_id"` | TPM 计算优先使用唯一稳定 ID；Ensembl ID 后续转 symbol；数值型 ID 必须显式指定列名 |
+| `GENE_LENGTH_COLUMN` | character/NULL | `NULL` | raw count 表中基因长度列名（bp 或 kb，由 `GENE_LENGTH_UNIT` 控制） |
+| `GENE_LENGTH_UNIT` | character | `"bp"` | `"bp"` 或 `"kb"` |
+| `GENE_START_COL` / `GENE_END_COL` | character | `"gene_start"` / `"gene_end"` | 若未提供 `GENE_LENGTH_COLUMN`，则用起止坐标计算长度 |
 | `SAMPLE_COLUMN` | character | `"sample"` | 样本名列 |
+| `GROUP_COLUMN` | character | `"condition"` | 分组列 |
 | `GROUP_LEVELS` | character vector/NULL | `NULL` | 分组水平顺序 |
-| `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；小鼠数据会经 `biomaRt::getLDS` 把 MGI symbol 转为 HGNC symbol 后再进行反卷积 |
-| `GROUP_COLORS` | named character vector/NULL | `NULL` | 自定义分组颜色，例如 `c("Control"="#6F6F6F", "Treatment"="#E07B54")`；NULL 时自动生成 |
+| `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；小鼠数据会经 `convert_expression_rownames()` 把 MGI symbol 转为 HGNC symbol 后再进行反卷积 |
+| `GROUP_COLORS` | named character vector/NULL | `NULL` | 自定义分组颜色；NULL 时自动生成 |
 | `RUN_ESTIMATE` | logical | `TRUE` | 是否运行 native ESTIMATE |
 | `RUN_IOBR` | logical | `TRUE` | 是否运行 IOBR |
 | `IOBR_METHODS` | character vector | `c("estimate", "cibersort", "epic", "xcell")` | 要运行的 IOBR 方法 |
@@ -97,7 +109,7 @@
 | `CIBERSORT_SCRIPT` | character | `NULL`（自动定位） | native CIBERSORT 脚本路径；`NULL` 时从项目 git 根目录自动定位 `references/CIBERSORT/CIBERSORT.R` |
 | `CIBERSORT_SIGNATURE` | character | `NULL`（自动定位） | CIBERSORT signature 文件路径；`NULL` 时按 `SPECIES` 自动选择 `LM22.txt`（human）或 `cibersort_mouse_22.csv`（mouse） |
 | `CIBERSORT_PERM` | numeric | `1000` | CIBERSORT permutation 次数（native 与 IOBR 一致） |
-| `CIBERSORT_QN` | logical | `TRUE` | 是否对混合表达矩阵做分位数归一化（QN） |
+| `CIBERSORT_QN` | logical | `FALSE` | RNA-seq 关闭分位数归一化；microarray 通常设为 TRUE |
 | `RUN_CIBERSORT_COMPARISON` | logical | `TRUE` | 当 `RUN_CIBERSORT` 与 `RUN_IOBR` 均含 `"cibersort"` 时，是否自动生成 native vs IOBR 对比表和 PDF（输出到 `OUTDIR`） |
 
 ### 各 TME 方法输入要求

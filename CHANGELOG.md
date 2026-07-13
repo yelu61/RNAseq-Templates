@@ -6,6 +6,38 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Added
 
+- **New `RNAseq_lib/data_utils.R`** with reusable data loading, validation, and gene-conversion helpers:
+  - `read_expression_matrix()`, `read_metadata()`, `validate_samples_match()`
+  - `detect_expression_scale()` for heuristic classification of raw counts / TPM / log-scale / VST
+  - `counts_to_tpm()`, `counts_to_fpkm()`, `extract_gene_lengths()`, `validate_count_matrix()`
+  - `convert_gene_ids()`, `convert_expression_rownames()` supporting human/mouse Ensembl↔symbol and MGI→HGNC
+- **Unit tests** for `data_utils.R` in `tests/testthat/test-data_utils.R`.
+- `validate_expression_contract()` enforces declared TPM/log2(TPM+1)/VST input units and gene/sample-name integrity.
+- `tests/validate_notebooks.R` parses every notebook code cell and every shared R script; CI runs it on push and pull requests.
+- `RNAseq_TME_Deconvolution_Template.ipynb` now defaults to raw integer counts plus gene lengths and computes TPM internally.
+- `RNAseq_limma_voom_Template.ipynb`: new `SPECIES` parameter (default `"human"`) drives species-aware org.db and KEGG organism code selection.
+- `RNAseq_TCGA_GEO_Template.ipynb`: new `GDC_COUNTS_ASSAY` and `GDC_TPM_ASSAY` parameters to explicitly select assays instead of relying on hard-coded `assays_list[[4]]`.
+
+### Changed
+
+- `RNAseq_TME_Deconvolution_Template.ipynb`, `RNAseq_TimeCourse_Template.ipynb`, `RNAseq_WGCNA_Template.ipynb`, and `RNAseq_TCGA_GEO_Template.ipynb` now load expression and metadata via `data_utils.R` helpers and perform explicit sample-name validation.
+- `RNAseq_limma_voom_Template.ipynb` uses `validate_count_matrix()` after `build_count_matrix()`.
+- limma-voom batch adjustment is now fitted as a model covariate; `removeBatchEffect()` is reserved for visualization.
+- `RNAseq_General.ipynb` sources `data_utils.R` and calls `validate_count_matrix()` after building the count matrix.
+
+### Fixed
+
+- TME no longer treats VST/rlog as invertible log2(TPM+1); VST is rejected for CIBERSORT/EPIC/ESTIMATE input.
+- Restored the truncated TME visualization cell and its CIBERSORT/EPIC/xCell/ESTIMATE outputs.
+- Fixed successful gene-ID conversion/deduplication in `convert_expression_rownames()` and rejected unsafe numeric first-column inference.
+- GEO SeriesMatrix assays must pass raw-integer-count validation before DESeq2; normalized GEO data are directed to limma.
+- TPM conversion now rejects zero-total-RPK samples, and metadata rejects unknown factor levels.
+
+- `plot_tme_heatmap_pdf()` now orders samples by group, then clusters within each group, so heatmaps keep biological replicates together while preserving within-group structure.
+- `melt_estimate_scores()` now recognizes IOBR's `_estimate`-suffixed score columns and strips the suffix for consistent plotting.
+- `get_cibersort_category_map("human")` now matches both canonical spaced LM22 names and IOBR's underscore-separated column names, fixing empty/wrong broad-category aggregation for IOBR CIBERSORT.
+- `plot_estimate_boxplot_pdf()` supports `ncol`, `save_individual`, and `individual_prefix` for a combined 1×4 layout plus per-score single plots.
+
 - **Mouse TME deconvolution support** in `RNAseq_TME_Deconvolution_Template.ipynb` and `RNAseq_lib/tme_utils.R`:
   - New `SPECIES` parameter (`"human"` / `"mouse"`) in the TME notebook.
   - `convert_mouse_symbols_to_human()` uses `biomaRt::getLDS` to map MGI symbols to HGNC symbols.
@@ -36,6 +68,10 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 - TME template no longer silently assumes human gene symbols; mouse data is now explicitly converted before deconvolution.
 - TME plots no longer ignore user color preferences; `GROUP_COLORS` is propagated throughout.
+- `plot_tme_heatmap_pdf()` now orders samples by group (using the factor levels) and clusters within each group, so heatmaps keep biological replicates together while preserving within-group structure.
+- `melt_estimate_scores()` now recognizes IOBR's `_estimate`-suffixed score columns and strips the suffix for consistent plotting.
+- `get_cibersort_category_map("human")` now matches both canonical spaced LM22 names and IOBR's underscore-separated column names, fixing empty/wrong broad-category aggregation for IOBR CIBERSORT.
+- `plot_estimate_boxplot_pdf()` supports `ncol`, `save_individual`, and `individual_prefix` for a combined 1×4 layout plus per-score single plots.
 
 - `examples/run_demo_smoke_test.R`: automated smoke test that runs the General notebook core pipeline on demo data and validates outputs.
 - `RNAseq_lib/batch_utils.R`: batch-effect PCA (`plot_pca_by_batch_pdf`), batch variance-explained summary (`summarize_pve_by_batch`), and PVE barplot (`plot_batch_pve_pdf`).

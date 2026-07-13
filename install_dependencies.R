@@ -14,11 +14,16 @@ options(repos = c(CRAN = "https://cloud.r-project.org/"))
   "corrplot",       # correlation plots
   "openxlsx",       # Excel input/output
   "UpSetR",         # DEG overlap visualization
-  "estimate",       # ESTIMATE scores (R-Forge)
   "ashr",           # DESeq2 lfcShrink type = "ashr"
   "ggrepel",        # volcano plot labels
   "data.table",     # used by notebooks and GEOquery
-  "matrixStats"     # rowMads / rowSds in visualization
+  "matrixStats",    # rowMads / rowSds in visualization
+  "jsonlite",       # notebook JSON validation
+  "rprojroot",      # robust repository path discovery
+  "babelgene",      # offline mouse-human ortholog mapping
+  "e1071",          # native CIBERSORT support
+  "future",         # native CIBERSORT parallel backend
+  "furrr"           # native CIBERSORT parallel mapping
 )
 
 bioc_packages <- c(
@@ -45,7 +50,8 @@ bioc_packages <- c(
   "DOSE",           # enrichment visualization dependency
   "BiocParallel",   # parallel backends
   "GEOquery",        # GEO SeriesMatrix download (optional but pre-installed)
-  "biomaRt"          # mouse-to-human ortholog lookup for TME deconvolution
+  "biomaRt",         # mouse-to-human ortholog lookup for TME deconvolution
+  "preprocessCore"   # native CIBERSORT quantile normalization
 )
 
 # Install CRAN packages
@@ -55,6 +61,12 @@ if (length(missing_cran) > 0) {
   install.packages(missing_cran)
 } else {
   message("All CRAN packages already installed.")
+}
+
+# ESTIMATE is distributed through R-Forge rather than CRAN.
+if (!requireNamespace("estimate", quietly = TRUE)) {
+  message("Installing estimate from R-Forge...")
+  install.packages("estimate", repos = c(RForge = "https://R-Forge.R-project.org", getOption("repos")))
 }
 
 # Install Bioconductor packages
@@ -76,7 +88,7 @@ if (!requireNamespace("IOBR", quietly = TRUE)) {
 }
 
 # Verify
-check_pkgs <- c(cran_packages, bioc_packages, "IOBR")
+check_pkgs <- c(cran_packages, bioc_packages, "estimate", "IOBR")
 failed <- check_pkgs[!vapply(check_pkgs, requireNamespace, logical(1), quietly = TRUE)]
 if (length(failed) > 0) {
   warning("Failed to install: ", paste(failed, collapse = ", "))

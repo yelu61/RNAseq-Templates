@@ -132,6 +132,33 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `write_all_genes_excel(res_list, outdir, filename)`
   All-gene results Excel export.
 
+## `data_utils.R` — unified data loading, validation, and gene conversion
+
+- `read_expression_matrix(file, gene_column, sample_ids, file_format)`
+  Load CSV/TSV/Excel expression matrix; auto-detect gene column, coerce numeric, deduplicate rows by mean expression.
+- `read_metadata(file, sample_column, required_columns, group_column, group_levels, time_column, time_levels)`
+  Load metadata; rename duplicated sample columns, validate required columns, factorize group/time columns.
+- `validate_samples_match(expr_samples, meta_samples, context, strict_order)`
+  Check sample overlap and ordering between expression and metadata.
+- `detect_expression_scale(mat, sample_n, gene_n)`
+  Heuristic classification of expression matrix scale: raw_counts / log2_tpm / tpm / vst / unknown.
+- `validate_expression_contract(mat, expected, tolerance)`
+  Enforce declared expression units and gene/sample-name integrity; heuristic detection never chooses a transformation automatically.
+- `counts_to_tpm(counts_mat, gene_lengths_kb)`
+  Convert raw counts to TPM using gene lengths (kb).
+- `counts_to_fpkm(counts_mat, gene_lengths_kb)`
+  Convert raw counts to FPKM.
+- `extract_gene_lengths(raw_annot, id_col, length_col, start_col, end_col, length_unit)`
+  Extract gene lengths in kb from annotation columns.
+- `validate_count_matrix(mat, require_integer, require_non_negative, min_samples)`
+  Validate numeric, non-negative, optionally integer count matrix.
+- `detect_gene_id_type(ids)`
+  Heuristic: Ensembl IDs vs symbols.
+- `convert_gene_ids(ids, from, to, species, method)`
+  Convert gene IDs via AnnotationDbi / babelgene; supports human/mouse Ensembl↔symbol and MGI→HGNC.
+- `convert_expression_rownames(expr, species, target, method)`
+  Convert expression matrix row names and deduplicate by mean expression.
+
 ## `limma_voom_utils.R` — limma-voom DE
 
 - `prepare_dge_for_voom(counts, group, ...)`
@@ -139,6 +166,7 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `run_voom(dge, design, plot_file)`
   Run `limma::voom`.
 - `remove_batch_effect_voom(v, batch, ...)`
+  Visualization-only batch removal. Differential testing should include batch in `make_group_design()`.
   Apply `limma::removeBatchEffect`.
 - `run_limma_contrasts(v, design, comparisons)`
   Fit + contrast + eBayes; standardized result list.

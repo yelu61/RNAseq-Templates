@@ -83,10 +83,23 @@ run_limma_contrasts <- function(v, design, comparisons) {
 }
 
 # Build a no-intercept design matrix from a grouping vector.
-make_group_design <- function(group) {
+# Batch belongs in the fitted model. removeBatchEffect() is intended for
+# visualization and must not replace batch adjustment in differential testing.
+make_group_design <- function(group, batch = NULL) {
   group <- factor(group)
-  design <- stats::model.matrix(~ 0 + group)
-  colnames(design) <- levels(group)
+  if (is.null(batch)) {
+    design <- stats::model.matrix(~ 0 + group)
+    colnames(design) <- levels(group)
+  } else {
+    batch <- factor(batch)
+    if (length(batch) != length(group)) stop("batch length must equal group length.")
+    if (nlevels(batch) < 2) stop("batch must contain at least two levels.")
+    design <- stats::model.matrix(~ 0 + group + batch)
+    colnames(design)[seq_len(nlevels(group))] <- levels(group)
+    if (qr(design)$rank < ncol(design)) {
+      stop("The group + batch design matrix is not full rank. Group and batch may be confounded.")
+    }
+  }
   design
 }
 

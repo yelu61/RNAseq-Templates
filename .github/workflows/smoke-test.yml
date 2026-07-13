@@ -26,6 +26,7 @@ jobs:
         with:
           packages: |
             any::testthat
+            any::jsonlite
             any::knitr
             any::rmarkdown
           extra-packages: |
@@ -54,11 +55,13 @@ jobs:
             any::RColorBrewer
             any::openxlsx
             any::UpSetR
-            any::estimate
             github::IOBR/IOBR
 
       - name: Run smoke test
         run: Rscript examples/run_demo_smoke_test.R
 
       - name: Run unit tests
-        run: Rscript -e "testthat::test_dir('tests/testthat')"
+        run: Rscript tests/testthat.R
+
+      - name: Validate all notebooks and R scripts
+        run: Rscript tests/validate_notebooks.R

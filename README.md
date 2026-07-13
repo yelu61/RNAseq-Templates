@@ -103,14 +103,14 @@ sessionInfo.txt
 
 All major visualizations are saved as editable PDF files under `3-Visualization/`. Threshold-specific ORA figures are written to `3-Visualization/<threshold>/`.
 
-`RNAseq_General.ipynb` also exports reusable intermediate files for topic notebooks:
+`RNAseq_General.ipynb` also exports reusable intermediate files for analyses that require variance-stabilized expression:
 
 ```text
 1-DEG/vsd_matrix.csv
 1-DEG/colData.csv
 ```
 
-The WGCNA and TME templates default to these exports, so the usual workflow is: run the general notebook first, then copy/run a topic notebook in the same project folder.
+WGCNA and time-course clustering can use the exported VST matrix. TME deconvolution does **not** use VST as TPM: it defaults to the original raw counts plus gene lengths and computes TPM internally. VST/rlog cannot be inverted to TPM.
 
 ## General Bulk RNA-seq Workflow
 
@@ -169,7 +169,7 @@ GSEA is intentionally not repeated by DEG threshold because it uses the full ran
 
 ## Topic Templates
 
-- `RNAseq_TME_Deconvolution_Template.ipynb`: ssGSEA immune/stromal signatures, native ESTIMATE, **IOBR multi-algorithm deconvolution (CIBERSORT/EPIC/xCell/ESTIMATE)**, optional native CIBERSORT, group comparisons, and heatmaps.
+- `RNAseq_TME_Deconvolution_Template.ipynb`: raw counts + gene lengths to TPM, ssGSEA immune/stromal signatures, native ESTIMATE, **IOBR multi-algorithm deconvolution (CIBERSORT/EPIC/xCell/ESTIMATE)**, optional native CIBERSORT, group comparisons, and heatmaps. Expression-file fallback accepts only TPM or log2(TPM+1), never VST/rlog.
 - `RNAseq_WGCNA_Template.ipynb`: expression filtering, sample QC, soft-threshold selection, module detection, module-trait correlation, hub gene export.
 - `RNAseq_TCGA_GEO_Template.ipynb`: TCGA data download via TCGAbiolinks or local GEO matrices, counts/TPM preparation, Tumor vs Normal DESeq2 DEG, single-gene expression, **KM survival (median/quartile), univariate and multivariate Cox regression**, clinical-variable KM, ORA/GSEA. **GEO SeriesMatrix auto-download** is also supported.
 - `RNAseq_limma_voom_Template.ipynb`: `edgeR` + `limma-voom` alternative DEG workflow with optional batch correction (`BATCH_VECTOR`) and multi-contrast analysis.
