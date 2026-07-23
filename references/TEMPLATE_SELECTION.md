@@ -52,3 +52,14 @@ What is your experimental design?
 
 - All templates share the same `RNAseq_lib/` helper library. Copy the notebook into your project folder and keep `RNAseq_lib/` accessible (copy it next to the notebook or adjust `LIB_DIR`).
 - When in doubt, start with `RNAseq_General.ipynb`; it covers the most common use case and exports files that other templates consume.
+
+## Non-interactive / batch execution
+
+If you want to run the General pipeline without opening a notebook (scheduling,
+batch across projects, headless servers), use the command-line runner instead:
+
+- `templates/General/run_analysis.R` + `config.R` runs the same General pipeline via `Rscript`, with optional switches for TF analysis, TME deconvolution (`RUN_TME`, output to `4-TME/`), Excel export, and the HTML report.
+- After a run, `templates/General/visualize_results.R` regenerates targeted figures (key genes, single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without recompute.
+
+The notebooks remain the better choice for interactive exploration (tweaking gene
+sets for GSVA, ad-hoc plots). See [templates/General/README.md](../templates/General/README.md).

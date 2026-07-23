@@ -250,7 +250,10 @@ build_multi_comparison_enrich_df <- function(result_map,
   out <- dplyr::bind_rows(rows)
   if (nrow(out) == 0) return(out)
   if (!is.null(ontology_filter) && "ONTOLOGY" %in% colnames(out)) {
-    out <- out[out$ONTOLOGY %in% ontology_filter, , drop = FALSE]
+    # Keep NA-ontology rows: enrichResult objects already carry a real ONTOLOGY,
+    # but a plain data.frame (e.g. read back from a saved ORA csv) gets NA here
+    # and would otherwise be silently dropped by the filter.
+    out <- out[is.na(out$ONTOLOGY) | out$ONTOLOGY %in% ontology_filter, , drop = FALSE]
   }
   out
 }

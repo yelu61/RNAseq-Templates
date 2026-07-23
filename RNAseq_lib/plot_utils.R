@@ -773,6 +773,13 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
   if (!"p.adjust" %in% colnames(df)) df$p.adjust <- df$pvalue
   df <- df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
   df <- utils::head(df, show_category)
+  # KEGG results can carry NA or duplicated Descriptions (the online KEGG map
+  # supplies IDs without names). Fill missing labels from ID and deduplicate so
+  # the factor levels below are unique; otherwise factor() errors with
+  # "factor level is duplicated".
+  desc <- as.character(df$Description)
+  desc[is.na(desc) | desc == ""] <- as.character(df$ID)[is.na(desc) | desc == ""]
+  df$Description <- make.unique(desc, sep = " ")
   df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
   df$log10_padj <- -log10(pmax(df$p.adjust, .Machine$double.xmin))
   wrapped_terms <- wrap_term_labels(df$Description, width = 54)

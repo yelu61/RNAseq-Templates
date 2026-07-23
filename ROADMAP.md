@@ -36,6 +36,9 @@ This project provides notebook-first bulk RNA-seq analysis templates with a shar
 
 - [x] Add automated CI/GitHub Actions to run `examples/run_demo_smoke_test.R` on push
 - [x] Add formal unit tests for `RNAseq_lib` helpers
+- [x] Command-line runner for the General template (`templates/General/run_analysis.R` + `config.R`)
+- [x] Optional TME deconvolution switch (`RUN_TME`) inside `run_analysis.R` (output to `4-TME/`)
+- [x] Targeted re-visualization script (`templates/General/visualize_results.R`) from saved results
 - [ ] Create a Python/CLI wrapper to convert notebook parameter cells to R scripts for headless execution
 - [ ] Add more public-data examples (GEO local-file mode, TCGA local-file mode)
 - [x] Add interactive HTML report generation (`reports/analysis_report.qmd`, rendered via quarto or rmarkdown)

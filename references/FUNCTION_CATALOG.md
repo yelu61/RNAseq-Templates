@@ -358,31 +358,6 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `summarize_mfuzz_clusters(cluster_df)`
   Cluster size summary.
 
-## `tme_utils.R` — TME deconvolution
-
-- `undo_log_expr(expr, is_log, log_base)`
-  Reverse log transform.
-- `run_iobr_deconvolution(expr, methods, ...)`
-  Run IOBR deconvolution methods.
-- `run_native_cibersort(expr, signature_file, ...)`
-  Run bundled native CIBERSORT (human LM22 or mouse signature).
-- `compare_native_iobr_cibersort(native_df, iobr_df, ...)`
-  Compare native vs IOBR CIBERSORT fractions.
-- `plot_cibersort_correlation_pdf(long_df, ...)` / `plot_cibersort_difference_pdf(long_df, ...)`
-  Native vs IOBR comparison plots.
-- `combine_tme_results(result_list, id_column)`
-  Inner-join results across methods.
-- `melt_tme_results(tme_df, ...)`
-  Long format for ggplot.
-- `plot_tme_barplot_pdf(...)`
-  Stacked cell-fraction barplot.
-- `plot_tme_boxplot_pdf(...)`
-  Cell-fraction box/violin plots.
-- `melt_estimate_scores(estimate_df, ...)`
-  Long-format ESTIMATE scores.
-- `plot_estimate_boxplot_pdf(...)`
-  ESTIMATE score boxplots.
-
 ## `report_utils.R` — unified HTML report
 
 - `render_analysis_report(outdir, report_file, template, params)`

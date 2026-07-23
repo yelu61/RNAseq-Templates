@@ -1,5 +1,8 @@
 .ipynb_checkpoints/
 
+# R plotting side-effect (auto-generated when a plot is drawn with no device open)
+Rplots.pdf
+
 # Analysis outputs
 1-DEG/
 2-GSEA/

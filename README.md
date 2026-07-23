@@ -42,6 +42,12 @@ examples/
   demo_RNAseq_TCGA_GEO/   # runnable TCGA/GEO local-file demo (offline)
 reports/
   analysis_report.qmd     # unified HTML report template
+templates/
+  General/                # command-line runner for the General template
+    config.R              #   edit per-project parameters here
+    run_analysis.R        #   Rscript entry point (same pipeline as the notebook)
+    visualize_results.R   #   targeted re-visualization from saved results (no recompute)
+    README.md             #   usage, batch execution, when to use the notebook
 references/
   PARAMETER_REFERENCE.md  # parameter glossary
   FUNCTION_CATALOG.md     # helper function index
@@ -89,6 +95,27 @@ See [references/TEMPLATE_SELECTION.md](references/TEMPLATE_SELECTION.md) for a d
 For a step-by-step guide, see [GETTING_STARTED.md](GETTING_STARTED.md).
 
 ## Recommended Usage
+
+### Option A — command line (reproducible / batch)
+
+For running the standard General pipeline without opening a notebook (scheduling,
+batch across many projects, headless servers), use the script runner:
+
+```bash
+cp templates/General/{config.R,run_analysis.R,visualize_results.R} /path/to/project/
+# edit /path/to/project/config.R, then:
+cd /path/to/project && Rscript run_analysis.R
+```
+
+It runs the same pipeline as the General notebook and writes the same outputs.
+`run_analysis.R` also supports optional TME deconvolution (`RUN_TME`, output to
+`4-TME/`) and caches `gseaResult` objects to `2-GSEA/gsea_results.rds`. After a
+run, `Rscript visualize_results.R` regenerates targeted figures (key genes,
+single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without
+recompute. See [templates/General/README.md](templates/General/README.md) for
+batch execution and library-path resolution.
+
+### Option B — notebook (interactive exploration)
 
 1. Copy a notebook from `notebooks/` into a concrete project folder.
 2. Keep access to `RNAseq_lib/` by either:
@@ -139,6 +166,7 @@ WGCNA and time-course clustering can use the exported VST matrix. TME deconvolut
 - GSVA for custom gene sets with heatmap, combined boxplot, and per-signature violin/box/jitter PDFs
 - single-gene expression plots with mean bar, SEM, sample points, and layered pairwise P values
 - optional DoRothEA/VIPER TF activity analysis
+- optional TME deconvolution (ESTIMATE / IOBR / ssGSEA; `RUN_TME` switch, output to `4-TME/`)
 - DEG set overlap visualization (UpSet plot + Jaccard heatmap) across comparisons and thresholds
 - optional multi-threshold DEG Excel export (`1-DEG/DEG_results.xlsx`)
 - optional unified HTML report (`RNAseq_report.html`) summarizing DEG/ORA/GSEA/QC outputs

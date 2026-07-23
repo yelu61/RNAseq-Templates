@@ -6,6 +6,24 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Added
 
+- **Command-line runner for the General template** under `templates/General/`:
+  - `run_analysis.R` + `config.R` run the full General pipeline (all 15 sections) non-interactively via `Rscript`, driven by a single editable config file. `RNAseq_lib` is located via `RNASEQ_LIB_DIR`, the project directory, the repository root, or the parent directory. Intended for reproducible / batch / headless execution alongside the notebook.
+  - **Optional TME deconvolution switch** (`RUN_TME`) in `run_analysis.R`: builds TPM from raw counts + gene lengths, then runs native ESTIMATE, IOBR (`estimate`/`cibersort`/`epic`/`xcell`), and ssGSEA immune signatures, writing to `4-TME/`. Sub-switches `RUN_TME_ESTIMATE` / `RUN_TME_IOBR` / `RUN_TME_SSGSEA`; IOBR/estimate absence degrades gracefully. Mouse input is converted to human orthologs via biomaRt.
+  - `run_analysis.R` now caches `gseaResult` objects to `2-GSEA/gsea_results.rds` and saves `GROUP_LEVELS`/`COMPARISONS`/`SPECIES`/`colData` into `1-DEG/DEG_results.Rdata` so downstream figures can be regenerated without recompute.
+  - **`visualize_results.R`**: targeted re-visualization from saved results with no DESeq2/ORA/GSEA recompute. Three independent sections — key-gene bar/SEM + heatmap (from `DEG_results.Rdata`), single-term gseaplot2 figures (from cached `gsea_results.rds`), and ORA theme dot-heatmaps (from saved ORA csvs).
+  - `templates/General/README.md` documenting usage, batch execution, switches, and when to use the notebook instead.
+- **Unit tests for `plot_utils.R`** (`tests/testthat/test-plot_utils.R`, 23 test blocks): palette/theme, label/ratio/z-score/SEM helpers, `pairwise_effect_table`, `prepare_enrich_df`, and theme matching.
+
+### Fixed
+
+- `plot_gsea_nes_barplot_pdf()` no longer fails with `factor level is duplicated` when KEGG GSEA results carry `NA` or duplicated `Description` values (the online KEGG map supplies IDs without names); missing labels now fall back to the term ID and are deduplicated.
+- `build_multi_comparison_enrich_df()` no longer drops enrichment rows whose `ONTOLOGY` is `NA` when an `ontology_filter` is set — this previously blanked ORA theme dot-heatmaps built from csv-read results (e.g. in `visualize_results.R`).
+- Native-ESTIMATE table parsing in `run_analysis.R` now selects real sample columns explicitly instead of positionally, so the extra `Description.1` column ESTIMATE writes is not mistaken for a sample.
+- Removed a duplicated `tme_utils.R` section in `references/FUNCTION_CATALOG.md`.
+- `Rplots.pdf` added to `.gitignore` (stray R plotting side-effect).
+
+### Added
+
 - **Runnable demos for all remaining topic templates**, each with a `regenerate_demo_data.R` + `run_demo.R` pair under `examples/`:
   - `examples/demo_RNAseq_TME/`: raw counts + gene lengths → TPM → ESTIMATE / IOBR (estimate, cibersort, epic) / ssGSEA. Uses human symbols so the whole run is offline.
   - `examples/demo_RNAseq_TimeCourse/`: VST expression across 4 time points with injected temporal patterns → Mfuzz clustering, plus raw-count time-point-vs-baseline DESeq2.
