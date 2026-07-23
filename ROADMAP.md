@@ -38,13 +38,14 @@ This project provides notebook-first bulk RNA-seq analysis templates with a shar
 - [x] Add formal unit tests for `RNAseq_lib` helpers
 - [ ] Create a Python/CLI wrapper to convert notebook parameter cells to R scripts for headless execution
 - [ ] Add more public-data examples (GEO local-file mode, TCGA local-file mode)
-- [ ] Add interactive HTML report generation (using R Markdown or Quarto)
+- [x] Add interactive HTML report generation (`reports/analysis_report.qmd`, rendered via quarto or rmarkdown)
 - [ ] Add single-cell reference integration / deconvolution (e.g., Bisque, CIBERSORTx)
 - [ ] Support additional model organisms (rat, zebrafish) via configurable `org.*.eg.db`
-- [x] Provide example datasets for each topic template (General, limma-voom, WGCNA done; TME, TimeCourse, TCGA/GEO planned)
-- [ ] Add runnable demos for RNAseq_TME_Deconvolution_Template.ipynb
-- [ ] Add runnable demos for RNAseq_TimeCourse_Template.ipynb
-- [ ] Add runnable demos for RNAseq_TCGA_GEO_Template.ipynb (local-file mode)
+- [x] Provide example datasets for each topic template (General, limma-voom, WGCNA, TME, TimeCourse, TCGA/GEO all done)
+- [x] Add runnable demos for RNAseq_TME_Deconvolution_Template.ipynb
+- [x] Add runnable demos for RNAseq_TimeCourse_Template.ipynb
+- [x] Add runnable demos for RNAseq_TCGA_GEO_Template.ipynb (local-file mode)
+- [x] Add unified HTML report generation (`reports/analysis_report.qmd` + `render_analysis_report()`)
 
 ## How to contribute
 

@@ -1,0 +1,174 @@
+---
+title: "`r params$title`"
+author: "`r params$author`"
+date: "`r Sys.Date()`"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    theme: cosmo
+    embed-resources: true
+    fig-cap-location: bottom
+    df-print: kable
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  title: "RNA-seq Analysis Report"
+  author: ""
+  outdir: "."
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+outdir <- params$outdir
+deg_dir <- file.path(outdir, "1-DEG")
+gsea_dir <- file.path(outdir, "2-GSEA")
+viz_dir <- file.path(outdir, "3-Visualization")
+
+read_csv_safe <- function(path, ...) {
+  if (!file.exists(path)) return(NULL)
+  tryCatch(utils::read.csv(path, stringsAsFactors = FALSE, ...), error = function(e) NULL)
+}
+list_pdfs <- function(dir, pattern = "\\.pdf$") {
+  if (!dir.exists(dir)) return(character(0))
+  sort(list.files(dir, pattern = pattern, full.names = FALSE, recursive = TRUE))
+}
+show_table <- function(df, caption = NULL, max_rows = 50) {
+  if (is.null(df) || nrow(df) == 0) {
+    cat("_No data available._\n")
+    return(invisible(NULL))
+  }
+  if (nrow(df) > max_rows) {
+    cat(sprintf("_Showing first %d of %d rows._\n", max_rows, nrow(df)))
+    df <- utils::head(df, max_rows)
+  }
+  knitr::kable(df, caption = caption, row.names = FALSE)
+}
+show_pdf <- function(rel_path, width = "100%") {
+  # Embed a PDF figure inline so it renders inside the HTML report.
+  full <- file.path(viz_dir, rel_path)
+  if (!file.exists(full)) {
+    cat("_Figure not found: ", rel_path, "_\n", sep = "")
+    return(invisible(NULL))
+  }
+  uri <- knitr::image_uri(full)
+  cat(sprintf('<object data="%s" type="application/pdf" width="%s" height="620px">', uri, width))
+  cat(sprintf('<p>PDF figure: <a href="%s">%s</a></p>', uri, rel_path))
+  cat('</object>')
+}
+```
+
+# Overview
+
+This report summarizes a bulk RNA-seq analysis run with the **RNAseq-Templates**
+workflow. All figures are saved as editable PDFs under `3-Visualization/`; the
+sections below embed the key tables and figures for a single shareable document.
+
+**Analysis directory:** `r outdir`
+
+```{r summary}
+summary_txt <- file.path(outdir, "Analysis_summary.txt")
+if (file.exists(summary_txt)) {
+  cat("```\n")
+  cat(readLines(summary_txt, warn = FALSE), sep = "\n")
+  cat("\n```\n")
+}
+```
+
+# Differential Expression
+
+## DEG counts by threshold
+
+```{r deg-summary}
+deg_summary <- read_csv_safe(file.path(deg_dir, "DEG_threshold_summary.csv"))
+show_table(deg_summary, caption = "Number of differentially expressed genes per comparison and threshold.")
+```
+
+## Raw vs shrunken log2FC strategy
+
+```{r lfc-strategy}
+lfc_strategy <- read_csv_safe(file.path(deg_dir, "DEG_lfc_strategy_summary.csv"))
+show_table(lfc_strategy, caption = "DEG counts using raw vs shrunken log2 fold-change.")
+```
+
+## Volcano plots
+
+```{r volcano, results='asis'}
+volcano_pdfs <- list_pdfs(viz_dir, pattern = "^Volcano_.*\\.pdf$")
+if (length(volcano_pdfs) == 0) cat("_No volcano plots found._\n")
+for (f in volcano_pdfs) {
+  cat("\n### ", sub("\\.pdf$", "", f), "\n\n")
+  show_pdf(f)
+}
+```
+
+# Sample Quality Control
+
+```{r qc, results='asis'}
+qc_pdfs <- list_pdfs(viz_dir, pattern = "^(PCA_plot|Sample_distance_heatmap).*\\.pdf$")
+for (f in qc_pdfs) {
+  cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
+  show_pdf(f)
+}
+if (length(qc_pdfs) == 0) cat("_No QC figures found._\n")
+```
+
+# Enrichment (ORA)
+
+```{r ora-summary}
+ora_summary <- read_csv_safe(file.path(gsea_dir, "ORA_threshold_summary.csv"))
+show_table(ora_summary, caption = "Over-representation analysis summary across thresholds.")
+```
+
+```{r ora-figures, results='asis'}
+ora_pdfs <- list_pdfs(viz_dir, pattern = "(ORA|GO_|KEGG_).*\\.pdf$")
+if (length(ora_pdfs) > 0) {
+  cat("\n## ORA figures\n\n")
+  for (f in utils::head(ora_pdfs, 12)) {
+    cat("\n### ", sub("\\.pdf$", "", f), "\n\n")
+    show_pdf(f)
+  }
+}
+```
+
+# Enrichment (GSEA)
+
+```{r gsea-figures, results='asis'}
+gsea_pdfs <- list_pdfs(viz_dir, pattern = "GSEA.*\\.pdf$")
+if (length(gsea_pdfs) == 0) {
+  cat("_No GSEA figures found._\n")
+} else {
+  for (f in utils::head(gsea_pdfs, 12)) {
+    cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
+    show_pdf(f)
+  }
+}
+```
+
+# Expression Heatmaps
+
+```{r heatmaps, results='asis'}
+hm_pdfs <- list_pdfs(viz_dir, pattern = "Heatmap.*\\.pdf$")
+if (length(hm_pdfs) == 0) cat("_No heatmaps found._\n")
+for (f in utils::head(hm_pdfs, 8)) {
+  cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
+  show_pdf(f)
+}
+```
+
+# Reproducibility
+
+```{r session-info, results='asis'}
+sess <- file.path(outdir, "sessionInfo.txt")
+if (file.exists(sess)) {
+  cat("```\n")
+  cat(utils::head(readLines(sess, warn = FALSE), 60), sep = "\n")
+  cat("\n```\n")
+} else {
+  cat("_sessionInfo.txt not found._\n")
+}
+```

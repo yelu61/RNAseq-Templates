@@ -205,7 +205,8 @@ for (comp_name in names(res_list)) {
                    filename = paste0("./3-Visualization/Volcano_", comp_name, "_standard.pdf"))
 }
 
-# Heatmap
+# Heatmap. Rasterization is auto-disabled when no cairo device is available, so
+# the heatmap renders on minimal/headless systems too (just without raster).
 top_genes_mad <- head(order(matrixStats::rowMads(vsd_mat), decreasing = TRUE), 1000)
 plot_expression_heatmap_pdf(vsd_mat[top_genes_mad, ],
                             filename = "./3-Visualization/Heatmap_top1000_variable_genes.pdf",
@@ -257,13 +258,23 @@ expected_files <- c(
   "1-DEG/DEG_lfc_strategy_summary.csv",
   "1-DEG/DEG_diagnostic_summary.csv",
   "2-GSEA/ORA_threshold_summary.csv",
-  "3-Visualization/PCA_plot.pdf",
   "3-Visualization/Sample_distance_heatmap.pdf",
-  "3-Visualization/Volcano_Treatment_vs_Control_standard.pdf",
   "3-Visualization/Heatmap_top1000_variable_genes.pdf",
   "Analysis_summary.txt",
   "sessionInfo.txt"
 )
+# ggplot-based PDFs (PCA, volcano) need a working graphics device. They are
+# required on CI (which has cairo) but skipped on minimal/headless systems.
+ggplot_pdfs <- c(
+  "3-Visualization/PCA_plot.pdf",
+  "3-Visualization/Volcano_Treatment_vs_Control_standard.pdf"
+)
+if (.has_working_cairo()) {
+  expected_files <- c(expected_files, ggplot_pdfs)
+} else {
+  message("cairo device unavailable; not requiring ggplot PDFs: ",
+          paste(ggplot_pdfs, collapse = ", "))
+}
 
 missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {
@@ -283,6 +294,56 @@ stopifnot(all(deg_summary$Total >= 0))
 stopifnot(nrow(res_list[[1]]) > 0)
 
 cat("\n========================================\n")
-cat("Smoke test PASSED.\n")
+cat("General demo smoke test PASSED.\n")
 cat("All expected output files were generated.\n")
+cat("========================================\n")
+
+# ---- Topic-template demos ----
+# Each demo regenerates its own input data and runs its core pipeline. Run them
+# via Rscript so each gets a fresh R session and working directory. The smoke
+# test fails if any demo fails.
+setwd(repo_root)
+demo_scripts <- c(
+  "demo_RNAseq_TME/regenerate_demo_data.R",
+  "demo_RNAseq_TME/run_demo.R",
+  "demo_RNAseq_TimeCourse/regenerate_demo_data.R",
+  "demo_RNAseq_TimeCourse/run_demo.R",
+  "demo_RNAseq_TCGA_GEO/regenerate_demo_data.R",
+  "demo_RNAseq_TCGA_GEO/run_demo.R"
+)
+
+rscript <- file.path(R.home("bin"), "Rscript")
+failed_demos <- character(0)
+# The demo scripts locate their own directory via --file= and chdir into it, but
+# only when Rscript resolves a path containing a separator. Invoke each with its
+# repo-root-relative path and force the working directory to the repo root so the
+# inherited cwd is predictable regardless of where the General demo left it.
+setwd(repo_root)
+for (script in demo_scripts) {
+  script_rel <- file.path("examples", script)
+  script_path <- file.path(repo_root, script_rel)
+  if (!file.exists(script_path)) {
+    cat("\n>>> SKIP (missing):", script, "\n")
+    next
+  }
+  cat("\n----------------------------------------\n")
+  cat(">>> Running:", script, "\n")
+  cat("----------------------------------------\n")
+  status <- system2(rscript, shQuote(script_rel))
+  if (!identical(status, 0L)) {
+    failed_demos <- c(failed_demos, script)
+    cat(">>> FAILED:", script, "(exit status", status, ")\n")
+  } else {
+    cat(">>> OK:", script, "\n")
+  }
+}
+
+cat("\n========================================\n")
+if (length(failed_demos) > 0) {
+  cat("Smoke test FAILED. Topic demos that failed:\n")
+  cat(paste0("  - ", failed_demos, collapse = "\n"), "\n")
+  cat("========================================\n")
+  stop("One or more topic-template demos failed.")
+}
+cat("All demo smoke tests PASSED (General + TME + TimeCourse + TCGA-GEO).\n")
 cat("========================================\n")

@@ -85,7 +85,33 @@ This guide lists common issues and how to fix them.
 - `BATCH_VECTOR` must be non-NULL and have the same length as `SAMPLE_NAMES` / `ncol(vsd)`.
 - Check that the batch-effect diagnostics cell ran after the PCA cell.
 
+### Q: PDF plots fail with "failed to load cairo DLL" / X11 errors
+
+- This is an environment issue (missing X11/cairo), not an analysis error. The analysis tables (CSV) are still produced.
+- On macOS install XQuartz; on Linux install `libx11`/`cairo` dev packages. The demo smoke tests only require PDF figures when `capabilities("cairo")` is available.
+
+### Q: HTML report is skipped
+
+- Report generation needs the **quarto** CLI (https://quarto.org) plus the R `quarto` package, or the **rmarkdown** package. If neither is present the notebook prints a message and continues.
+- The report only assembles already-saved CSV/PDF outputs, so re-running just the report cell after installing quarto/rmarkdown is enough.
+
 ## TCGA / GEO
+
+### Q: Clinical KM / survival plots fail with "object of type 'symbol' is not subsettable"
+
+- This was a bug in `plot_km_by_group_pdf()` under R ≥ 4.x where the survfit formula was captured as a symbol. Update `RNAseq_lib/survival_utils.R` to the latest version — the formula is now inlined into the survfit call.
+
+## TME deconvolution
+
+### Q: ESTIMATE fails with "找不到对象 'common_genes'" (object 'common_genes' not found)
+
+- `requireNamespace("estimate")` does not load the package's lazy-data objects, but `filterCommonGenes()` / `estimateScore()` use them directly. The template now calls `utils::data("common_genes", package = "estimate")` and `utils::data("SI_geneset", package = "estimate")` first. Update the notebook / template if you have an older copy.
+
+### Q: ssGSEA fails with "object 'immune_gene_sets' not found"
+
+- Older TME templates referenced an undefined `immune_gene_sets` variable. It is now a built-in constant in `RNAseq_lib/tme_utils.R` (28 immune signatures, Charoentong et al. 2017). Source `tme_utils.R` before the ssGSEA cell.
+
+
 
 ### Q: `GENE_ID_MAP_FILE` not found
 

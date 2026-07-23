@@ -29,13 +29,19 @@ RNAseq_lib/
   batch_utils.R            # batch-effect diagnostics
   design_utils.R           # paired design helpers
   geo_utils.R              # GEO SeriesMatrix download
+  report_utils.R           # unified HTML report rendering
 examples/
   sample_config_template.R
-  run_demo_smoke_test.R   # automated demo validation
+  run_demo_smoke_test.R   # runs every demo and validates outputs
   demo_data/              # demo count table and metadata
   demo_RNAseq_General/    # pre-configured General notebook ready to run
   demo_RNAseq_limma_voom/ # pre-configured limma-voom notebook ready to run
   demo_RNAseq_WGCNA/      # pre-configured WGCNA notebook ready to run
+  demo_RNAseq_TME/        # runnable TME deconvolution demo (offline)
+  demo_RNAseq_TimeCourse/ # runnable time-course demo
+  demo_RNAseq_TCGA_GEO/   # runnable TCGA/GEO local-file demo (offline)
+reports/
+  analysis_report.qmd     # unified HTML report template
 references/
   PARAMETER_REFERENCE.md  # parameter glossary
   FUNCTION_CATALOG.md     # helper function index
@@ -135,6 +141,11 @@ WGCNA and time-course clustering can use the exported VST matrix. TME deconvolut
 - optional DoRothEA/VIPER TF activity analysis
 - DEG set overlap visualization (UpSet plot + Jaccard heatmap) across comparisons and thresholds
 - optional multi-threshold DEG Excel export (`1-DEG/DEG_results.xlsx`)
+- optional unified HTML report (`RNAseq_report.html`) summarizing DEG/ORA/GSEA/QC outputs
+
+## Unified HTML report
+
+Set `GENERATE_HTML_REPORT <- TRUE` in the General notebook (default) to render a single self-contained `RNAseq_report.html` from the saved CSV and PDF outputs — easier to share with collaborators than a folder of PDFs. The report is assembled by `reports/analysis_report.qmd` via `render_analysis_report()` and does not re-run any analysis. It renders with the [quarto](https://quarto.org) CLI when available, otherwise falls back to the `rmarkdown` package. The report cell skips gracefully (with a message) when neither is installed.
 
 ## Multi-threshold DEG + ORA
 

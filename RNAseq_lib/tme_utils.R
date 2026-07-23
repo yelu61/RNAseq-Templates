@@ -1,5 +1,39 @@
 # Tumor microenvironment (TME) deconvolution helpers for bulk RNA-seq templates.
 
+# Built-in pan-cancer immune cell signatures for ssGSEA (28 cell types), from
+# Charoentong et al., Cell Reports 2017 (PMID 28052254). Human gene symbols.
+# Used as the default `immune_gene_sets` in the TME deconvolution template.
+immune_gene_sets <- list(
+  "Activated B cell" = c("CCR6", "CD180", "CD19", "CD22", "CD38", "CD69", "CD79A", "CD79B", "CD83", "CR2", "FCER2", "FCRL1", "FCRL2", "FCRL5", "IGHD", "IGHM", "MS4A1", "PAX5", "TCL1A"),
+  "Activated CD4 T cell" = c("CCL5", "CCR6", "CD2", "CD28", "CD3D", "CD3E", "CD3G", "CD4", "CD40LG", "CD69", "ICOS", "IFNG", "IL2RA", "IL2RB", "ITK", "LCK", "LTA", "PTPRC", "TRAC", "TRBC1", "TRBC2", "ZAP70"),
+  "Activated CD8 T cell" = c("CCL5", "CD2", "CD3D", "CD3E", "CD3G", "CD69", "CD8A", "CD8B", "CST7", "CTSW", "EOMES", "FGFBP2", "GZMA", "GZMB", "GZMH", "GZMK", "GZMM", "IFNG", "KLRB1", "KLRC1", "KLRD1", "KLRK1", "NKG7", "PRF1", "TRAC", "ZAP70"),
+  "Activated dendritic cell" = c("CCR7", "CD1A", "CD1B", "CD1C", "CD1E", "CD207", "CD80", "CD83", "CD86", "CLEC9A", "CLEC10A", "FCER1A", "HLA-DPA1", "HLA-DPB1", "HLA-DQA1", "HLA-DQB1", "HLA-DRA", "HLA-DRB1", "LAMP3", "XCR1"),
+  "Central memory CD4 T cell" = c("CCR7", "CD27", "CD28", "CD3D", "CD3E", "CD4", "IL7R", "LTB", "SELL", "TCF7"),
+  "Central memory CD8 T cell" = c("CCR7", "CD27", "CD28", "CD3D", "CD3E", "CD8A", "CD8B", "IL7R", "LTB", "SELL", "TCF7"),
+  "Effector memory CD4 T cell" = c("CD3D", "CD3E", "CD4", "CXCR3", "GPR15", "ITGA4", "ITGB1", "KLRB1", "S100A4"),
+  "Effector memory CD8 T cell" = c("CD3D", "CD3E", "CD8A", "CD8B", "CCL5", "CXCR3", "EOMES", "GZMA", "GZMK", "KLRG1", "NKG7"),
+  "Eosinophil" = c("CCR3", "CLC", "IL5RA", "PRG2", "PRG3", "SIGLEC8"),
+  "Gamma delta T cell" = c("CCL5", "CD3D", "CD3E", "CD3G", "KLRC1", "KLRD1", "NKG7", "TRDC", "TRGC1", "TRGC2"),
+  "Immature B cell" = c("CD19", "CD22", "CD38", "CD72", "CD79A", "CD79B", "IGHD", "IGHM", "MS4A1", "TCL1A", "VPREB3"),
+  "Immature dendritic cell" = c("CD1A", "CD1B", "CD1C", "CD1E", "CD207", "CLEC10A", "FCER1A", "HLA-DPA1", "HLA-DQA1", "HLA-DRA"),
+  "MDSC" = c("ARG1", "CD14", "CD33", "CD34", "CXCR2", "FCGR3B", "IL13RA1", "ITGAM", "S100A8", "S100A9"),
+  "Macrophage" = c("C1QA", "C1QB", "C1QC", "CD14", "CD163", "CD68", "CD84", "CSF1R", "CYBB", "FCGR1A", "FCGR2A", "FCGR3A", "ITGAM", "MERTK", "MSR1"),
+  "Mast cell" = c("CPA3", "CTSG", "GATA2", "HDC", "HPGDS", "KIT", "MS4A2", "TPSAB1", "TPSB2"),
+  "Memory B cell" = c("AIM2", "CD19", "CD27", "CD38", "CD79A", "CD79B", "CR2", "MS4A1", "TNFRSF13B", "TNFRSF13C"),
+  "Monocyte" = c("CD14", "CD300E", "CD33", "CSF1R", "FCGR3A", "FCN1", "S100A12", "S100A8", "S100A9", "VCAN"),
+  "Natural killer T cell" = c("CD3D", "CD3E", "CD3G", "GZMB", "KLRB1", "KLRC1", "KLRD1", "NKG7", "PRF1", "TRAC", "ZBTB16"),
+  "Natural killer cell" = c("CD244", "FGFBP2", "GNLY", "KLRC1", "KLRD1", "KLRF1", "KLRK1", "NCR1", "NCR3", "NKG7", "PRF1", "XCL1", "XCL2"),
+  "Neutrophil" = c("CEACAM3", "CSF3R", "CXCR1", "CXCR2", "FCGR3B", "FPR1", "FPR2", "MPO", "S100A8", "S100A9"),
+  "NK CD56bright cell" = c("GZMK", "IL7R", "KLRC1", "NCAM1", "SELL", "XCL1"),
+  "NK CD56dim cell" = c("CD160", "CX3CR1", "FCGR3A", "FGFBP2", "GNLY", "GZMB", "KLRG1", "NKG7", "PRF1", "SPON2"),
+  "Plasmacytoid dendritic cell" = c("CLEC4C", "GZMB", "IL3RA", "IRF7", "LILRA4", "MZB1", "NRP1", "TLR7", "TLR9"),
+  "Regulatory T cell" = c("CCR4", "CCR8", "CD3D", "CD3E", "CD4", "CTLA4", "FOXP3", "IKZF2", "IL2RA", "TIGIT", "TNFRSF18", "TNFRSF4"),
+  "T follicular helper cell" = c("BCL6", "CD3D", "CD3E", "CD4", "CXCR5", "ICOS", "IL21", "PDCD1", "SH2D1A"),
+  "Type 1 T helper cell" = c("CCR5", "CD3D", "CD3E", "CD4", "CXCR3", "IFNG", "IL12RB2", "STAT1", "STAT4", "TBX21"),
+  "Type 17 T helper cell" = c("BATF", "CCR6", "CD3D", "CD3E", "CD4", "IL17A", "IL17F", "IL21", "IL23R", "RORA", "RORC", "STAT3"),
+  "Type 2 T helper cell" = c("CCR4", "CD3D", "CD3E", "CD4", "GATA3", "IL13", "IL4", "IL5", "PTGDR2", "STAT6")
+)
+
 # Reverse log-transformed expression if the input is log-scale.
 # IOBR/ESTIMATE/CIBERSORT usually expect non-log TPM-like values.
 undo_log_expr <- function(expr, is_log = TRUE, log_base = 2) {

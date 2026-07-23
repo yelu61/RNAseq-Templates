@@ -1,6 +1,41 @@
 # Plotting helpers for bulk RNA-seq templates. All helpers save editable PDFs.
 # For color conventions and figure sizing see references/VISUALIZATION_STYLE_GUIDE.md.
 
+# Return TRUE only when a PNG device can actually be opened. capabilities("cairo")
+# can report TRUE even when the cairo/X11 shared libraries are broken (common on
+# headless or partially-configured systems), so probe by opening a real device.
+.has_working_cairo <- local({
+  cache <- NULL
+  function() {
+    if (!is.null(cache)) return(cache)
+    cache <<- isTRUE(tryCatch({
+      if (!capabilities("cairo")) stop("no cairo")
+      tmp <- tempfile(fileext = ".png")
+      grDevices::png(tmp, type = "cairo")
+      grDevices::dev.off()
+      unlink(tmp)
+      TRUE
+    }, error = function(e) FALSE, warning = function(w) {
+      # A warning while opening the device (e.g. "failed to load cairo DLL")
+      # means cairo is not actually usable.
+      FALSE
+    }))
+    cache
+  }
+})
+
+# Close any graphics devices left open by an earlier plotting call. Some plotting
+# paths (notably EnhancedVolcano/ggrepel via ggsave) can leak an open device; a
+# later function that opens its own device and draws with ComplexHeatmap then
+# fails at dev.off() with "写入失败"/"write failed". Closing strays first keeps
+# each helper self-contained and order-independent.
+.close_leaked_devices <- function() {
+  while (grDevices::dev.cur() > 1) {
+    try(grDevices::dev.off(), silent = TRUE)
+  }
+  invisible(NULL)
+}
+
 # Standard palette constants used across templates.
 RNAseq_PALETTE <- list(
   up_regulated    = "#d6604d",
@@ -316,6 +351,7 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
   }
 
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  .close_leaked_devices()
   grDevices::pdf(filename, width = width, height = height)
   ht <- ComplexHeatmap::Heatmap(
     plot_mat,
@@ -333,7 +369,10 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     row_names_gp = grid::gpar(fontsize = row_font_size),
     column_names_gp = grid::gpar(fontsize = column_font_size),
     column_title = title,
-    use_raster = nrow(plot_mat) > 500,
+    # Rasterization goes through ImageMagick, which needs a working graphics
+    # device. Disable it when no usable cairo device exists (e.g. minimal or
+    # headless systems) so the heatmap still renders instead of erroring.
+    use_raster = nrow(plot_mat) > 500 && .has_working_cairo(),
     show_heatmap_legend = TRUE,
         heatmap_legend_param = list(
           title = expression(~'Z-score of VST'),
@@ -805,8 +844,8 @@ plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category
       ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
     save_pdf_plot(p_running, paste0(prefix, "_running.pdf"), width = 9, height = 7)
   }
-  top_up <- head(gsea_df$ID[gsea_df$NES > 0], 3)
-  top_down <- head(gsea_df$ID[gsea_df$NES < 0], 3)
+  top_up <- head(gsea_df$ID[!is.na(gsea_df$NES) & gsea_df$NES > 0], 3)
+  top_down <- head(gsea_df$ID[!is.na(gsea_df$NES) & gsea_df$NES < 0], 3)
   if (length(top_up) > 0) {
     p_up <- plot_gsea_term_figure_pdf(gsea_result, top_up, title = paste(title_prefix, "Top activated terms"))
     save_pdf_plot(p_up, paste0(prefix, "_running_top_activated.pdf"), width = 9, height = 7)
@@ -852,9 +891,17 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
   padj <- term_stats$p.adjust[[1]]
   term_desc <- term_stats$Description[[1]]
 
+  # Synthetic or sparse data can yield NA NES/p-values for a term (e.g. unbalanced
+  # gene-level statistics). Such terms can't be plotted meaningfully; skip instead
+  # of erroring on `if (nes >= 0)` or downstream gseaplot2 calls.
+  if (is.na(nes) || length(nes) == 0) {
+    message("Skipping single-term GSEA figure (NA NES) for: ", term_desc)
+    return(invisible(NULL))
+  }
+
   fmt_p <- function(x) {
     x <- as.numeric(x)
-    ifelse(x < 0.001, sprintf("%.2e", x), sprintf("%.4f", x))
+    ifelse(is.na(x), "NA", ifelse(x < 0.001, sprintf("%.2e", x), sprintf("%.4f", x)))
   }
   stats_text <- sprintf("NES = %.3f | p = %s | adj p = %s", nes, fmt_p(pval), fmt_p(padj))
 

@@ -382,3 +382,17 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Long-format ESTIMATE scores.
 - `plot_estimate_boxplot_pdf(...)`
   ESTIMATE score boxplots.
+
+## `report_utils.R` — unified HTML report
+
+- `render_analysis_report(outdir, report_file, template, params)`
+  Render `reports/analysis_report.qmd` into a single self-contained HTML report from the saved DEG/ORA/GSEA/QC outputs (no re-analysis). Uses the quarto CLI when available, else `rmarkdown`.
+- `list_report_figures(dir, pattern, base)`
+  List PDF figures under a directory as portable relative paths.
+- `read_csv_safe(path, ...)`
+  Read a CSV if it exists, else return `NULL` (for conditional report tables).
+
+## TME constants
+
+- `immune_gene_sets`
+  Built-in 28-cell-type immune signature collection (Charoentong et al. 2017, human symbols) used as the default ssGSEA gene sets in the TME deconvolution template.

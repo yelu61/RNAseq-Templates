@@ -15,7 +15,12 @@ prepare_mfuzz_eset <- function(expr, na_thres = 0.25, fill_mode = "mean", min_st
   if (!requireNamespace("Mfuzz", quietly = TRUE)) {
     stop("Package 'Mfuzz' is required for time-course clustering.")
   }
-  dat <- Mfuzz::ExpressionSet(assayData = as.matrix(expr))
+  # ExpressionSet lives in Biobase (Mfuzz depends on it but does not re-export it
+  # in current Bioconductor), so construct it via Biobase rather than Mfuzz::.
+  if (!requireNamespace("Biobase", quietly = TRUE)) {
+    stop("Package 'Biobase' is required to build the ExpressionSet for Mfuzz.")
+  }
+  dat <- Biobase::ExpressionSet(assayData = as.matrix(expr))
   dat <- Mfuzz::filter.NA(dat, thres = na_thres)
   dat <- Mfuzz::fill.NA(dat, mode = fill_mode)
   dat <- Mfuzz::filter.std(dat, min.std = min_std)
@@ -68,6 +73,7 @@ plot_mfuzz_trends_pdf <- function(eset, mfuzz_result, filename,
   if (is.null(time_labels)) {
     time_labels <- colnames(eset)
   }
+  .close_leaked_devices()
   grDevices::pdf(filename, width = width, height = height)
   Mfuzz::mfuzz.plot(
     eset,
@@ -111,6 +117,7 @@ plot_timecourse_heatmap_pdf <- function(expr, cluster_df, group_vec, group_level
 
   col_fun <- circlize::colorRamp2(c(-z_cap, 0, z_cap), c("#2166ac", "white", "#b2182b"))
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  .close_leaked_devices()
   grDevices::pdf(filename, width = width, height = height)
   ht <- ComplexHeatmap::Heatmap(
     z,
@@ -124,7 +131,7 @@ plot_timecourse_heatmap_pdf <- function(expr, cluster_df, group_vec, group_level
     show_row_names = FALSE,
     show_row_dend = FALSE,
     show_column_dend = FALSE,
-    use_raster = nrow(z) > 500,
+    use_raster = nrow(z) > 500 && .has_working_cairo(),
     row_names_gp = grid::gpar(fontsize = row_font_size)
   )
   ComplexHeatmap::draw(ht)

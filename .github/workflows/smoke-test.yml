@@ -46,6 +46,9 @@ jobs:
             bioc::edgeR
             bioc::SummarizedExperiment
             bioc::GEOquery
+            bioc::Mfuzz
+            bioc::WGCNA
+            bioc::survival
             any::ashr
             any::ggrepel
             any::data.table
@@ -55,6 +58,12 @@ jobs:
             any::RColorBrewer
             any::openxlsx
             any::UpSetR
+            any::corrplot
+            any::e1071
+            any::babelgene
+            any::rprojroot
+            any::survminer
+            any::estimate
             github::IOBR/IOBR
 
       - name: Run smoke test

@@ -145,8 +145,11 @@ plot_km_by_group_pdf <- function(surv_df, group_col, filename,
     plot_data$time <- plot_data$time / 365.25
   }
 
-  formula <- stats::as.formula(paste0("survival::Surv(time, status) ~ ", group_col))
-  fit <- survival::survfit(formula, data = plot_data)
+  # Inline the formula into the survfit call so ggsurvplot() can re-evaluate it
+  # later; passing a symbol (e.g. `surv_formula`) leaves fit$call$formula as that
+  # symbol, which breaks with "object of type 'symbol' is not subsettable".
+  surv_formula <- stats::as.formula(paste0("survival::Surv(time, status) ~ ", group_col))
+  fit <- eval(substitute(survival::survfit(F, data = plot_data), list(F = surv_formula)))
   p <- survminer::ggsurvplot(
     fit,
     data = plot_data,

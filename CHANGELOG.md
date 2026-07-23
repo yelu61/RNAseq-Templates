@@ -6,6 +6,24 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Added
 
+- **Runnable demos for all remaining topic templates**, each with a `regenerate_demo_data.R` + `run_demo.R` pair under `examples/`:
+  - `examples/demo_RNAseq_TME/`: raw counts + gene lengths → TPM → ESTIMATE / IOBR (estimate, cibersort, epic) / ssGSEA. Uses human symbols so the whole run is offline.
+  - `examples/demo_RNAseq_TimeCourse/`: VST expression across 4 time points with injected temporal patterns → Mfuzz clustering, plus raw-count time-point-vs-baseline DESeq2.
+  - `examples/demo_RNAseq_TCGA_GEO/`: local-file mode (no network) with a synthetic TCGA-like cohort (TCGA barcodes, raw counts + TPM + clinical) → Tumor-vs-Normal DESeq2, KM survival, clinical KM, Cox, ORA/GSEA.
+- `examples/run_demo_smoke_test.R` now drives every topic demo after the General demo and fails if any one fails, so each push exercises all templates.
+- **Unified HTML report**: `reports/analysis_report.qmd` + `RNAseq_lib/report_utils.R` (`render_analysis_report()`). Assembles the saved DEG/ORA/GSEA/QC CSV and PDF outputs into a single self-contained HTML document without re-running the analysis. `RNAseq_General.ipynb` gains a `GENERATE_HTML_REPORT` parameter and a report cell (Section 15). Renders with the quarto CLI when available, else falls back to `rmarkdown`.
+- `immune_gene_sets` built-in 28-cell-type immune signature collection (Charoentong et al. 2017) in `RNAseq_lib/tme_utils.R`, used by the TME ssGSEA step.
+- CI (`smoke-test.yml`) installs the extra packages the new demos need (Mfuzz, WGCNA, survival, survminer, estimate, corrplot, e1071, babelgene, rprojroot) and rmarkdown for the report.
+
+### Fixed
+
+- **`immune_gene_sets` was undefined** in `RNAseq_TME_Deconvolution_Template.ipynb` — the ssGSEA cell referenced a variable that was never created and is not exported by IOBR, which would error for every user. Now provided as a built-in constant in `tme_utils.R`.
+- **Native ESTIMATE failed with "找不到对象 'common_genes'"** in the TME template: `requireNamespace("estimate")` does not resolve the package's lazy-data objects, but `filterCommonGenes()`/`estimateScore()` reference them directly. Both the notebook and the demo now call `utils::data("common_genes"/"SI_geneset", package = "estimate")` first.
+- **`plot_km_by_group_pdf()` failed with "object of type 'symbol' is not subsettable"** under R ≥ 4.x: the survfit call captured the formula as a local symbol, which `ggsurvplot()` could not re-evaluate. The formula is now inlined into the call via `eval(substitute(...))`. This broke all clinical-variable KM plots in the TCGA-GEO template.
+- TimeCourse time-point-vs-baseline DEG no longer includes a single-level `condition` column in the DESeq2 design (which errored with "design contains variables with all samples having the same value"); the condition covariate is only added when it actually varies.
+
+### Added
+
 - **New `RNAseq_lib/data_utils.R`** with reusable data loading, validation, and gene-conversion helpers:
   - `read_expression_matrix()`, `read_metadata()`, `validate_samples_match()`
   - `detect_expression_scale()` for heuristic classification of raw counts / TPM / log-scale / VST
