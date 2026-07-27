@@ -23,6 +23,14 @@ sessionInfo.txt
 *.gct
 *.txt.gz
 
+# ...but demo input data is intentionally committed so CI can run the demos
+# offline. Re-include those specific files/dirs. (TME/TimeCourse/TCGA-GEO demos
+# regenerate their inputs at run time, so they are not listed here.)
+!examples/demo_data/**
+!examples/demo_RNAseq_limma_voom/0-Data/**
+!examples/demo_RNAseq_WGCNA/vsd_matrix.csv
+!examples/demo_RNAseq_WGCNA/colData.csv
+
 # Local/editor files
 .DS_Store
 .Rhistory
