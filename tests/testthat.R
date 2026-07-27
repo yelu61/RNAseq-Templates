@@ -17,6 +17,12 @@ source(file.path(lib_dir, "design_utils.R"))
 source(file.path(lib_dir, "tme_utils.R"))
 source(file.path(lib_dir, "data_utils.R"))
 source(file.path(lib_dir, "limma_voom_utils.R"))
+source(file.path(lib_dir, "batch_utils.R"))
+source(file.path(lib_dir, "survival_utils.R"))
+source(file.path(lib_dir, "timecourse_utils.R"))
+source(file.path(lib_dir, "report_utils.R"))
+source(file.path(lib_dir, "geo_utils.R"))
+source(file.path(lib_dir, "tcga_utils.R"))
 
 # Run all tests under tests/testthat/
 test_dir(file.path(repo_root, "tests", "testthat"))
