@@ -1,6 +1,7 @@
 # RNAseq-Templates
 
 ![Smoke Test](https://github.com/yelu61/RNAseq-Templates/actions/workflows/smoke-test.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-0.9.0-blue)
 
 Notebook-first bulk RNA-seq analysis templates with a lightweight shared R helper library.
 

@@ -2,6 +2,59 @@
 
 All notable changes to RNAseq-Templates are documented in this file.
 
+## [0.9.0] - 2026-07-27
+
+Reliability and CI hardening release. The headline: the GitHub Actions smoke
+test went from never passing to fully green across all six templates, with the
+unit-test suite expanded to every helper module and two real integration bugs
+fixed in the General template.
+
+### Fixed
+
+- **Paired-design integration bug (General template)**: the paired branch in
+  `templates/General/run_analysis.R` and `RNAseq_General.ipynb` built `colData`
+  but never created `group`, so `filter_low_count_genes()` and the
+  `save(..., group, ...)` call failed with `object 'group' not found` on any
+  paired run. `group <- colData$condition` is now set in the paired branch.
+- **Batch-correction loop not closed (General template)**: `BATCH_VECTOR` fed
+  PCA/PVE diagnostics but was never written into `colData`, so a batch-aware
+  `DESIGN_FORMULA` (e.g. `~ batch + condition`) could not resolve. New
+  `add_batch_col()` in `design_utils.R` (paired with the existing
+  `validate_batch_design()`) writes the batch covariate into `colData`; both the
+  runner and the notebook call it.
+- **CI dependency install (the reason CI never passed)**:
+  - The hand-written package list in `smoke-test.yml` had drifted from
+    `install_dependencies.R` and used wrong namespaces (`bioc::survival` is a
+    CRAN package; `any::estimate` is R-Forge-only). The workflow now reuses
+    `install_dependencies.R` as the single source of truth.
+  - `install_dependencies.R` warned instead of failing on missing packages, so
+    the install step reported success and the smoke test was the first thing to
+    actually stop. It now `stop()`s with a clear, attributable message.
+  - `install_dependencies.R` hard-coded the P3M *jammy* repo while
+    `ubuntu-latest` is now *noble* (24.04), pulling a `libMagick++` soname
+    (`.so.8`) that noble's apt packages do not provide — this broke
+    `SpatialExperiment` → `GSVA` → `IOBR` at load time. The distro codename is
+    now detected from `/etc/os-release`, and `libmagick++-dev` (plus other Bioc
+    system libraries) is installed explicitly.
+
+### Added
+
+- **Unit tests for the 6 previously-untested modules** (`batch_utils`,
+  `geo_utils`, `report_utils`, `survival_utils`, `tcga_utils`,
+  `timecourse_utils`), giving all 14 `RNAseq_lib` modules direct coverage.
+  Suite: 293 assertions, 0 fail/warn/skip.
+- **Integration tests** (`tests/testthat/test-design-integration.R`)
+  reproducing the paired-`group` and batch-`colData` failure modes above.
+- **limma-voom and WGCNA demos added to the smoke test**; the smoke test now
+  exercises all six templates. Their demo input data is committed (with targeted
+  `.gitignore` exemptions), matching how `examples/demo_data` is handled.
+- **CI diagnosability**: per-demo logs (`examples/demo_logs/`) echoed into the
+  main log, and a `failure()` artifact upload of demo outputs, so future CI
+  failures are self-describing.
+- The bundled CIBERSORT mouse signature
+  (`references/CIBERSORT/cibersort_mouse_22.csv`) is now tracked, so the native
+  CIBERSORT test runs on CI instead of skipping.
+
 ## [Unreleased]
 
 ### Added

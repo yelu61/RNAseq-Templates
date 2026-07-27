@@ -2,7 +2,9 @@
 
 ## Status
 
-This project provides notebook-first bulk RNA-seq analysis templates with a shared R helper library (`RNAseq_lib/`). The core pipeline and six topic templates are functional; ongoing work focuses on stability, documentation, and additional workflow helpers.
+This project provides notebook-first bulk RNA-seq analysis templates with a shared R helper library (`RNAseq_lib/`). The core pipeline and six topic templates are functional, the GitHub Actions smoke test is green across all six templates, and all 14 helper modules have unit tests. Ongoing work focuses on stability, documentation, and additional workflow helpers.
+
+**Current release: v0.9.0** (see [CHANGELOG.md](CHANGELOG.md)).
 
 ## Completed
 
@@ -35,15 +37,20 @@ This project provides notebook-first bulk RNA-seq analysis templates with a shar
 ## Planned / Future
 
 - [x] Add automated CI/GitHub Actions to run `examples/run_demo_smoke_test.R` on push
-- [x] Add formal unit tests for `RNAseq_lib` helpers
+- [x] Add formal unit tests for `RNAseq_lib` helpers (all 14 modules covered; 293 assertions)
 - [x] Command-line runner for the General template (`templates/General/run_analysis.R` + `config.R`)
 - [x] Optional TME deconvolution switch (`RUN_TME`) inside `run_analysis.R` (output to `4-TME/`)
 - [x] Targeted re-visualization script (`templates/General/visualize_results.R`) from saved results
+- [x] Fix paired-design and batch-covariate integration bugs in the General template
+- [x] Get GitHub Actions smoke test fully green (dependency install + all six template demos)
+- [x] Add limma-voom and WGCNA demos to the smoke test (now exercises all six templates)
 - [ ] Create a Python/CLI wrapper to convert notebook parameter cells to R scripts for headless execution
 - [ ] Add more public-data examples (GEO local-file mode, TCGA local-file mode)
 - [x] Add interactive HTML report generation (`reports/analysis_report.qmd`, rendered via quarto or rmarkdown)
 - [ ] Add single-cell reference integration / deconvolution (e.g., Bisque, CIBERSORTx)
 - [ ] Support additional model organisms (rat, zebrafish) via configurable `org.*.eg.db`
+- [ ] Introduce `renv.lock` for long-term dependency reproducibility (deferred; platform-specific binaries and GitHub/R-Forge sources make this non-trivial)
+- [ ] Publish v1.0.0
 - [x] Provide example datasets for each topic template (General, limma-voom, WGCNA, TME, TimeCourse, TCGA/GEO all done)
 - [x] Add runnable demos for RNAseq_TME_Deconvolution_Template.ipynb
 - [x] Add runnable demos for RNAseq_TimeCourse_Template.ipynb
