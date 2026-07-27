@@ -314,6 +314,10 @@ demo_scripts <- c(
 
 rscript <- file.path(R.home("bin"), "Rscript")
 failed_demos <- character(0)
+# Capture each demo's stdout+stderr to a per-demo log so CI artifact upload (or a
+# local rerun) shows the exact R error instead of just a non-zero exit status.
+demo_log_dir <- file.path(repo_root, "examples", "demo_logs")
+dir.create(demo_log_dir, showWarnings = FALSE, recursive = TRUE)
 # The demo scripts locate their own directory via --file= and chdir into it, but
 # only when Rscript resolves a path containing a separator. Invoke each with its
 # repo-root-relative path and force the working directory to the repo root so the
@@ -326,13 +330,19 @@ for (script in demo_scripts) {
     cat("\n>>> SKIP (missing):", script, "\n")
     next
   }
+  log_file <- file.path(demo_log_dir, paste0(gsub("/", "__", script), ".log"))
   cat("\n----------------------------------------\n")
   cat(">>> Running:", script, "\n")
   cat("----------------------------------------\n")
-  status <- system2(rscript, shQuote(script_rel))
+  status <- system2(rscript, shQuote(script_rel), stdout = log_file, stderr = log_file)
+  # Echo the tail of the demo log so it also appears in the main CI log.
+  if (file.exists(log_file)) {
+    log_lines <- readLines(log_file, warn = FALSE)
+    cat(paste(tail(log_lines, 25), collapse = "\n"), "\n")
+  }
   if (!identical(status, 0L)) {
     failed_demos <- c(failed_demos, script)
-    cat(">>> FAILED:", script, "(exit status", status, ")\n")
+    cat(">>> FAILED:", script, "(exit status", status, ") — see", log_file, "\n")
   } else {
     cat(">>> OK:", script, "\n")
   }

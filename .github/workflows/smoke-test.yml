@@ -71,6 +71,22 @@ jobs:
       - name: Run smoke test
         run: Rscript examples/run_demo_smoke_test.R
 
+      # On any failure, upload the demo outputs and logs so the exact error is
+      # inspectable from the Actions UI without re-running.
+      - name: Upload smoke-test outputs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-outputs
+          if-no-files-found: ignore
+          path: |
+            examples/demo_logs/**
+            examples/demo_RNAseq_General/**
+            examples/demo_RNAseq_TME/**
+            examples/demo_RNAseq_TimeCourse/**
+            examples/demo_RNAseq_TCGA_GEO/**
+          retention-days: 7
+
       - name: Run unit tests
         run: Rscript tests/testthat.R
 

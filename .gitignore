@@ -31,3 +31,4 @@ sessionInfo.txt
 
 # CI-local R package library (GitHub Actions)
 .r-lib/
+examples/demo_logs/
