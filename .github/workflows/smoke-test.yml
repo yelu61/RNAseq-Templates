@@ -85,6 +85,8 @@ jobs:
           path: |
             examples/demo_logs/**
             examples/demo_RNAseq_General/**
+            examples/demo_RNAseq_limma_voom/**
+            examples/demo_RNAseq_WGCNA/**
             examples/demo_RNAseq_TME/**
             examples/demo_RNAseq_TimeCourse/**
             examples/demo_RNAseq_TCGA_GEO/**

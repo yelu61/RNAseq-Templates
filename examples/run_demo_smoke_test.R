@@ -304,6 +304,8 @@ cat("========================================\n")
 # test fails if any demo fails.
 setwd(repo_root)
 demo_scripts <- c(
+  "demo_RNAseq_limma_voom/run_demo.R",
+  "demo_RNAseq_WGCNA/run_demo.R",
   "demo_RNAseq_TME/regenerate_demo_data.R",
   "demo_RNAseq_TME/run_demo.R",
   "demo_RNAseq_TimeCourse/regenerate_demo_data.R",
@@ -355,5 +357,5 @@ if (length(failed_demos) > 0) {
   cat("========================================\n")
   stop("One or more topic-template demos failed.")
 }
-cat("All demo smoke tests PASSED (General + TME + TimeCourse + TCGA-GEO).\n")
+cat("All demo smoke tests PASSED (General + limma-voom + WGCNA + TME + TimeCourse + TCGA-GEO).\n")
 cat("========================================\n")
