@@ -31,6 +31,11 @@ sessionInfo.txt
 !examples/demo_RNAseq_WGCNA/vsd_matrix.csv
 !examples/demo_RNAseq_WGCNA/colData.csv
 
+# CIBERSORT reference signatures are bundled with the repo (LM22.txt and
+# CIBERSORT.R are already tracked); keep the mouse signature too so native
+# CIBERSORT works on a fresh clone and its test runs on CI.
+!references/CIBERSORT/cibersort_mouse_22.csv
+
 # Local/editor files
 .DS_Store
 .Rhistory
