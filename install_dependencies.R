@@ -7,13 +7,23 @@
 # builds. Locally (macOS) the default CRAN repo already serves binaries.
 
 # Prefer Posit Package Manager binaries on Linux; fall back to CRAN elsewhere.
-# P3M serves Linux binaries via the __linux__/<distro>/ prefix. ubuntu-latest is
-# jammy-based; the jammy URL resolves to compatible binaries. setup-r with
-# use-public-rspm would pick this up too, but we set it explicitly so the script
-# is correct whether or not it runs under setup-r.
+# P3M serves distro-specific binaries via the __linux__/<distro>/ prefix, and the
+# distro MUST match the runner's glibc/system-library ABI. ubuntu-latest is now
+# noble (24.04); using the jammy binaries pulled a libMagick++ soname (.so.8) that
+# noble's apt packages (libmagick++-6.q16-9t64 -> .so.9) do not provide, which
+# broke SpatialExperiment/GSVA/IOBR at load time. Detect the codename at runtime
+# and fall back to noble.
 .on_ci <- nzchar(Sys.getenv("GITHUB_ACTIONS"))
 if (.on_ci || (Sys.info()[["sysname"]] == "Linux" && !nzchar(Sys.getenv("RENV_PATHS_ROOT")))) {
-  options(repos = c(P3M = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
+  codename <- "noble"
+  os_release <- tryCatch(readLines("/etc/os-release", warn = FALSE), error = function(e) character(0))
+  vc_line <- grep("^VERSION_CODENAME=", os_release, value = TRUE)
+  if (length(vc_line) > 0) {
+    codename <- sub('^VERSION_CODENAME="?([^"]*)"?.*$', "\\1", vc_line[1])
+  }
+  p3m <- sprintf("https://packagemanager.posit.co/cran/__linux__/%s/latest", codename)
+  options(repos = c(P3M = p3m))
+  message("Using P3M repo for distro '", codename, "': ", p3m)
 } else {
   options(repos = c(CRAN = "https://cloud.r-project.org/"))
 }
