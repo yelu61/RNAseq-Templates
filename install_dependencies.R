@@ -130,7 +130,12 @@ if (!requireNamespace("IOBR", quietly = TRUE)) {
 check_pkgs <- c(cran_packages, bioc_packages, "estimate", "IOBR")
 failed <- check_pkgs[!vapply(check_pkgs, requireNamespace, logical(1), quietly = TRUE)]
 if (length(failed) > 0) {
-  warning("Failed to install: ", paste(failed, collapse = ", "))
+  # Hard-fail so CI surfaces the missing packages at the install step instead of
+  # "passing with warnings" and only erroring later in the smoke test (which made
+  # failures hard to attribute). Local users still get the same clear message.
+  stop("Failed to install required packages: ", paste(failed, collapse = ", "),
+       "\nInstall the missing system libraries (e.g. libmagick++-dev for ",
+       "SpatialExperiment/GSVA) and re-run install_dependencies.R.")
 } else {
   message("All dependencies installed successfully.")
 }

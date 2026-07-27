@@ -38,7 +38,9 @@ jobs:
 
       # System libraries needed by some Bioconductor/CRAN packages when a P3M
       # binary is unavailable for a given R version and the package compiles
-      # from source (igraph/glpk, XML-dependent parsers, curl/openssl, cairo).
+      # from source. Notably SpatialExperiment (a GSVA dependency) compiles from
+      # source and links ImageMagick (libMagick++), so without libmagick++-dev
+      # the whole GSVA -> IOBR -> smoke-test chain fails.
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -46,7 +48,8 @@ jobs:
             libcurl4-openssl-dev libssl-dev libxml2-dev \
             libcairo2-dev libpng-dev libxt-dev \
             libglpk-dev libgmp-dev libharfbuzz-dev libfribidi-dev \
-            libfontconfig1-dev libfreetype6-dev libtiff5-dev libjpeg-dev
+            libfontconfig1-dev libfreetype6-dev libtiff5-dev libjpeg-dev \
+            libmagick++-dev librsvg2-dev libhdf5-dev libudunits2-dev libgdal-dev
 
       # Cache the R package library so dependency installs are incremental
       # across runs. Keyed on the install script + R version; a change to
