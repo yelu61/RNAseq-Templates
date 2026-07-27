@@ -1,13 +1,32 @@
 #!/usr/bin/env Rscript
 # Install all R/Bioconductor dependencies for RNAseq-Templates.
 # Run from the repository root: Rscript install_dependencies.R
+#
+# On CI (GitHub Actions ubuntu + r-lib/actions setup-r with use-public-rspm),
+# set P3M as the repo so Linux gets pre-built binaries instead of slow source
+# builds. Locally (macOS) the default CRAN repo already serves binaries.
 
+# Prefer Posit Package Manager binaries on Linux; fall back to CRAN elsewhere.
+# P3M serves Linux binaries via the __linux__/<distro>/ prefix. ubuntu-latest is
+# jammy-based; the jammy URL resolves to compatible binaries. setup-r with
+# use-public-rspm would pick this up too, but we set it explicitly so the script
+# is correct whether or not it runs under setup-r.
+.on_ci <- nzchar(Sys.getenv("GITHUB_ACTIONS"))
+if (.on_ci || (Sys.info()[["sysname"]] == "Linux" && !nzchar(Sys.getenv("RENV_PATHS_ROOT")))) {
+  options(repos = c(P3M = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
+} else {
+  options(repos = c(CRAN = "https://cloud.r-project.org/"))
+}
 options(
-  repos = c(CRAN = "https://cloud.r-project.org/"),
   timeout = 600,            # allow slow CDN downloads of large binaries
   warn = 1,
   Ncpus = max(1L, parallel::detectCores() - 1L)
 )
+# Binary installs are only meaningful on macOS (CRAN binaries). P3M serves Linux
+# binaries through the same install.packages() source path (the repo URL carries
+# the binary payload), so a plain "source" type still downloads pre-built .tar.gz
+# binaries from P3M. Keep "binary" only for macOS where CRAN uses that type.
+.pkg_type <- if (Sys.info()[["sysname"]] == "Darwin") "binary" else "source"
 # install_dependencies.R is non-interactive: never prompt for library creation or
 # dependency updates, and make BiocManager installs non-interactive too.
 options(
@@ -76,7 +95,7 @@ bioc_packages <- c(
 missing_cran <- cran_packages[!vapply(cran_packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_cran) > 0) {
   message("Installing CRAN packages: ", paste(missing_cran, collapse = ", "))
-  install.packages(missing_cran, type = "binary")
+  install.packages(missing_cran, type = .pkg_type)
 } else {
   message("All CRAN packages already installed.")
 }
@@ -84,15 +103,17 @@ if (length(missing_cran) > 0) {
 # ESTIMATE is distributed through R-Forge rather than CRAN.
 if (!requireNamespace("estimate", quietly = TRUE)) {
   message("Installing estimate from R-Forge...")
-  install.packages("estimate", repos = c(RForge = "https://R-Forge.R-project.org", getOption("repos")), type = "binary")
+  install.packages("estimate", repos = c(RForge = "https://R-Forge.R-project.org", getOption("repos")), type = .pkg_type)
 }
 
 # Install Bioconductor packages
-if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", type = "binary")
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", type = .pkg_type)
 missing_bioc <- bioc_packages[!vapply(bioc_packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_bioc) > 0) {
   message("Installing Bioconductor packages: ", paste(missing_bioc, collapse = ", "))
-  BiocManager::install(missing_bioc, ask = FALSE, update = FALSE, type = "binary")
+  # BiocManager resolves Bioc repos itself; it uses getOption("repos") for the CRAN
+  # mirror, which we already pointed at P3M on Linux for fast binaries.
+  BiocManager::install(missing_bioc, ask = FALSE, update = FALSE, type = .pkg_type)
 } else {
   message("All Bioconductor packages already installed.")
 }

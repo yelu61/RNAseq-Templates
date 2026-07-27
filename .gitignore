@@ -28,3 +28,6 @@ sessionInfo.txt
 .Rhistory
 .RData
 .Rproj.user/
+
+# CI-local R package library (GitHub Actions)
+.r-lib/

@@ -61,6 +61,22 @@ formula_term_labels <- function(design_formula) {
   if (is.null(labels)) character(0) else labels
 }
 
+# Append a batch covariate column to colData so DESIGN_FORMULA can reference it.
+# Pairs with validate_batch_design(): that helper warns when the formula expects a
+# batch term, this one actually writes it. batch_vector must be sample-ordered to
+# match SAMPLE_NAMES / rownames(colData).
+add_batch_col <- function(colData, batch_vector, batch_term = "batch") {
+  if (is.null(batch_vector)) {
+    return(colData)
+  }
+  if (nrow(colData) != length(batch_vector)) {
+    stop("BATCH_VECTOR length (", length(batch_vector),
+         ") does not match number of samples in colData (", nrow(colData), ").")
+  }
+  colData[[batch_term]] <- factor(batch_vector)
+  colData
+}
+
 validate_batch_design <- function(batch_vector = NULL, design_formula = ~ condition,
                                   sample_names = NULL,
                                   batch_term = "batch") {

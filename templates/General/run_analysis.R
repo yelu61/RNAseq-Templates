@@ -171,10 +171,18 @@ if (!is.null(PAIR_ID)) {
   validate_paired_design(SAMPLE_NAMES, GROUPS, PAIR_ID, GROUP_LEVELS)
   colData <- make_paired_col_data(SAMPLE_NAMES, GROUPS, GROUP_LEVELS, PAIR_ID)
   DESIGN_FORMULA <- build_paired_design_formula("condition", "pair_id")
+  group <- colData$condition
   cat("Paired design enabled:", deparse(DESIGN_FORMULA), "\n")
 } else {
   group <- factor(GROUPS, levels = GROUP_LEVELS)
   colData <- make_col_data(countData, SAMPLE_NAMES, GROUPS, GROUP_LEVELS)
+}
+
+# Batch covariate: surface diagnostics, and close the loop by writing batch into
+# colData so a batch-aware DESIGN_FORMULA (e.g. ~ batch + condition) actually resolves.
+if (!is.null(BATCH_VECTOR)) {
+  validate_batch_design(BATCH_VECTOR, DESIGN_FORMULA, SAMPLE_NAMES)
+  colData <- add_batch_col(colData, BATCH_VECTOR)
 }
 
 sample_qc <- calculate_sample_qc(countData, colData, group_col = "condition")
