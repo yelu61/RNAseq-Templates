@@ -2,6 +2,35 @@
 
 如果你会操作 Excel，就会使用这个 RNA-seq 分析模板。本指南面向**完全没有编程经验**的用户。
 
+整个上手过程只有五步，先看一张图了解全貌：
+
+```mermaid
+flowchart LR
+    accTitle: 零基础上手五步流程
+    accDescr: 从安装 R 和 RStudio 开始，安装依赖包，跑通演示数据，然后换成自己的数据运行分析，最后查看生成的结果。这是一个面向无编程经验用户的五步上手流程。
+
+    s1["1️⃣ 安装 R<br/>和 RStudio"]
+    s2["2️⃣ 安装所有<br/>依赖包"]
+    s3["3️⃣ 跑通<br/>演示数据"]
+    s4["4️⃣ 换成<br/>你的数据"]
+    s5["5️⃣ 查看<br/>分析结果"]
+
+    s1 --> s2 --> s3 --> s4 --> s5
+
+    ok{{"✅ 环境正常"}}
+
+    s3 -.->|能跑通| ok
+    ok -.-> s4
+
+    classDef step fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+    classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+
+    class s1,s2,s3,s4,s5 step
+    class ok good
+```
+
+> 💡 第 1–3 步只需做**一次**（搭好环境），以后每次分析只需做第 4–5 步。
+
 ---
 
 ## 你需要准备的
@@ -241,7 +270,7 @@ Rscript examples/run_demo_smoke_test.R
 
 ---
 
-## 常见问题
+## 更多故障排查
 
 更完整的故障排查请查看 [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md)。
 
