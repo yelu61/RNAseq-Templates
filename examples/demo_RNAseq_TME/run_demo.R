@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 # Validate the TME deconvolution demo core pipeline.
 # Raw counts + gene lengths -> TPM -> ESTIMATE / IOBR deconvolution / ssGSEA.
-# The demo uses human gene symbols so the whole run is offline (no biomaRt).
+# Human gene symbols avoid biomaRt, but some IOBR methods may still download
+# reference data unless it is already present in the local package cache.
 # Run from repository root: Rscript examples/demo_RNAseq_TME/run_demo.R
 
 this_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE))

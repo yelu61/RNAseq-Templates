@@ -14,44 +14,61 @@ Start from a count or TPM matrix and get publication-ready results: copy a noteb
 ```mermaid
 flowchart LR
     accTitle: RNAseq-Templates Workflow
-    accDescr: A count or TPM expression matrix plus sample metadata flows into one of six analysis templates, which share the RNAseq_lib helper library and produce publication-ready PDF figures, result tables, and an optional unified HTML report.
+    accDescr: Expression data and sample metadata pass through an analysis router into one of six RNA-seq templates. All templates use the shared RNAseq_lib library and produce a reproducible result bundle containing figures, tables, and an optional HTML report.
 
-    subgraph inputs ["📥 Inputs"]
-        counts[(💾 Count / TPM matrix)]
-        metadata[📋 Sample metadata]
+    subgraph data_contract ["1 · Data contract"]
+        direction TB
+        counts[("Raw count matrix")]
+        normalized[("TPM or VST matrix")]
+        metadata["Sample metadata"]
     end
 
-    subgraph templates ["🧪 Six templates"]
-        general[⚙️ General<br/>DESeq2]
-        limma[⚙️ limma-voom]
-        timecourse[📈 TimeCourse<br/>Mfuzz]
-        tme[🧬 TME<br/>deconvolution]
-        wgcna[🕸️ WGCNA<br/>network]
-        tcga[💊 TCGA / GEO<br/>+ survival]
+    router{{"2 · Choose by research question"}}
+
+    subgraph analysis_paths ["3 · Analysis path"]
+        direction TB
+        general["General<br/>DESeq2 · ORA/GSEA · GSVA"]
+        limma["limma-voom<br/>contrasts · batch covariate"]
+        timecourse["TimeCourse<br/>Mfuzz · longitudinal DEG"]
+        tme["TME<br/>IOBR · ESTIMATE · ssGSEA"]
+        wgcna["WGCNA<br/>modules · traits · hub genes"]
+        tcga["TCGA / GEO<br/>DEG · survival · public cohorts"]
     end
 
-    subgraph outputs ["📤 Outputs"]
-        figures[📊 Publication PDFs]
-        tables[📑 Result tables]
-        report[🌐 HTML report]
+    shared_lib[["RNAseq_lib<br/>validation · statistics · visualization"]]
+    result_bundle{{"4 · Reproducible result bundle"}}
+
+    subgraph deliverables ["Share and reuse"]
+        direction TB
+        figures["Publication-ready PDFs"]
+        tables["CSV / Excel / R objects"]
+        report["Self-contained HTML report"]
     end
 
-    lib[["🔧 RNAseq_lib shared helpers"]]
+    counts & normalized & metadata --> router
+    router --> general & limma & timecourse & tme & wgcna & tcga
+    general & limma & timecourse & tme & wgcna & tcga --> result_bundle
+    result_bundle --> figures & tables & report
 
-    inputs --> templates
-    lib -.-> templates
-    templates --> outputs
+    shared_lib -. "shared helpers" .-> router
+    shared_lib -. "consistent outputs" .-> result_bundle
 
-    classDef input fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
-    classDef process fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#3b0764
-    classDef output fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+    classDef input fill:#eff6ff,stroke:#3b82f6,stroke-width:1.8px,color:#1e3a5f
+    classDef decision fill:#fff7ed,stroke:#f97316,stroke-width:2.4px,color:#7c2d12
+    classDef template fill:#f5f3ff,stroke:#8b5cf6,stroke-width:1.8px,color:#3b0764
+    classDef helper fill:#ecfeff,stroke:#0891b2,stroke-width:2px,color:#164e63
+    classDef result fill:#ecfdf5,stroke:#10b981,stroke-width:2.4px,color:#14532d
+    classDef output fill:#f0fdf4,stroke:#22c55e,stroke-width:1.8px,color:#14532d
 
-    class counts,metadata input
-    class general,limma,timecourse,tme,wgcna,tcga,lib process
+    class counts,normalized,metadata input
+    class router decision
+    class general,limma,timecourse,tme,wgcna,tcga template
+    class shared_lib helper
+    class result_bundle result
     class figures,tables,report output
 ```
 
-Every template runs on **human or mouse** data, is exercised by a CI smoke test on each push, and ships with a runnable offline demo under `examples/`.
+Templates support **human or mouse where biologically applicable** (TCGA cohorts are human), are exercised by a CI smoke test on each push, and ship with runnable bundled-data demos under `examples/`. Most demo paths are offline; optional services such as KEGG and some IOBR/xCell reference data still require network access or a populated local cache.
 
 ## 🧭 Which template should I use?
 
@@ -113,7 +130,7 @@ reports/analysis_report.qmd  # unified HTML report template
 examples/
   run_demo_smoke_test.R    # runs every demo and validates outputs
   demo_data/               # shared demo counts + metadata
-  demo_RNAseq_*/           # one runnable offline demo per template
+  demo_RNAseq_*/           # one bundled-data demo per template
 references/                # PARAMETER_REFERENCE, FUNCTION_CATALOG,
                            # TEMPLATE_SELECTION, TROUBLESHOOTING,
                            # VISUALIZATION_STYLE_GUIDE

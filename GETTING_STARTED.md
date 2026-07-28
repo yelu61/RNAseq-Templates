@@ -5,28 +5,47 @@
 整个上手过程只有五步，先看一张图了解全貌：
 
 ```mermaid
-flowchart LR
+flowchart TB
     accTitle: 零基础上手五步流程
-    accDescr: 从安装 R 和 RStudio 开始，安装依赖包，跑通演示数据，然后换成自己的数据运行分析，最后查看生成的结果。这是一个面向无编程经验用户的五步上手流程。
+    accDescr: 首次使用时安装 R 和项目依赖并运行演示，通过环境检查后进入每个项目的数据配置、分析运行和结果查看循环；检查失败则先查阅排错指南再重试。
 
-    s1["1️⃣ 安装 R<br/>和 RStudio"]
-    s2["2️⃣ 安装所有<br/>依赖包"]
-    s3["3️⃣ 跑通<br/>演示数据"]
-    s4["4️⃣ 换成<br/>你的数据"]
-    s5["5️⃣ 查看<br/>分析结果"]
+    subgraph one_time ["一次性 · 环境准备"]
+        direction LR
+        install["1 · 安装 R 和 RStudio"]
+        dependencies["2 · 安装项目依赖"]
+        demo["3 · 运行演示数据"]
+        install --> dependencies --> demo
+    end
 
-    s1 --> s2 --> s3 --> s4 --> s5
+    check{{"Smoke test 通过？"}}
+    troubleshoot["查看故障排查<br/>修复环境或依赖"]
 
-    ok{{"✅ 环境正常"}}
+    subgraph every_project ["每个项目 · 分析循环"]
+        direction LR
+        own_data["4 · 放入表达矩阵<br/>和样本信息"]
+        configure["修改参数单元格"]
+        run["Run All"]
+        results["5 · 检查表格、图片<br/>和 HTML 报告"]
+        own_data --> configure --> run --> results
+    end
 
-    s3 -.->|能跑通| ok
-    ok -.-> s4
+    demo --> check
+    check -->|"是 · 环境就绪"| own_data
+    check -->|"否"| troubleshoot
+    troubleshoot --> dependencies
+    results -.->|"下一个项目"| own_data
 
-    classDef step fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
-    classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+    classDef setup fill:#eff6ff,stroke:#3b82f6,stroke-width:1.8px,color:#1e3a5f
+    classDef gate fill:#fff7ed,stroke:#f97316,stroke-width:2.4px,color:#7c2d12
+    classDef recovery fill:#fff1f2,stroke:#e11d48,stroke-width:1.8px,color:#881337
+    classDef project fill:#ecfdf5,stroke:#10b981,stroke-width:1.8px,color:#14532d
+    classDef result fill:#f0fdf4,stroke:#16a34a,stroke-width:2.4px,color:#14532d
 
-    class s1,s2,s3,s4,s5 step
-    class ok good
+    class install,dependencies,demo setup
+    class check gate
+    class troubleshoot recovery
+    class own_data,configure,run project
+    class results result
 ```
 
 > 💡 第 1–3 步只需做**一次**（搭好环境），以后每次分析只需做第 4–5 步。

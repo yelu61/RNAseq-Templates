@@ -78,7 +78,7 @@ fixed in the General template.
 ### Added
 
 - **Runnable demos for all remaining topic templates**, each with a `regenerate_demo_data.R` + `run_demo.R` pair under `examples/`:
-  - `examples/demo_RNAseq_TME/`: raw counts + gene lengths → TPM → ESTIMATE / IOBR (estimate, cibersort, epic) / ssGSEA. Uses human symbols so the whole run is offline.
+  - `examples/demo_RNAseq_TME/`: raw counts + gene lengths → TPM → ESTIMATE / IOBR (estimate, cibersort, epic) / ssGSEA. Human symbols avoid online ortholog mapping; some IOBR reference datasets may still require network access or a populated local cache.
   - `examples/demo_RNAseq_TimeCourse/`: VST expression across 4 time points with injected temporal patterns → Mfuzz clustering, plus raw-count time-point-vs-baseline DESeq2.
   - `examples/demo_RNAseq_TCGA_GEO/`: local-file mode (no network) with a synthetic TCGA-like cohort (TCGA barcodes, raw counts + TPM + clinical) → Tumor-vs-Normal DESeq2, KM survival, clinical KM, Cox, ORA/GSEA.
 - `examples/run_demo_smoke_test.R` now drives every topic demo after the General demo and fails if any one fails, so each push exercises all templates.
