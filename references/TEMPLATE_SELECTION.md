@@ -15,25 +15,39 @@ Not sure which notebook to use? Use the decision table below, then follow the co
 
 ## Detailed Decision Flow
 
+```mermaid
+flowchart TD
+    accTitle: Template Selection Decision Flow
+    accDescr: A decision tree that starts from the experimental design and routes to the recommended RNAseq notebook template based on whether the data is a time series, independent groups, tumor microenvironment, a co-expression network, or public TCGA/GEO data.
+
+    start([🧬 What is your<br/>experimental design?])
+
+    start --> time_q{⏰ Time series /<br/>repeated measures?}
+    time_q -->|Yes| timecourse[📈 RNAseq_TimeCourse<br/>Mfuzz + time-point DEG]
+    time_q -->|No| group_q{👥 Two or more<br/>independent groups?}
+
+    group_q -->|Yes| pref_q{🔧 Which engine?}
+    pref_q -->|DESeq2 + full viz| general[⚙️ RNAseq_General<br/>DEG + ORA/GSEA/GSVA]
+    pref_q -->|limma-voom / batch| limma[⚙️ RNAseq_limma_voom]
+
+    group_q -->|No| tme_q{🧬 Tumor immune /<br/>stromal infiltration?}
+    tme_q -->|Yes| tme[🧬 RNAseq_TME_Deconvolution<br/>IOBR / ESTIMATE / ssGSEA]
+    tme_q -->|No| net_q{🕸️ Co-expression<br/>network?}
+
+    net_q -->|Yes| wgcna[🕸️ RNAseq_WGCNA<br/>modules + hub genes]
+    net_q -->|No| pub_q{💊 Public data<br/>TCGA / GEO?}
+    pub_q -->|Yes| tcga[💊 RNAseq_TCGA_GEO<br/>Tumor/Normal + survival]
+
+    classDef decision fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#713f12
+    classDef template fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#3b0764
+    classDef startnode fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+
+    class time_q,group_q,pref_q,tme_q,net_q,pub_q decision
+    class general,limma,timecourse,tme,wgcna,tcga template
+    class start startnode
 ```
-What is your experimental design?
-│
-├─ Time-series / repeated measures over time
-│  └─ Use RNAseq_TimeCourse_Template.ipynb
-│
-├─ Two or more independent groups
-│  ├─ Want DESeq2 + comprehensive visualization ── RNAseq_General.ipynb
-│  └─ Want limma-voom / batch correction ─────── RNAseq_limma_voom_Template.ipynb
-│
-├─ Tumor samples: immune / stromal infiltration
-│  └─ Use RNAseq_TME_Deconvolution_Template.ipynb
-│
-├─ Co-expression network analysis
-│  └─ Use RNAseq_WGCNA_Template.ipynb
-│
-└─ Public data (TCGA / GEO)
-   └─ Use RNAseq_TCGA_GEO_Template.ipynb
-```
+
+> 💡 **Default starting point:** if none of the branches fits clearly, run `RNAseq_General.ipynb` first — it covers the most common case and exports the `vsd_matrix.csv` / `colData.csv` that WGCNA and TimeCourse consume.
 
 ## Typical Workflow Combinations
 
