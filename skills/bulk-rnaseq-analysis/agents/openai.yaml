@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bulk RNA-seq Analysis"
+  short_description: "Route and run reproducible bulk RNA-seq workflows"
+  default_prompt: "Use $bulk-rnaseq-analysis to inspect my bulk RNA-seq data, select the correct backend, and build a reproducible analysis plan."

@@ -70,6 +70,28 @@ flowchart LR
 
 Templates support **human or mouse where biologically applicable** (TCGA cohorts are human), are exercised by a CI smoke test on each push, and ship with runnable bundled-data demos under `examples/`. Most demo paths are offline; optional services such as KEGG and some IOBR/xCell reference data still require network access or a populated local cache.
 
+## 🤖 Codex / Claude Code Skill
+
+The repository includes `bulk-rnaseq-analysis`, a shared Skill that acts as
+the single entry point for bulk RNA-seq downstream analysis. It inspects the
+data source and requested analysis, then routes work to:
+
+- **RNAseq-Templates** for generic local/GEO matrix workflows.
+- **[TCGA](https://github.com/yelu61/TCGA)** for TCGA/TARGET/GTEx,
+  pan-cancer, mutation, multi-omics, prognostic, and external-validation tasks.
+
+Invoke it in Codex or Claude Code:
+
+```text
+Use $bulk-rnaseq-analysis to inspect these counts and metadata,
+choose the correct workflow, and run a reproducible DEG + enrichment analysis.
+```
+
+The canonical Skill source is `skills/bulk-rnaseq-analysis/`. Project discovery
+links under `.agents/skills/` and `.claude/skills/` point to that same
+directory so the two agent environments cannot drift. The Skill bridges the
+repositories; it does not copy or merge their analysis implementations.
+
 ## 🧭 Which template should I use?
 
 | I want to... | Use this template | Input | Key outputs |
@@ -127,6 +149,10 @@ templates/General/         # CLI runner for the General pipeline
   run_analysis.R           #   Rscript entry point (same as notebook)
   visualize_results.R      #   re-plot from saved results (no recompute)
 reports/analysis_report.qmd  # unified HTML report template
+skills/bulk-rnaseq-analysis/ # Codex/Claude routing Skill
+  SKILL.md
+  scripts/backend_router.py  # backend discovery + deterministic routing
+  references/                # backend and output contracts
 examples/
   run_demo_smoke_test.R    # runs every demo and validates outputs
   demo_data/               # shared demo counts + metadata

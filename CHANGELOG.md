@@ -59,6 +59,19 @@ fixed in the General template.
 
 ### Added
 
+- **`bulk-rnaseq-analysis` Codex/Claude Code Skill**:
+  - Adds one user-facing entry point for generic local/GEO matrix workflows
+    and the independent TCGA/TARGET/GTEx toolkit.
+  - Includes deterministic repository discovery and routing with explicit
+    warnings for invalid contracts such as DESeq2 on normalized values or TME
+    deconvolution from VST/rlog.
+  - Keeps one canonical Skill source under `skills/`, exposed to Codex and
+    Claude Code through project-level discovery links.
+  - Defines backend routing, scientific guardrails, cross-backend handoffs,
+    and a reproducible output/provenance contract without copying analysis
+    implementation between repositories.
+  - Adds Python unit coverage for generic, TCGA, mixed, warning, and ambiguous
+    routing cases; CI runs it before the R workflow.
 - **Command-line runner for the General template** under `templates/General/`:
   - `run_analysis.R` + `config.R` run the full General pipeline (all 15 sections) non-interactively via `Rscript`, driven by a single editable config file. `RNAseq_lib` is located via `RNASEQ_LIB_DIR`, the project directory, the repository root, or the parent directory. Intended for reproducible / batch / headless execution alongside the notebook.
   - **Optional TME deconvolution switch** (`RUN_TME`) in `run_analysis.R`: builds TPM from raw counts + gene lengths, then runs native ESTIMATE, IOBR (`estimate`/`cibersort`/`epic`/`xcell`), and ssGSEA immune signatures, writing to `4-TME/`. Sub-switches `RUN_TME_ESTIMATE` / `RUN_TME_IOBR` / `RUN_TME_SSGSEA`; IOBR/estimate absence degrades gracefully. Mouse input is converted to human orthologs via biomaRt.

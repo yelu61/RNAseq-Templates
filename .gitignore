@@ -1,4 +1,6 @@
 .ipynb_checkpoints/
+__pycache__/
+*.pyc
 
 # R plotting side-effect (auto-generated when a plot is drawn with no device open)
 Rplots.pdf

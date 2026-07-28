@@ -50,6 +50,17 @@ flowchart TB
 
 > 💡 第 1–3 步只需做**一次**（搭好环境），以后每次分析只需做第 4–5 步。
 
+如果使用 Codex 或 Claude Code，也可以直接调用项目自带的统一入口：
+
+```text
+Use $bulk-rnaseq-analysis to inspect my data and choose the correct workflow.
+```
+
+Skill 会先判断输入是本地/GEO 表达矩阵，还是 TCGA/TARGET/GTEx
+肿瘤队列，再选择 `RNAseq-Templates` 或独立的 TCGA Toolkit。它不会把
+TPM/VST 错当作 DESeq2 原始 counts，也不会把 VST/rlog 当作 TME 所需的
+TPM。
+
 ---
 
 ## 你需要准备的
