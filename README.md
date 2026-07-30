@@ -48,9 +48,13 @@ Templates support **human or mouse where biologically applicable** (TCGA cohorts
 
 ## 🤖 Codex / Claude Code Skill
 
-The repository includes `bulk-rnaseq-analysis`, a shared Skill that acts as
-the single entry point for bulk RNA-seq downstream analysis. It inspects the
-data source and requested analysis, then routes work to:
+The reusable
+[`bulk-rnaseq-analysis`](https://github.com/yelu61/agent-ready-research-skills/tree/main/skills/bulk-rnaseq-analysis)
+Skill is maintained in the public
+[`agent-ready-research-skills`](https://github.com/yelu61/agent-ready-research-skills)
+collection. It acts as the single agent entry point for bulk RNA-seq
+downstream analysis, inspects the data source and requested analysis, and
+routes work to:
 
 - **RNAseq-Templates** for generic local/GEO matrix workflows.
 - **[TCGA](https://github.com/yelu61/TCGA)** for TCGA/TARGET/GTEx,
@@ -63,10 +67,9 @@ Use $bulk-rnaseq-analysis to inspect these counts and metadata,
 choose the correct workflow, and run a reproducible DEG + enrichment analysis.
 ```
 
-The canonical Skill source is `skills/bulk-rnaseq-analysis/`. Project discovery
-links under `.agents/skills/` and `.claude/skills/` point to that same
-directory so the two agent environments cannot drift. The Skill bridges the
-repositories; it does not copy or merge their analysis implementations.
+Install or link the Skill from its canonical collection directory. The Skill
+bridges this repository and TCGA through explicit backend contracts; it does
+not copy or merge either analysis implementation.
 
 ## 🧭 Which template should I use?
 
@@ -125,10 +128,6 @@ templates/General/         # CLI runner for the General pipeline
   run_analysis.R           #   Rscript entry point (same as notebook)
   visualize_results.R      #   re-plot from saved results (no recompute)
 reports/analysis_report.qmd  # unified HTML report template
-skills/bulk-rnaseq-analysis/ # Codex/Claude routing Skill
-  SKILL.md
-  scripts/backend_router.py  # backend discovery + deterministic routing
-  references/                # backend and output contracts
 examples/
   run_demo_smoke_test.R    # runs every demo and validates outputs
   demo_data/               # shared demo counts + metadata
