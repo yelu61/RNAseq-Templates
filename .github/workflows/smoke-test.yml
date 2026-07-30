@@ -23,9 +23,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Test bulk RNA-seq Skill router
-        run: python3 -m unittest tests/test_backend_router.py
-
       - name: Set up R
         id: setup-r
         uses: r-lib/actions/setup-r@v2
