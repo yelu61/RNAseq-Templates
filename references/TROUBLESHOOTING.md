@@ -17,6 +17,10 @@ This guide lists common issues and how to fix them.
    install.packages("包名")
    ```
 4. For `IOBR` specifically, it installs from GitHub; ensure `remotes` or `devtools` is installed first.
+5. Installing `IOBR` is not sufficient for a guaranteed offline run. Its
+   deconvolution methods may fetch reference bundles on first use. Run the
+   requested methods once while online to populate their cache, or set
+   `RUN_IOBR <- FALSE` and use the deterministic native ESTIMATE/ssGSEA path.
 
 ### Q: Notebook reports `could not find function "..."`
 

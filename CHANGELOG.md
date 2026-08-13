@@ -59,6 +59,94 @@ fixed in the General template.
 
 ### Added
 
+- **Command-line runners for the remaining five templates**, completing the
+  CLI coverage that previously existed only for General. Each ships the same
+  four files as `templates/General/` — `config.R` (the only file you edit),
+  `run_analysis.R` (headless pipeline), `visualize_results.R` (re-plot from
+  saved results, no recompute), and `README.md` — and follows the same
+  conventions: config-as-argument bootstrap, 4-step `RNAseq_lib` resolution,
+  numbered output layout, `0-Config/analysis_config_used.R` snapshot, targeted
+  intermediate `.Rdata` saves, `Analysis_summary.txt` + `sessionInfo.txt` tail,
+  and an optional `render_analysis_report()` block (off by default for these
+  topics since the shared `.qmd` is General-oriented):
+  - `templates/Limma_Voom/` — full voom → contrasts → volcano/heatmap → ORA +
+    GSEA → theme-dotheatmap/single-term pipeline. Species-aware OrgDb.
+  - `templates/WGCNA/` — direct WGCNA calls (no `wgcna_utils`), soft-threshold
+    auto-pick with max-R² fallback and a `SOFT_POWER` override; outputs under
+    `5-WGCNA/`.
+  - `templates/TME/` — ESTIMATE / IOBR / native-CIBERSORT / ssGSEA under
+    `4-TME/` with parent+sub-switch `requireNamespace` degradation.
+  - `templates/TimeCourse/` — Mfuzz soft clustering (seeded, `5-TimeCourse/`)
+    plus time-point-vs-baseline DESeq2 (`1-DEG_Timepoint/`).
+  - `templates/TCGA_GEO/` — GDC / GEO / local-file acquisition, Tumor-vs-Normal
+    DESeq2, single-gene + clinical KM, uni/multivariate Cox (`6-Survival/`),
+    ORA + GSEA. Local-file mode runs fully offline.
+- **Notebook → script converter** `tools/notebook_to_runner.R`: parses a
+  template notebook, extracts the parameter cell into `config.R`, flattens the
+  remaining code cells into a `run_analysis.R` draft (with the standard
+  bootstrap), and writes a `conversion_report.txt` flagging side effects,
+  hard-coded OrgDb, display-only calls and OUTDIR routing to review. Sourceable
+  functions plus a CLI (`Rscript tools/notebook_to_runner.R in.ipynb out_dir`).
+- Unit tests for the converter (`tests/testthat/test-notebook_to_runner.R`) and
+  new regression tests for the enrichment/TME fixes below.
+
+### Fixed
+
+- **`prepare_enrich_df()`** dropped `factor level is duplicated` errors when an
+  enrichment result carries duplicate `Description` values (KEGG GSEA returns
+  the same pathway name under different IDs): all term rows are now preserved,
+  missing labels fall back to `ID`, and repeated display labels are
+  disambiguated without changing the enrichment table. The same row-preserving
+  label contract is used by dot/bar/bidirectional and NES plots.
+- **Runner path contract**: all six CLI runners resolve a relative config path
+  before loading it and preserve the invocation directory as the explicit run
+  root. Relative inputs/outputs therefore no longer resolve accidentally inside
+  the template source tree. Converter-generated runners use the same bootstrap.
+- **Graphics-device containment**: plotting helpers return invisibly, limma
+  `voom()` runs once inside the managed PDF device, and WGCNA base plots use the
+  shared transactional export helpers. The smoke test now fails on any leaked
+  `Rplots.pdf` instead of hiding the side effect via `.gitignore`.
+- **WGCNA trait encoding**: renamed copies of the sample-ID column are excluded
+  from module--trait correlations, invariant traits are dropped, and
+  categorical contrasts receive readable labels. This prevents malformed or
+  legacy metadata from producing one heatmap column per sample.
+- **Mfuzz figure styling**: saturated membership-rainbow trend panels are
+  replaced by low-opacity cluster trajectories with a weighted centroid,
+  journal-scale sans-serif typography, and stable final-size layout.
+- **Strict demo exits and offline TME smoke**: topic demos require runner status
+  zero. The required TME smoke path uses native ESTIMATE + ssGSEA without IOBR;
+  IOBR remains an explicit integration path requiring cached reference bundles
+  or network access.
+- **`plot_gsea_term_figures_from_df()`** no longer aborts the whole loop when a
+  single term produces a degenerate figure on small data — each term is wrapped
+  in `tryCatch` and skipped with a message.
+- **`compare_native_iobr_cibersort()`** now strips IOBR's `_CIBERSORT` (and other
+  method) column suffix before normalizing cell-type names; previously the
+  suffix survived normalization as a trailing token so no cell types matched the
+  native LM22 names ("No common cell types").
+- **TME template ordering**: `group_df_for_plot` is built right after metadata
+  loading, before the native-CIBERSORT section that references it (the notebook
+  defined it later, so a top-to-bottom `RUN_CIBERSORT=TRUE` run failed).
+- **TimeCourse species handling**: the Mfuzz cluster-ORA step no longer
+  hard-codes `org.Hs.eg.db`; the runner selects the OrgDb from `SPECIES`.
+- **TCGA_GEO median-split KM** is computed once (the notebook duplicated it in
+  two sections).
+
+### Changed
+
+- **Skills housekeeping**: the unified `bulk-rnaseq-analysis` skill lives in the
+  central `agent-ready-research-skills` collection; the dangling project-level
+  `.agents/skills/` + `.claude/skills/` symlinks and the stale
+  `tests/__pycache__/` artifact are removed, the empty `skills/` now holds a
+  `README.md` pointing at the canonical location, and `GETTING_STARTED.md` no
+  longer describes the skill as bundled with this repo.
+- **Topic demos now drive the template runners** (`examples/demo_RNAseq_*/
+  run_demo.R` call `templates/<Topic>/run_analysis.R` with a demo config and
+  assert the numbered-layout outputs), so CI exercises the production runners
+  rather than a duplicated inline pipeline.
+
+### Added (earlier in this cycle)
+
 - **Final-size publication figure contract**: shared 89/183 mm dimensions,
   portable sans-serif font resolution, 8 pt typography hierarchy, safe vector
   and 600-dpi raster bundles, and transactional export for ggplot plus
@@ -141,7 +229,8 @@ fixed in the General template.
 - `build_multi_comparison_enrich_df()` no longer drops enrichment rows whose `ONTOLOGY` is `NA` when an `ontology_filter` is set — this previously blanked ORA theme dot-heatmaps built from csv-read results (e.g. in `visualize_results.R`).
 - Native-ESTIMATE table parsing in `run_analysis.R` now selects real sample columns explicitly instead of positionally, so the extra `Description.1` column ESTIMATE writes is not mistaken for a sample.
 - Removed a duplicated `tme_utils.R` section in `references/FUNCTION_CATALOG.md`.
-- `Rplots.pdf` added to `.gitignore` (stray R plotting side-effect).
+- `Rplots.pdf` remains ignored as a defensive cleanup rule, while the smoke
+  suite now treats creation of one as a graphics-device leak and fails.
 
 ### Added
 

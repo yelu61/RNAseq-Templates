@@ -214,7 +214,7 @@ plot_expression_heatmap_pdf(vsd_mat[top_genes_mad, ],
                             group = as.character(colData[colnames(vsd_mat), "condition"]),
                             group_levels = GROUP_LEVELS, group_colors = group_colors,
                             show_row_names = FALSE, show_column_names = FALSE,
-                            cluster_columns = TRUE, width = 8, height = 10)
+                            cluster_columns = TRUE, width = mm_to_in(183), height = mm_to_in(247))
 
 # ---- Enrichment ----
 org_db <- org.Mm.eg.db
@@ -356,6 +356,11 @@ if (length(failed_demos) > 0) {
   cat(paste0("  - ", failed_demos, collapse = "\n"), "\n")
   cat("========================================\n")
   stop("One or more topic-template demos failed.")
+}
+leaked_rplots <- list.files(repo_root, pattern = "^Rplots\\.pdf$", recursive = TRUE, full.names = TRUE)
+if (length(leaked_rplots) > 0) {
+  stop("Smoke test FAILED. Plot calls escaped their managed devices and created:\n",
+       paste(leaked_rplots, collapse = "\n"))
 }
 cat("All demo smoke tests PASSED (General + limma-voom + WGCNA + TME + TimeCourse + TCGA-GEO).\n")
 cat("========================================\n")

@@ -311,7 +311,7 @@ plot_pathway_sensitivity_matrix_pdf <- function(
       legend.position = "right"
     )
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Registry QC separates provenance/coverage from biological inference. Bar
@@ -370,7 +370,7 @@ plot_gene_set_registry_qc_pdf <- function(
       legend.position = "top"
     )
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Bidirectional bar chart summarising delta scores across pathways and
@@ -423,7 +423,7 @@ plot_pathway_delta_summary_pdf <- function(comp_df, filename,
     ggplot2::theme(legend.position = "top",
                    plot.margin = ggplot2::margin(8, 18, 8, 12))
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Heatmap of log2 fold-changes for a set of key genes across comparisons.

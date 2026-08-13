@@ -34,7 +34,7 @@ plot_pca_by_batch_pdf <- function(vsd, batch_vec, filename,
     ggplot2::theme(legend.position = "right", aspect.ratio = 1)
 
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Summarize percentage of variance explained by batch for top PCs.
@@ -98,5 +98,5 @@ plot_batch_pve_pdf <- function(pve_df, filename,
     theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "top", legend.title = ggplot2::element_blank())
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }

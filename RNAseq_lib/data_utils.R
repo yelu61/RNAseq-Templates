@@ -221,6 +221,68 @@ read_metadata <- function(file,
   meta
 }
 
+#' Encode metadata traits for WGCNA module--trait correlations.
+#'
+#' Sample identifiers (including duplicated mirror columns such as `sample_1`)
+#' are excluded. Numeric traits are retained as-is; each non-reference level of
+#' a categorical trait becomes a clearly labelled 0/1 indicator. All-missing
+#' and invariant columns are dropped because their correlations are undefined.
+#'
+#' @param traits Sample metadata data frame.
+#' @param sample_column Name of the primary sample identifier column.
+#' @return A numeric matrix with samples in rows and encoded traits in columns.
+encode_wgcna_traits <- function(traits, sample_column = "sample") {
+  traits <- as.data.frame(traits, check.names = FALSE)
+  if (!sample_column %in% colnames(traits)) {
+    stop("Sample column not found in metadata: ", sample_column)
+  }
+
+  sample_ids <- as.character(traits[[sample_column]])
+  candidate_names <- setdiff(colnames(traits), sample_column)
+  # read_metadata() deliberately preserves duplicate columns by renaming them.
+  # Do not accidentally correlate module eigengenes with a renamed copy of the
+  # sample identifier, a failure mode observed in a real template-derived run.
+  mirrored_ids <- candidate_names[vapply(candidate_names, function(nm) {
+    identical(as.character(traits[[nm]]), sample_ids)
+  }, logical(1))]
+  candidate_names <- setdiff(candidate_names, mirrored_ids)
+
+  blocks <- list()
+  for (nm in candidate_names) {
+    x <- traits[[nm]]
+    if (is.numeric(x) || is.integer(x) || is.logical(x)) {
+      values <- as.numeric(x)
+      finite_values <- values[is.finite(values)]
+      if (length(finite_values) > 1 && stats::sd(finite_values) > 0) {
+        block <- matrix(values, ncol = 1, dimnames = list(NULL, nm))
+        blocks[[length(blocks) + 1L]] <- block
+      }
+      next
+    }
+
+    observed <- as.character(x)
+    levels_x <- if (is.factor(x)) levels(droplevels(x)) else unique(observed[!is.na(observed)])
+    if (length(levels_x) < 2) next
+    reference <- levels_x[[1]]
+    for (level in levels_x[-1]) {
+      values <- ifelse(is.na(observed), NA_real_, as.numeric(observed == level))
+      label <- paste0(nm, ": ", level)
+      block <- matrix(values, ncol = 1, dimnames = list(NULL, label))
+      attr(block, "reference_level") <- reference
+      blocks[[length(blocks) + 1L]] <- block
+    }
+  }
+
+  if (!length(blocks)) {
+    return(matrix(numeric(), nrow = nrow(traits), ncol = 0,
+                  dimnames = list(rownames(traits), character())))
+  }
+  out <- do.call(cbind, blocks)
+  rownames(out) <- rownames(traits)
+  storage.mode(out) <- "double"
+  out
+}
+
 # -----------------------------------------------------------------------------
 # Sample name validation
 # -----------------------------------------------------------------------------

@@ -22,22 +22,27 @@
 options(stringsAsFactors = FALSE)
 
 # ---- Locate this script and the config file ----------------------------------
+invocation_dir <- normalizePath(getwd(), mustWork = TRUE)
 cmd_args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", grep("^--file=", cmd_args, value = TRUE))
-script_dir <- if (length(file_arg) > 0 && nzchar(file_arg)) dirname(normalizePath(file_arg[1])) else getwd()
-setwd(script_dir)
+script_dir <- if (length(file_arg) > 0 && nzchar(file_arg)) dirname(normalizePath(file_arg[1])) else invocation_dir
 
 user_args <- commandArgs(trailingOnly = TRUE)
-config_path <- if (length(user_args) >= 1) user_args[1] else file.path(script_dir, "config.R")
+config_path <- if (length(user_args) >= 1) {
+  normalizePath(path.expand(user_args[1]), mustWork = FALSE)
+} else {
+  file.path(script_dir, "config.R")
+}
 if (!file.exists(config_path)) {
   stop("Config file not found: ", config_path,
        "\nProvide one as: Rscript run_analysis.R path/to/config.R")
 }
+config_path <- normalizePath(config_path, mustWork = TRUE)
 
 cat("========================================\n")
 cat("RNAseq_General — run_analysis.R\n")
 cat("Working dir :", getwd(), "\n")
-cat("Config file :", normalizePath(config_path), "\n")
+cat("Config file :", config_path, "\n")
 cat("========================================\n\n")
 
 # Source the config into the global environment so all parameters are available.
@@ -46,14 +51,16 @@ source(config_path, local = globalenv())
 # ---- Resolve RNAseq_lib -------------------------------------------------------
 lib_dir <- Sys.getenv("RNASEQ_LIB_DIR", unset = NA_character_)
 if (is.na(lib_dir) || !dir.exists(lib_dir)) {
-  if (dir.exists("RNAseq_lib")) {
-    lib_dir <- "RNAseq_lib"
+  if (dir.exists(file.path(invocation_dir, "RNAseq_lib"))) {
+    lib_dir <- file.path(invocation_dir, "RNAseq_lib")
+  } else if (dir.exists(file.path(script_dir, "RNAseq_lib"))) {
+    lib_dir <- file.path(script_dir, "RNAseq_lib")
   } else {
-    repo_root <- tryCatch(rprojroot::find_root(rprojroot::is_git_root), error = function(e) NA_character_)
+    repo_root <- tryCatch(rprojroot::find_root(rprojroot::is_git_root, path = script_dir), error = function(e) NA_character_)
     if (!is.na(repo_root) && dir.exists(file.path(repo_root, "RNAseq_lib"))) {
       lib_dir <- file.path(repo_root, "RNAseq_lib")
-    } else if (dir.exists(file.path("..", "RNAseq_lib"))) {
-      lib_dir <- file.path("..", "RNAseq_lib")
+    } else if (dir.exists(file.path(dirname(script_dir), "RNAseq_lib"))) {
+      lib_dir <- file.path(dirname(script_dir), "RNAseq_lib")
     } else {
       stop("Could not locate RNAseq_lib. Set RNASEQ_LIB_DIR or run from a project ",
            "that has RNAseq_lib/ alongside run_analysis.R.")
@@ -303,7 +310,7 @@ plot_expression_heatmap_pdf(vsd_mat[top_genes_mad, ],
                             group = as.character(colData[colnames(vsd_mat), "condition"]),
                             group_levels = GROUP_LEVELS, group_colors = group_colors,
                             show_row_names = FALSE, show_column_names = FALSE,
-                            cluster_columns = TRUE, width = 8, height = 10)
+                            cluster_columns = TRUE, width = mm_to_in(183), height = mm_to_in(247))
 
 # Top DEGs heatmap
 all_sig_genes <- unique(unlist(lapply(default_res_list, function(res) {
@@ -816,7 +823,12 @@ if (RUN_TF_ANALYSIS) {
         scale_fill_manual(values = colors_direction) +
         labs(title = paste("Top Differentially Active TFs -", comp_name), x = NULL, y = "Log2 Fold Change (TF Activity)") +
         theme_publication(base_size = 8) + theme(legend.position = "top")
-      ggsave(paste0("./3-Visualization/TF_barplot_", comp_name, ".pdf"), plot = p_tf_bar, width = 7, height = 8)
+      save_pdf_plot(
+        p_tf_bar,
+        paste0("./3-Visualization/TF_barplot_", comp_name, ".pdf"),
+        width = mm_to_in(183),
+        height = min(mm_to_in(247), max(4.8, 0.34 * nrow(top_tf) + 2.2))
+      )
     }
   }
 }

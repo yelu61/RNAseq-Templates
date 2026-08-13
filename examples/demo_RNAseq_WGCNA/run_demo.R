@@ -1,123 +1,88 @@
 #!/usr/bin/env Rscript
-# Validate the WGCNA demo notebook core pipeline.
+# Drive the WGCNA production template against the demo data.
+# Thin driver: builds a demo config (absolute paths), then calls
+# templates/WGCNA/run_analysis.R and asserts the expected output files exist.
 # Run from repository root: Rscript examples/demo_RNAseq_WGCNA/run_demo.R
 
 this_file <- sub("^--file=", "", grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE))
 if (length(this_file) == 0 || this_file == "") this_file <- "examples/demo_RNAseq_WGCNA/run_demo.R"
 setwd(dirname(this_file))
+demo_dir <- normalizePath(getwd())
 
 options(stringsAsFactors = FALSE)
 
-EXPR_FILE <- "./vsd_matrix.csv"
-TRAIT_FILE <- "./colData.csv"
-GENE_COLUMN <- NULL
-SAMPLE_COLUMN <- "sample"
-GROUP_COLUMN <- "condition"
-MIN_MAD_QUANTILE <- 0.5
-NETWORK_TYPE <- "signed"
-POWER_VECTOR <- c(1:10, seq(12, 30, 2))
-MIN_MODULE_SIZE <- 30
-MERGE_CUT_HEIGHT <- 0.25
-TARGET_MODULES <- NULL
-OUTDIR <- "RNAseq_WGCNA_Output"
-dir.create(OUTDIR, showWarnings = FALSE, recursive = TRUE)
+repo_root <- tryCatch(rprojroot::find_root(rprojroot::is_git_root),
+                      error = function(e) normalizePath(file.path(demo_dir, "..", "..")))
+runner  <- file.path(repo_root, "templates", "WGCNA", "run_analysis.R")
+lib_dir <- file.path(repo_root, "RNAseq_lib")
+stopifnot(file.exists(runner), dir.exists(lib_dir))
+# NOTE: this macOS machine mangles spaces in system()/system2() arguments to
+# "~+~", so an absolute runner path (which contains "Mobile Documents") cannot be
+# passed to the child R process. Pass a RELATIVE, space-free runner path instead
+# (resolved by the child against the inherited cwd = demo_dir), and hand the
+# absolute RNAseq_lib path via the inherited environment.
+runner_rel <- file.path("..", "..", "templates", "WGCNA", "run_analysis.R")
 
-suppressPackageStartupMessages({
-  library(WGCNA)
-  library(tidyverse)
-  library(pheatmap)
-})
-allowWGCNAThreads()
+# The demo expression + trait tables are committed; no regeneration needed.
+EXPR_FILE  <- file.path(demo_dir, "vsd_matrix.csv")
+TRAIT_FILE <- file.path(demo_dir, "colData.csv")
+stopifnot(file.exists(EXPR_FILE), file.exists(TRAIT_FILE))
 
-LIB_DIR <- if (dir.exists("RNAseq_lib")) "RNAseq_lib" else "../../RNAseq_lib"
-source(file.path(LIB_DIR, "plot_utils.R"))
-theme_set(theme_publication())
+# WGCNA run_analysis.R uses RUN_ROOT <- dirname(OUTDIR): tables/figures land in
+# OUTDIR (set to .../RNAseq_WGCNA_Output/5-WGCNA) and the run-root artifacts
+# (0-Config/, Analysis_summary.txt, sessionInfo.txt) land in its parent.
+OUTDIR_NAME <- "RNAseq_WGCNA_Output"
+run_root    <- file.path(demo_dir, OUTDIR_NAME)
+outdir_abs  <- file.path(run_root, "5-WGCNA")
 
-expr_raw <- read.csv(EXPR_FILE, check.names = FALSE, colClasses = c("character", rep("numeric", 6)))
-if (!is.null(GENE_COLUMN) && GENE_COLUMN %in% colnames(expr_raw)) {
-  genes <- expr_raw[[GENE_COLUMN]]
-  expr <- as.matrix(expr_raw[, setdiff(colnames(expr_raw), GENE_COLUMN), drop = FALSE])
-  rownames(expr) <- genes
-} else if (!is.numeric(expr_raw[[1]])) {
-  genes <- expr_raw[[1]]
-  expr <- as.matrix(expr_raw[, -1, drop = FALSE])
-  rownames(expr) <- genes
-} else {
-  genes <- rownames(expr_raw)
-  expr <- as.matrix(expr_raw)
-}
-mode(expr) <- "numeric"
-expr <- expr[!duplicated(rownames(expr)) & rownames(expr) != "", , drop = FALSE]
-
-traits <- read.csv(TRAIT_FILE, check.names = FALSE)
-common_samples <- intersect(colnames(expr), traits[[SAMPLE_COLUMN]])
-expr <- expr[, common_samples, drop = FALSE]
-traits <- traits[match(common_samples, traits[[SAMPLE_COLUMN]]), ]
-rownames(traits) <- traits[[SAMPLE_COLUMN]]
-stopifnot(all(colnames(expr) == rownames(traits)))
-
-gene_mad <- apply(expr, 1, mad, na.rm = TRUE)
-expr <- expr[gene_mad >= quantile(gene_mad, MIN_MAD_QUANTILE, na.rm = TRUE), , drop = FALSE]
-datExpr <- t(as.matrix(expr))
-
-gsg <- goodSamplesGenes(datExpr, verbose = 0)
-if (!gsg$allOK) {
-  datExpr <- datExpr[gsg$goodSamples, gsg$goodGenes]
-  traits <- traits[rownames(datExpr), , drop = FALSE]
-}
-
-sft <- pickSoftThreshold(datExpr, powerVector = POWER_VECTOR, networkType = NETWORK_TYPE, verbose = 0)
-soft_power <- sft$powerEstimate
-if (is.na(soft_power)) {
-  fit_df <- sft$fitIndices
-  soft_power <- fit_df$Power[which.max(fit_df$SFT.R.sq)]
-}
-
-net <- blockwiseModules(
-  datExpr,
-  power = soft_power,
-  networkType = NETWORK_TYPE,
-  TOMType = NETWORK_TYPE,
-  minModuleSize = MIN_MODULE_SIZE,
-  reassignThreshold = 0,
-  mergeCutHeight = MERGE_CUT_HEIGHT,
-  numericLabels = TRUE,
-  pamRespectsDendro = FALSE,
-  saveTOMs = FALSE,
-  verbose = 0
+# Build a demo config with absolute paths so the child process is independent of
+# the caller and the smoke test never writes into a template source directory.
+q <- function(x) sprintf('"%s"', x)
+config_lines <- c(
+  "options(stringsAsFactors = FALSE)",
+  paste0("EXPR_FILE     <- ", q(EXPR_FILE)),
+  paste0("TRAIT_FILE    <- ", q(TRAIT_FILE)),
+  'GENE_COLUMN   <- "gene_name"',
+  'SAMPLE_COLUMN <- "sample"',
+  'GROUP_COLUMN  <- "condition"',
+  "MIN_MAD_QUANTILE <- 0.5",
+  'NETWORK_TYPE  <- "signed"',
+  "POWER_VECTOR  <- c(1:10, seq(12, 30, 2))",
+  "SOFT_POWER    <- NULL",
+  "MIN_MODULE_SIZE   <- 30",
+  "MERGE_CUT_HEIGHT  <- 0.25",
+  "TARGET_MODULES <- NULL",
+  paste0("OUTDIR        <- ", q(outdir_abs)),
+  "GENERATE_HTML_REPORT <- FALSE",
+  'REPORT_TITLE    <- "WGCNA demo"'
 )
-moduleColors <- labels2colors(net$colors)
-MEs <- orderMEs(net$MEs)
+config_path <- tempfile(fileext = ".R")
+writeLines(config_lines, config_path)
 
-write.csv(data.frame(gene = colnames(datExpr), module = moduleColors), file.path(OUTDIR, "WGCNA_gene_modules.csv"), row.names = FALSE)
-saveRDS(list(net = net, moduleColors = moduleColors, MEs = MEs, datExpr = datExpr, traits = traits), file.path(OUTDIR, "WGCNA_network.rds"))
+# Clean the run root so assertions reflect THIS run.
+unlink(run_root, recursive = TRUE, force = TRUE)
 
-trait_model <- traits %>% dplyr::select(-dplyr::any_of(SAMPLE_COLUMN)) %>% dplyr::select(dplyr::where(~ is.numeric(.) || is.factor(.) || is.character(.)))
-trait_model <- trait_model[, colSums(!is.na(trait_model)) > 0, drop = FALSE]
-trait_numeric <- model.matrix(~ . - 1, data = trait_model)
-moduleTraitCor <- cor(MEs, trait_numeric, use = "p")
-moduleTraitP <- corPvalueStudent(moduleTraitCor, nrow(datExpr))
-write.csv(moduleTraitCor, file.path(OUTDIR, "Module_trait_correlation.csv"))
-write.csv(moduleTraitP, file.path(OUTDIR, "Module_trait_pvalue.csv"))
-
-gene_module <- data.frame(gene = colnames(datExpr), module = moduleColors)
-all_modules <- unique(moduleColors[moduleColors != "grey"])
-if (!is.null(TARGET_MODULES)) all_modules <- intersect(all_modules, TARGET_MODULES)
-
-hub_list <- list()
-for (mod in all_modules) {
-  mod_genes <- gene_module$gene[gene_module$module == mod]
-  ME <- MEs[[paste0("ME", mod)]]
-  kME <- cor(datExpr[, mod_genes, drop = FALSE], ME, use = "p")
-  hub <- data.frame(gene = mod_genes, module = mod, kME = as.numeric(kME)) %>% dplyr::arrange(dplyr::desc(abs(kME)))
-  hub_list[[mod]] <- hub
-  write.csv(hub, file.path(OUTDIR, paste0("Hub_genes_", mod, ".csv")), row.names = FALSE)
+Sys.setenv(RNASEQ_LIB_DIR = lib_dir)
+status <- system2("Rscript", c(shQuote(runner_rel), shQuote(config_path)))
+if (is.null(status) || status != 0L) {
+  stop("WGCNA runner exited with status ", status, ".")
 }
-write.csv(dplyr::bind_rows(hub_list), file.path(OUTDIR, "Hub_genes_all_modules.csv"), row.names = FALSE)
-writeLines(capture.output(sessionInfo()), file.path(OUTDIR, "sessionInfo.txt"))
+
+expected_files <- c(
+  file.path(run_root, "0-Config", "analysis_config_used.R"),
+  file.path(outdir_abs, "WGCNA_network.rds"),
+  file.path(outdir_abs, "WGCNA_gene_modules.csv"),
+  file.path(outdir_abs, "Module_trait_correlation.csv"),
+  file.path(run_root, "Analysis_summary.txt"),
+  file.path(run_root, "sessionInfo.txt")
+)
+missing_files <- expected_files[!file.exists(expected_files)]
+if (length(missing_files) > 0) {
+  stop("WGCNA demo FAILED (runner exit status ", status, "). Missing expected outputs:\n",
+       paste(missing_files, collapse = "\n"))
+}
 
 cat("\n========================================\n")
-cat("WGCNA demo PASSED.\n")
-cat("Modules found:", paste(all_modules, collapse = ", "), "\n")
-cat("Outputs saved to", OUTDIR, "\n")
+cat("WGCNA demo PASSED (drove templates/WGCNA/run_analysis.R).\n")
+cat("Outputs saved to", run_root, "\n")
 cat("========================================\n")

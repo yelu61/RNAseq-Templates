@@ -238,6 +238,41 @@ test_that("prepare_enrich_df respects show_category limit", {
   expect_lte(nrow(out), 3)
 })
 
+test_that("prepare_enrich_df preserves duplicate Descriptions with unique display labels", {
+  # KEGG can return the same Description under different IDs. Both biological
+  # terms must remain present while their figure labels stay unambiguous.
+  df <- make_enrich_df()
+  dup <- df[2, ]
+  dup$ID <- "GO:dup"
+  dup$p.adjust <- 0.015  # sorts after the original term 2 (p.adjust 0.02)
+  df <- rbind(df, dup)
+  out <- prepare_enrich_df(df, show_category = 15)
+  expect_equal(nrow(out), nrow(df))
+  expect_equal(sum(grepl("term 2", out$Description_label, fixed = TRUE)), 2)
+  expect_equal(anyDuplicated(out$Description_label), 0)
+  expect_equal(anyDuplicated(levels(out$Description_wrapped)), 0)
+  dup_pdf <- tempfile(fileext = ".pdf")
+  on.exit(unlink(dup_pdf), add = TRUE)
+  expect_no_error(plot_enrich_dotplot(df, dup_pdf, "dup", show_category = 15))
+})
+
+test_that("prepare_enrich_df falls back to term IDs for missing descriptions", {
+  df <- make_enrich_df()
+  df$Description[1:2] <- c(NA_character_, "")
+  out <- prepare_enrich_df(df, show_category = 5)
+  expect_true(all(c("GO:1", "GO:2") %in% out$Description_label))
+  expect_equal(nrow(out), nrow(df))
+})
+
+test_that("plot helpers return invisibly so top-level runner calls do not open Rplots.pdf", {
+  df <- make_enrich_df()
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  result <- withVisible(plot_enrich_dotplot(df, outfile, "visibility", show_category = 5))
+  expect_s3_class(result$value, "ggplot")
+  expect_false(result$visible)
+})
+
 # --- theme matching ----------------------------------------------------------
 
 test_that("default_enrichment_themes is well-formed", {

@@ -145,6 +145,31 @@ test_that("read_metadata rejects unrecognized group and time values", {
   unlink(tmp)
 })
 
+test_that("encode_wgcna_traits excludes identifier mirrors and labels contrasts", {
+  traits <- data.frame(
+    sample = paste0("S", 1:4),
+    sample_1 = paste0("S", 1:4),
+    condition = factor(c("Control", "Control", "Treatment", "Treatment"),
+                       levels = c("Control", "Treatment")),
+    age = c(40, 50, 60, 70),
+    invariant = 1,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  rownames(traits) <- traits$sample
+  out <- encode_wgcna_traits(traits)
+  expect_equal(colnames(out), c("condition: Treatment", "age"))
+  expect_equal(as.numeric(out[, "condition: Treatment"]), c(0, 0, 1, 1))
+  expect_equal(rownames(out), traits$sample)
+  expect_type(out, "double")
+})
+
+test_that("encode_wgcna_traits returns an empty matrix without varying traits", {
+  traits <- data.frame(sample = c("S1", "S2"), batch = c("A", "A"))
+  out <- encode_wgcna_traits(traits)
+  expect_equal(dim(out), c(2L, 0L))
+})
+
 # -----------------------------------------------------------------------------
 # validate_samples_match
 # -----------------------------------------------------------------------------

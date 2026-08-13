@@ -23,7 +23,10 @@ prepare_mfuzz_eset <- function(expr, na_thres = 0.25, fill_mode = "mean", min_st
   dat <- Biobase::ExpressionSet(assayData = as.matrix(expr))
   dat <- Mfuzz::filter.NA(dat, thres = na_thres)
   dat <- Mfuzz::fill.NA(dat, mode = fill_mode)
-  dat <- Mfuzz::filter.std(dat, min.std = min_std)
+  # Mfuzz::filter.std() plots its ordered-SD diagnostic by default, which opens
+  # Rplots.pdf in a headless runner. The pipeline exports explicit diagnostics,
+  # so keep this preprocessing step non-visual and device-safe.
+  dat <- Mfuzz::filter.std(dat, min.std = min_std, visu = FALSE)
   dat <- Mfuzz::standardise(dat)
   dat
 }
@@ -62,7 +65,8 @@ extract_mfuzz_clusters <- function(mfuzz_result, eset = NULL, min_acore = NULL) 
 plot_mfuzz_trends_pdf <- function(eset, mfuzz_result, filename,
                                     time_labels = NULL, min_mem = 0,
                                     mfrow = NULL, width = 12, height = 7) {
-  if (!requireNamespace("Mfuzz", quietly = TRUE)) return(invisible(NULL))
+  if (!requireNamespace("Mfuzz", quietly = TRUE) ||
+      !requireNamespace("Biobase", quietly = TRUE)) return(invisible(NULL))
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
   n_clusters <- length(mfuzz_result$size)
   if (is.null(mfrow)) {
@@ -73,15 +77,52 @@ plot_mfuzz_trends_pdf <- function(eset, mfuzz_result, filename,
   if (is.null(time_labels)) {
     time_labels <- colnames(eset)
   }
+  expr <- Biobase::exprs(eset)
+  membership <- as.matrix(mfuzz_result$membership)
+  assignments <- mfuzz_result$cluster
+  cluster_colors <- rep(c(
+    "#3B6FB6", "#D0604C", "#4C956C", "#8C6BB1", "#C58B35", "#4F8C8D"
+  ), length.out = n_clusters)
   save_pdf_device(filename, width = width, height = height, draw = function() {
-    Mfuzz::mfuzz.plot(
-      eset,
-      mfuzz_result,
-      mfrow = mfrow,
-      new.window = FALSE,
-      time.labels = time_labels,
-      min.mem = min_mem
+    old_par <- graphics::par(
+      mfrow = mfrow, family = "sans", mar = c(3.8, 4.2, 2.4, 0.8),
+      mgp = c(2.35, 0.7, 0), tcl = -0.25,
+      cex.axis = 0.78, cex.lab = 0.88, cex.main = 0.92,
+      las = 1
     )
+    on.exit(graphics::par(old_par), add = TRUE)
+    x <- seq_len(ncol(expr))
+    for (cluster_id in seq_len(n_clusters)) {
+      gene_ids <- names(assignments)[assignments == cluster_id]
+      if (min_mem > 0) {
+        gene_ids <- gene_ids[membership[gene_ids, cluster_id] >= min_mem]
+      }
+      gene_ids <- intersect(gene_ids, rownames(expr))
+      if (!length(gene_ids)) {
+        graphics::plot.new()
+        graphics::title(main = paste("Cluster", cluster_id, "(n = 0)"))
+        next
+      }
+      cluster_expr <- expr[gene_ids, , drop = FALSE]
+      y_range <- range(cluster_expr, finite = TRUE)
+      if (!all(is.finite(y_range)) || diff(y_range) == 0) y_range <- c(-1, 1)
+      pad <- max(diff(y_range) * 0.06, 0.08)
+      graphics::plot(
+        x, rep(NA_real_, length(x)), type = "n", xaxt = "n",
+        xlab = "Time", ylab = "Standardized expression",
+        xlim = range(x), ylim = y_range + c(-pad, pad),
+        main = sprintf("Cluster %d  (n = %d)", cluster_id, length(gene_ids)),
+        bty = "l"
+      )
+      graphics::axis(1, at = x, labels = time_labels, las = 1)
+      graphics::abline(h = 0, col = "#D9D9D9", lwd = 0.6)
+      line_color <- grDevices::adjustcolor(cluster_colors[[cluster_id]], alpha.f = 0.18)
+      graphics::matlines(x, t(cluster_expr), col = line_color, lty = 1, lwd = 0.45)
+      weights <- membership[gene_ids, cluster_id]
+      centroid <- colSums(cluster_expr * weights, na.rm = TRUE) / colSums(!is.na(cluster_expr) * weights)
+      graphics::lines(x, centroid, col = cluster_colors[[cluster_id]], lwd = 2.2)
+      graphics::points(x, centroid, col = cluster_colors[[cluster_id]], pch = 16, cex = 0.55)
+    }
   })
   invisible(filename)
 }
@@ -89,7 +130,7 @@ plot_mfuzz_trends_pdf <- function(eset, mfuzz_result, filename,
 # Plot a time-course heatmap with cluster-based row split.
 plot_timecourse_heatmap_pdf <- function(expr, cluster_df, group_vec, group_levels,
                                          filename, group_colors = NULL,
-                                         z_cap = 2, width = 9, height = 10,
+                                         z_cap = 2, width = mm_to_in(183), height = mm_to_in(247),
                                          row_font_size = 6) {
   if (nrow(expr) == 0 || ncol(expr) == 0) return(invisible(NULL))
   cluster_df <- cluster_df[cluster_df$gene_name %in% rownames(expr), ]
@@ -290,7 +331,7 @@ plot_timepoint_deg_summary_pdf <- function(summary_df, filename,
     theme_publication(base_size = 8) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Write Mfuzz cluster assignments and memberships to CSV.

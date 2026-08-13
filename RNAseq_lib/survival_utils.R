@@ -119,7 +119,7 @@ plot_cox_forest_pdf <- function(cox_df, filename,
     theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "top")
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Plot Kaplan-Meier by a categorical grouping variable.

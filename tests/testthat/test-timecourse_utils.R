@@ -1,5 +1,18 @@
 # Tests for timecourse_utils.R (offline helpers; Mfuzz-dependent paths skipped)
 
+test_that("prepare_mfuzz_eset does not open a default graphics device", {
+  # Mfuzz imports tcltk, which can emit a harmless XQuartz warning on headless
+  # macOS before testthat evaluates the skip condition.
+  suppressWarnings(skip_if_not_installed("Mfuzz"))
+  skip_if_not_installed("Biobase")
+  expr <- matrix(seq_len(24), nrow = 6,
+                 dimnames = list(paste0("g", 1:6), paste0("t", 1:4)))
+  old_device <- getOption("device")
+  on.exit(options(device = old_device), add = TRUE)
+  options(device = function(...) stop("unexpected default graphics device"))
+  expect_no_error(prepare_mfuzz_eset(expr, min_std = 0))
+})
+
 test_that("aggregate_expr_by_group collapses samples by group mean", {
   expr <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 2, byrow = TRUE,
                  dimnames = list(c("g1", "g2"), c("s1", "s2", "s3")))

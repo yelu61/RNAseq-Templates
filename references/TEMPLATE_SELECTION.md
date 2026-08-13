@@ -71,11 +71,33 @@ flowchart LR
 
 ## Non-interactive / batch execution
 
-If you want to run the General pipeline without opening a notebook (scheduling,
-batch across projects, headless servers), use the command-line runner instead:
+If you want to run a pipeline without opening a notebook (scheduling, batch
+across projects, headless servers), use the command-line runner instead. **Every
+template — General plus the five topic templates — ships a
+`config.R` + `run_analysis.R` + `visualize_results.R` trio under `templates/`.**
 
 - `templates/General/run_analysis.R` + `config.R` runs the same General pipeline via `Rscript`, with optional switches for TF analysis, TME deconvolution (`RUN_TME`, output to `4-TME/`), Excel export, and the HTML report.
-- After a run, `templates/General/visualize_results.R` regenerates targeted figures (key genes, single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without recompute.
+- `templates/Limma_Voom/`, `templates/WGCNA/`, `templates/TME/`, `templates/TimeCourse/`, and `templates/TCGA_GEO/` each provide the equivalent runner for their pipeline (same bootstrap, numbered `0-Config/1-DEG/...` output layout, config snapshot, and summary/sessionInfo tail).
+- After a run, each template's `visualize_results.R` regenerates targeted figures (key genes, single-term gseaplot2, ORA theme dot-heatmaps, module/trait plots, KM curves) from the saved results without recompute.
+
+Each `run_analysis.R` takes the config as its first trailing argument
+(`Rscript templates/<Topic>/run_analysis.R path/to/config.R`, defaulting to the
+template's own `config.R`), so a single template directory serves many projects.
+The runner preserves the directory from which it was invoked: relative input
+paths and relative `OUTDIR` values are resolved from that run root, while the
+config argument is made absolute before loading. For production, create and
+enter `analysis/runs/<run_id>/` first, then invoke the central runner with a
+project config; the runner never changes into the template source directory.
 
 The notebooks remain the better choice for interactive exploration (tweaking gene
-sets for GSVA, ad-hoc plots). See [templates/General/README.md](../templates/General/README.md).
+sets for GSVA, ad-hoc plots). See [templates/General/README.md](../templates/General/README.md)
+for the canonical walkthrough.
+
+**Converting a notebook to a runner.** `tools/notebook_to_runner.R` extracts a
+notebook's `## 1. Parameter Configuration` cell into a `config.R` and flattens
+the remaining code cells into a `run_analysis.R` draft, plus a
+`conversion_report.txt` flagging patterns that need manual refinement:
+
+```bash
+Rscript tools/notebook_to_runner.R notebooks/RNAseq_General.ipynb out_dir --topic General
+```

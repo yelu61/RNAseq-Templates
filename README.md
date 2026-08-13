@@ -49,7 +49,7 @@ flowchart TB
     class output result
 ```
 
-Templates support **human or mouse where biologically applicable** (TCGA cohorts are human), are exercised by a CI smoke test on each push, and ship with runnable bundled-data demos under `examples/`. Most demo paths are offline; optional services such as KEGG and some IOBR/xCell reference data still require network access or a populated local cache.
+Templates support **human or mouse where biologically applicable** (TCGA cohorts are human), are exercised by a CI smoke test on each push, and ship with runnable bundled-data demos under `examples/`. The required smoke path is offline and deterministic; optional KEGG services and IOBR integration still require network access or a populated local cache.
 
 ## 🤖 Codex / Claude Code Skill
 
@@ -128,10 +128,12 @@ RNAseq_lib/                # shared R helpers (15 modules)
   tme_utils.R  tcga_utils.R  limma_voom_utils.R  timecourse_utils.R
   survival_utils.R  batch_utils.R  design_utils.R  geo_utils.R
   data_utils.R  report_utils.R
-templates/General/         # CLI runner for the General pipeline
-  config.R                 #   edit per-project parameters
-  run_analysis.R           #   Rscript entry point (same as notebook)
-  visualize_results.R      #   re-plot from saved results (no recompute)
+templates/                 # one CLI runner trio per template
+  General/  Limma_Voom/  WGCNA/  TME/  TimeCourse/  TCGA_GEO/
+    config.R                 #   edit per-project parameters
+    run_analysis.R           #   Rscript entry point (same as notebook)
+    visualize_results.R      #   re-plot from saved results (no recompute)
+tools/notebook_to_runner.R   # notebook param cell -> config.R + runner draft
 reports/analysis_report.qmd  # unified HTML report template
 examples/
   run_demo_smoke_test.R    # runs every demo and validates outputs
@@ -151,8 +153,10 @@ All six `demo_RNAseq_*` demos are exercised by the CI smoke test on every push.
 
 ### Option A — command line (reproducible / batch)
 
-For running the standard General pipeline without opening a notebook (scheduling,
-batch across many projects, headless servers), use the script runner:
+For running a pipeline without opening a notebook (scheduling, batch across
+many projects, headless servers), use the script runner. **Every template —
+General and all five topic templates — ships a `config.R` + `run_analysis.R` +
+`visualize_results.R` trio under `templates/`.**
 
 ```bash
 cp templates/General/{config.R,run_analysis.R,visualize_results.R} /path/to/project/
@@ -160,13 +164,33 @@ cp templates/General/{config.R,run_analysis.R,visualize_results.R} /path/to/proj
 cd /path/to/project && Rscript run_analysis.R
 ```
 
-It runs the same pipeline as the General notebook and writes the same outputs.
+Swap `General` for `Limma_Voom`, `WGCNA`, `TME`, `TimeCourse`, or `TCGA_GEO` to
+run that pipeline instead; each `run_analysis.R` shares the same bootstrap,
+numbered `0-Config/1-DEG/...` output layout, and config snapshot. It runs the
+same pipeline as the corresponding notebook and writes the same outputs.
+
+The runner preserves the invocation directory, which is the path base for
+relative input paths and `OUTDIR`; a relative config argument is resolved before
+loading. In production, enter a fresh `analysis/runs/<run_id>/` before invoking
+the central runner, so no output is written into the template source tree.
+
 `run_analysis.R` also supports optional TME deconvolution (`RUN_TME`, output to
 `4-TME/`) and caches `gseaResult` objects to `2-GSEA/gsea_results.rds`. After a
 run, `Rscript visualize_results.R` regenerates targeted figures (key genes,
 single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without
 recompute. See [templates/General/README.md](templates/General/README.md) for
 batch execution and library-path resolution.
+
+To convert a notebook's parameter cell into a `config.R` + `run_analysis.R`
+draft for a new pipeline, use the converter:
+
+```bash
+Rscript tools/notebook_to_runner.R notebooks/RNAseq_General.ipynb out_dir --topic General
+```
+
+It extracts the `## 1. Parameter Configuration` cell into `config.R`, flattens
+the remaining code cells into a runner draft, and writes a
+`conversion_report.txt` flagging patterns that need manual refinement.
 
 For a real project, run inside a versioned native output root such as
 `analysis/runs/20260813_01/`, then curate reviewed deliverables into

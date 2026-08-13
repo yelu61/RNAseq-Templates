@@ -103,7 +103,7 @@
 | `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；小鼠数据会经 `convert_expression_rownames()` 把 MGI symbol 转为 HGNC symbol 后再进行反卷积 |
 | `GROUP_COLORS` | named character vector/NULL | `NULL` | 自定义分组颜色；NULL 时自动生成 |
 | `RUN_ESTIMATE` | logical | `TRUE` | 是否运行 native ESTIMATE |
-| `RUN_IOBR` | logical | `TRUE` | 是否运行 IOBR |
+| `RUN_IOBR` | logical | `FALSE` | 是否运行 IOBR；首次运行可能下载方法参考数据，离线生产运行前需先完成缓存预检 |
 | `IOBR_METHODS` | character vector | `c("estimate", "cibersort", "epic", "xcell")` | 要运行的 IOBR 方法 |
 | `IOBR_PERM` | numeric | `1000` | CIBERSORT permutation 次数 |
 | `IOBR_ARRAYS` | logical | `FALSE` | RNA-seq 设为 FALSE；microarray 设为 TRUE |

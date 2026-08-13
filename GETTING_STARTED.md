@@ -50,7 +50,9 @@ flowchart TB
 
 > 💡 第 1–3 步只需做**一次**（搭好环境），以后每次分析只需做第 4–5 步。
 
-如果使用 Codex 或 Claude Code，也可以直接调用项目自带的统一入口：
+如果使用 Codex 或 Claude Code，也可以调用统一入口 skill（维护在中央集合
+[`agent-ready-research-skills`](https://github.com/yelu61/agent-ready-research-skills)，
+安装/链接后即可全局调用，本仓库不再内置）：
 
 ```text
 Use $bulk-rnaseq-analysis to inspect my data and choose the correct workflow.

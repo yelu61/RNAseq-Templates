@@ -314,6 +314,25 @@ test_that("compare_native_iobr_cibersort matches relaxed cell-type names", {
   expect_equal(sort(cmp$summary$cell_type), c("b cells naive", "t cells cd8"))
 })
 
+test_that("compare_native_iobr_cibersort strips the _CIBERSORT method suffix before matching", {
+  # IOBR appends "_CIBERSORT" to its cell-type columns; without stripping, the
+  # suffix normalizes to a trailing " cibersort" token and no cell types match.
+  native <- data.frame(
+    ID = c("S1", "S2"),
+    `B.cells.naive` = c(0.1, 0.2),
+    `T.cells.CD8` = c(0.3, 0.4),
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+  iobr <- data.frame(
+    ID = c("S1", "S2"),
+    `B cells naive_CIBERSORT` = c(0.12, 0.22),
+    `T cells CD8_CIBERSORT` = c(0.31, 0.39),
+    check.names = FALSE, stringsAsFactors = FALSE
+  )
+  cmp <- compare_native_iobr_cibersort(native, iobr, id_column = "ID")
+  expect_equal(sort(cmp$summary$cell_type), c("b cells naive", "t cells cd8"))
+})
+
 test_that("compare_native_iobr_cibersort errors on mismatched IDs", {
   native <- data.frame(ID = "A", CT1 = 0.5, CT2 = 0.5)
   iobr <- data.frame(ID = "B", CT1 = 0.5, CT2 = 0.5)

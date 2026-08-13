@@ -264,5 +264,5 @@ plot_tcga_gene_boxplot_pdf <- function(expr_df, gene, group_vec, filename,
     )
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }

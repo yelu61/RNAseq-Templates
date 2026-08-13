@@ -23,12 +23,17 @@ run_voom <- function(dge, design = NULL, plot_file = NULL) {
   if (!requireNamespace("limma", quietly = TRUE)) {
     stop("Package 'limma' is required.")
   }
-  v <- limma::voom(dge, design = design, plot = !is.null(plot_file))
-  if (!is.null(plot_file)) {
-    save_pdf_device(plot_file, width = 5.2, height = 4.6, draw = function() {
-      limma::voom(dge, design = design, plot = TRUE, save.plot = TRUE)
-    })
+  if (is.null(plot_file)) {
+    return(limma::voom(dge, design = design, plot = FALSE))
   }
+
+  # Run voom exactly once, inside the managed graphics device. The previous
+  # implementation plotted once to R's default device and recomputed voom for
+  # the canonical PDF, leaving an ignored Rplots.pdf beside the runner.
+  v <- NULL
+  save_pdf_device(plot_file, width = 5.2, height = 4.6, draw = function() {
+    v <<- limma::voom(dge, design = design, plot = TRUE, save.plot = TRUE)
+  })
   v
 }
 

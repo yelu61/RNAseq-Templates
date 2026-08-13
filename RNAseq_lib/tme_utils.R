@@ -348,7 +348,7 @@ plot_tme_barplot_pdf <- function(long_df, group_col = "condition", sample_col = 
     }
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Plot box/violin plots for each cell type with pairwise statistics.
@@ -398,7 +398,7 @@ plot_tme_boxplot_pdf <- function(long_df, group_col = "condition", value_col = "
     )
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Plot one cell type per PDF using the publication violin/box style.
@@ -651,7 +651,7 @@ plot_estimate_boxplot_pdf <- function(long_df, group_col = "condition", filename
     }
   }
 
-  p
+  invisible(p)
 }
 
 # -----------------------------------------------------------------------------
@@ -824,9 +824,15 @@ compare_native_iobr_cibersort <- function(native_df,
 
   # Try to match cell-type names. IOBR names may contain dots, spaces, or
   # slightly different capitalization. Use a relaxed matching that tolerates
-  # differences in punctuation/whitespace.
+  # differences in punctuation/whitespace. IOBR also suffixes its columns with
+  # the method name (e.g. "B cells naive_CIBERSORT"); strip a trailing method
+  # suffix BEFORE normalization, otherwise "[._]+"->" " turns it into a trailing
+  # " cibersort" token that never matches the native (spaced LM22) names.
   .normalize_celltype_name <- function(x) {
-    x <- tolower(as.character(x))
+    x <- as.character(x)
+    x <- sub("_(CIBERSORT|CIBERSORT[._-]?ABS|xCell|EPIC|quanTIseq|TIMER|MCPCounter|MCPcounter|estimate)$",
+             "", x, ignore.case = TRUE)
+    x <- tolower(x)
     x <- gsub("[._]+", " ", x)
     x <- gsub("\\s+", " ", x)
     x <- trimws(x)
@@ -939,7 +945,7 @@ plot_cibersort_correlation_pdf <- function(long_df,
     )
 
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Bland-Altman-style difference plot: (native - IOBR) vs mean, faceted by cell
@@ -1002,7 +1008,7 @@ plot_cibersort_difference_pdf <- function(long_df,
     )
 
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # -----------------------------------------------------------------------------

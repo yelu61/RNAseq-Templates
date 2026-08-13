@@ -5,8 +5,11 @@
 This project provides production-oriented bulk RNA-seq analysis templates with
 a shared R helper library (`RNAseq_lib/`). The command-line runner is preferred
 for reproducible project execution; notebooks remain available for interactive
-exploration. The core pipeline and six topic templates are functional and all
-15 helper modules have unit tests.
+exploration. Every template — General plus the five topic templates — now ships
+a `config.R` + `run_analysis.R` + `visualize_results.R` runner under
+`templates/`, the core pipeline and six topic templates are functional, and all
+helper modules have unit tests. `tools/notebook_to_runner.R` converts a
+notebook's parameter cell into a `config.R` + runner draft.
 
 **Current release: v0.9.0** (see [CHANGELOG.md](CHANGELOG.md)).
 
@@ -52,7 +55,9 @@ exploration. The core pipeline and six topic templates are functional and all
 - [x] Fix paired-design and batch-covariate integration bugs in the General template
 - [x] Get GitHub Actions smoke test fully green (dependency install + all six template demos)
 - [x] Add limma-voom and WGCNA demos to the smoke test (now exercises all six templates)
-- [ ] Create a Python/CLI wrapper to convert notebook parameter cells to R scripts for headless execution
+- [x] Create a converter to turn notebook parameter cells into `config.R` + a
+      `run_analysis.R` draft for headless execution (`tools/notebook_to_runner.R`,
+      R + jsonlite; emits a conversion report for manual refinement)
 - [ ] Add more public-data examples (GEO local-file mode, TCGA local-file mode)
 - [x] Add interactive HTML report generation (`reports/analysis_report.qmd`, rendered via quarto or rmarkdown)
 - [ ] Add single-cell reference integration / deconvolution (e.g., Bisque, CIBERSORTx)
@@ -64,6 +69,10 @@ exploration. The core pipeline and six topic templates are functional and all
 - [x] Add runnable demos for RNAseq_TimeCourse_Template.ipynb
 - [x] Add runnable demos for RNAseq_TCGA_GEO_Template.ipynb (local-file mode)
 - [x] Add unified HTML report generation (`reports/analysis_report.qmd` + `render_analysis_report()`)
+- [x] Add command-line runners (`config.R` + `run_analysis.R` +
+      `visualize_results.R`) for all five topic templates (Limma_Voom, WGCNA,
+      TME, TimeCourse, TCGA_GEO), matching the General runner conventions;
+      topic demos now drive these runners so CI exercises them
 
 ## How to contribute
 

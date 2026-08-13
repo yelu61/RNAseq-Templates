@@ -342,6 +342,26 @@ wrap_term_labels <- function(x, width = 45, max_lines = 2) {
   }, character(1))
 }
 
+# Build readable, row-preserving enrichment labels. Distinct term IDs can share
+# a Description (and KEGG can return missing descriptions), so label
+# disambiguation must never delete biological terms from a figure data set.
+make_enrich_display_labels <- function(df) {
+  n <- nrow(df)
+  if (n == 0) return(character(0))
+  desc <- if ("Description" %in% colnames(df)) as.character(df$Description) else rep(NA_character_, n)
+  ids <- if ("ID" %in% colnames(df)) as.character(df$ID) else rep(NA_character_, n)
+  desc <- trimws(desc)
+  ids <- trimws(ids)
+  missing_desc <- is.na(desc) | !nzchar(desc)
+  desc[missing_desc] <- ids[missing_desc]
+  desc[is.na(desc) | !nzchar(desc)] <- "Unlabelled term"
+
+  repeated <- duplicated(desc) | duplicated(desc, fromLast = TRUE)
+  with_id <- repeated & !is.na(ids) & nzchar(ids)
+  desc[with_id] <- paste0(desc[with_id], " [", ids[with_id], "]")
+  make.unique(desc, sep = " · ")
+}
+
 parse_ratio_numeric <- function(x) {
   vapply(strsplit(as.character(x), "/"), function(z) {
     if (length(z) != 2) return(NA_real_)
@@ -385,7 +405,7 @@ plot_pca_pdf <- function(vsd, group_levels, group_colors, filename, intgroup = "
     )
   }
   save_pdf_plot(p, filename, width = 7.2, height = 5.4)
-  p
+  invisible(p)
 }
 
 plot_sample_distance_pdf <- function(vsd, filename) {
@@ -436,7 +456,7 @@ plot_sample_qc_pdf <- function(sample_qc, filename, group_colors = NULL) {
     p <- p + ggplot2::scale_fill_manual(values = group_colors, na.value = "#999999")
   }
   save_pdf_plot(p, filename, width = min(12, max(7.2, 0.45 * nrow(sample_qc))), height = 8)
-  p
+  invisible(p)
 }
 
 plot_sample_correlation_pdf <- function(sample_qc, filename) {
@@ -472,7 +492,7 @@ plot_count_distribution_pdf <- function(count_data, filename, max_points_per_sam
     theme_publication(base_size = 7.5) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
   save_pdf_plot(p, filename, width = min(12, max(7.2, 0.45 * ncol(count_data))), height = 4.8)
-  p
+  invisible(p)
 }
 
 plot_filter_retention_pdf <- function(retention_df, filename) {
@@ -483,7 +503,7 @@ plot_filter_retention_pdf <- function(retention_df, filename) {
     theme_publication(base_size = 7.5) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
   save_pdf_plot(p, filename, width = min(12, max(7.2, 0.45 * nrow(retention_df))), height = 4.8)
-  p
+  invisible(p)
 }
 
 plot_deg_summary_pdf <- function(deg_summary, filename, threshold_col = "Threshold") {
@@ -509,7 +529,7 @@ plot_deg_summary_pdf <- function(deg_summary, filename, threshold_col = "Thresho
     width = min(12, max(7.2, ifelse(has_threshold, 2.45 * length(unique(deg_summary[[threshold_col]])), 6))),
     height = 4.8
   )
-  p
+  invisible(p)
 }
 
 plot_lfc_strategy_summary_pdf <- function(lfc_strategy_summary, filename) {
@@ -539,7 +559,7 @@ plot_lfc_strategy_summary_pdf <- function(lfc_strategy_summary, filename) {
     width = min(12, max(7.2, 2.45 * length(unique(lfc_strategy_summary$Threshold)))),
     height = 4.8
   )
-  p
+  invisible(p)
 }
 
 plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, filename, pvalue_column = "padj", lfc_column = "log2FoldChange") {
@@ -571,7 +591,7 @@ plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, fi
     widthConnectors = 0.4,
     boxedLabels = FALSE,
     xlim = c(-max_fc * 1.1, max_fc * 1.1),
-    title = comp_name,
+    title = gsub("_", " ", comp_name, fixed = TRUE),
     subtitle = NULL,
     caption = NULL,
     pCutoff = pvalue_thresh,
@@ -600,7 +620,7 @@ plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, fi
       plot.margin = ggplot2::margin(8, 10, 8, 8)
     )
   save_pdf_plot(p, filename, width = 7.2, height = 6.2)
-  p
+  invisible(p)
 }
 
 plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NULL, group_levels = NULL,
@@ -608,7 +628,7 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
                                         show_row_names = TRUE, show_column_names = FALSE,
                                         row_font_size = 7, column_font_size = 8,
                                         cluster_rows = TRUE, cluster_columns = TRUE,
-                                        column_split = TRUE, width = 8, height = 10,
+                                        column_split = TRUE, width = mm_to_in(183), height = mm_to_in(247),
                                         heatmap_name = "Z-score") {
   mat <- as.matrix(mat)
   if (nrow(mat) == 0 || ncol(mat) == 0) return(invisible(NULL))
@@ -666,6 +686,106 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     ComplexHeatmap::draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right")
   })
   invisible(ht)
+}
+
+# WGCNA uses base graphics, so keep its diagnostic figures under the same
+# transactional device, typography, colour, and final-size contract as ggplot
+# and ComplexHeatmap outputs.
+plot_wgcna_sample_tree_pdf <- function(sample_tree, filename,
+                                       width = mm_to_in(183), height = 4.5) {
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    old_par <- graphics::par(
+      family = "sans", bty = "l", las = 1,
+      mar = c(4.2, 4.2, 2.2, 0.8), mgp = c(2.4, 0.7, 0),
+      cex.axis = 0.78, cex.lab = 0.88, cex.main = 0.95
+    )
+    on.exit(graphics::par(old_par), add = TRUE)
+    graphics::plot(sample_tree, main = "Sample clustering", sub = "", xlab = "",
+                   hang = -0.05)
+  })
+  invisible(filename)
+}
+
+plot_wgcna_soft_threshold_pdf <- function(sft, selected_power = NULL, filename,
+                                          width = mm_to_in(183), height = 3.7) {
+  fit <- sft$fitIndices
+  if (is.null(fit) || nrow(fit) == 0) return(invisible(NULL))
+  signal <- RNAseq_PALETTE$gsea_suppressed
+  threshold <- RNAseq_PALETTE$gsea_activated
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    old_par <- graphics::par(
+      family = "sans", mfrow = c(1, 2), bty = "l", las = 1,
+      mar = c(4.2, 4.0, 2.2, 0.8), mgp = c(2.35, 0.7, 0),
+      cex.axis = 0.72, cex.lab = 0.82, cex.main = 0.9
+    )
+    on.exit(graphics::par(old_par), add = TRUE)
+    signed_fit <- -sign(fit[, 3]) * fit[, 2]
+    graphics::plot(fit[, 1], signed_fit, xlab = "Soft-threshold power",
+                   ylab = "Signed scale-free fit (R²)", type = "n",
+                   main = "Scale-free topology")
+    graphics::text(fit[, 1], signed_fit, labels = fit[, 1], col = signal, cex = 0.72)
+    graphics::abline(h = 0.8, col = threshold, lty = 2, lwd = 0.8)
+    if (!is.null(selected_power) && is.finite(selected_power)) {
+      graphics::abline(v = selected_power, col = "#555555", lty = 3, lwd = 0.7)
+    }
+    graphics::plot(fit[, 1], fit[, 5], xlab = "Soft-threshold power",
+                   ylab = "Mean connectivity", type = "n",
+                   main = "Network connectivity")
+    graphics::text(fit[, 1], fit[, 5], labels = fit[, 1], col = signal, cex = 0.72)
+    if (!is.null(selected_power) && is.finite(selected_power)) {
+      graphics::abline(v = selected_power, col = "#555555", lty = 3, lwd = 0.7)
+    }
+  })
+  invisible(filename)
+}
+
+plot_wgcna_module_dendrogram_pdf <- function(net, module_colors, filename,
+                                              width = mm_to_in(183), height = 4.5) {
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    old_par <- graphics::par(
+      family = "sans", mar = c(3.2, 4.1, 2.2, 0.8), mgp = c(2.3, 0.7, 0),
+      cex.axis = 0.72, cex.lab = 0.82, cex.main = 0.9
+    )
+    on.exit(graphics::par(old_par), add = TRUE)
+    WGCNA::plotDendroAndColors(
+      net$dendrograms[[1]], module_colors[net$blockGenes[[1]]], "Module colors",
+      dendroLabels = FALSE, hang = 0.03, addGuide = TRUE,
+      main = "Gene dendrogram and detected modules"
+    )
+  })
+  invisible(filename)
+}
+
+plot_wgcna_module_trait_heatmap_pdf <- function(module_trait_cor, module_trait_p,
+                                                 filename, title = "Module–trait relationships") {
+  if (is.null(module_trait_cor) || length(module_trait_cor) == 0) return(invisible(NULL))
+  text_matrix <- paste(signif(module_trait_cor, 2), "\n(", signif(module_trait_p, 1), ")", sep = "")
+  width <- min(mm_to_in(183), max(mm_to_in(89), 1.9 + 0.55 * ncol(module_trait_cor)))
+  height <- min(mm_to_in(247), max(4.2, 1.8 + 0.30 * nrow(module_trait_cor)))
+  text_cex <- max(0.48, min(0.72, 7 / max(nrow(module_trait_cor), ncol(module_trait_cor))))
+  longest_x_label <- max(nchar(colnames(module_trait_cor)), 0)
+  bottom_margin <- if (longest_x_label > 12) 8.8 else 5.8
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    old_par <- graphics::par(
+      family = "sans", mar = c(bottom_margin, 6.0, 2.3, 2.0),
+      cex.axis = 0.72, cex.lab = 0.82, cex.main = 0.9
+    )
+    on.exit(graphics::par(old_par), add = TRUE)
+    WGCNA::labeledHeatmap(
+      Matrix = module_trait_cor,
+      xLabels = colnames(module_trait_cor),
+      yLabels = rownames(module_trait_cor),
+      ySymbols = rownames(module_trait_cor),
+      colorLabels = FALSE,
+      colors = WGCNA::blueWhiteRed(50),
+      textMatrix = text_matrix,
+      setStdMargins = FALSE,
+      cex.text = text_cex,
+      zlim = c(-1, 1),
+      main = title
+    )
+  })
+  invisible(filename)
 }
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
@@ -825,7 +945,7 @@ plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_c
       ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.28)))
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 plot_group_violin_boxplot_pdf <- function(data, value_col, group_col, filename,
@@ -883,7 +1003,7 @@ plot_group_violin_boxplot_pdf <- function(data, value_col, group_col, filename,
     p <- p + ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.07, 0.12)))
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 sem_upper <- function(x) mean(x, na.rm = TRUE) + stats::sd(x, na.rm = TRUE) / sqrt(sum(!is.na(x)))
@@ -951,7 +1071,7 @@ plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
     p <- p + ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.18)))
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 prepare_enrich_df <- function(enrich_result, show_category = 15) {
@@ -960,7 +1080,9 @@ prepare_enrich_df <- function(enrich_result, show_category = 15) {
   if (nrow(df) == 0) return(df)
   df <- df[order(df$p.adjust, df$pvalue), , drop = FALSE]
   df <- utils::head(df, show_category)
-  df$Description_wrapped <- factor(wrap_term_labels(df$Description), levels = rev(wrap_term_labels(df$Description)))
+  df$Description_label <- make_enrich_display_labels(df)
+  wrapped <- make.unique(wrap_term_labels(df$Description_label), sep = " · ")
+  df$Description_wrapped <- factor(wrapped, levels = rev(wrapped))
   if (!"Count" %in% colnames(df) && "setSize" %in% colnames(df)) df$Count <- df$setSize
   if (!"Count" %in% colnames(df)) df$Count <- 1L
   if ("GeneRatio" %in% colnames(df)) {
@@ -1005,7 +1127,7 @@ plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 
   # quantity readers compare on the x axis. This preserves inferential priority
   # without leaving an apparently random y-axis order.
   df <- df[order(df[[x_col]], decreasing = TRUE), , drop = FALSE]
-  labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
+  labels <- make.unique(wrap_term_labels(df$Description_label, width = 42, max_lines = 2), sep = " · ")
   df$Term <- factor(labels, levels = rev(labels))
   p <- ggplot2::ggplot(
     df,
@@ -1022,7 +1144,7 @@ plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 
       legend.position = "right"
     )
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_category = 20, width = 7.2, height = 5.8,
@@ -1036,7 +1158,7 @@ plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_categor
   }
   df <- df[order(df$FoldEnrichment, decreasing = TRUE), , drop = FALSE]
   df <- utils::head(df, show_category)
-  labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
+  labels <- make.unique(wrap_term_labels(df$Description_label, width = 42, max_lines = 2), sep = " · ")
   df$Term <- factor(labels, levels = rev(labels))
   fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
@@ -1066,7 +1188,7 @@ plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_categor
       legend.text = ggplot2::element_text(size = 7)
     )
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filename, title,
@@ -1088,7 +1210,8 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   # Saved CSVs can infer unused columns such as geneID with different types
   # when one direction is empty/sparse. Bind only the fields used by this plot
   # so a presentation-only refresh does not depend on irrelevant CSV typing.
-  plot_cols <- c("Description", "FoldEnrichment", "log10_pvalue", "log10_padj", "Direction")
+  plot_cols <- c("Description", "Description_label", "FoldEnrichment",
+                 "log10_pvalue", "log10_padj", "Direction")
   if (nrow(up_df) > 0) up_df <- up_df[, plot_cols, drop = FALSE]
   if (nrow(down_df) > 0) down_df <- down_df[, plot_cols, drop = FALSE]
   df <- dplyr::bind_rows(up_df, down_df)
@@ -1098,8 +1221,8 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   }
   df$SignedFoldEnrichment <- ifelse(df$Direction == "UP", df$FoldEnrichment, -df$FoldEnrichment)
   df <- df[order(df$Direction, abs(df$FoldEnrichment), decreasing = TRUE), , drop = FALSE]
-  labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
-  df$Term <- factor(labels, levels = unique(labels[order(df$SignedFoldEnrichment)]))
+  labels <- make.unique(wrap_term_labels(df$Description_label, width = 42, max_lines = 2), sep = " · ")
+  df$Term <- factor(labels, levels = labels[order(df$SignedFoldEnrichment)])
   fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
 
@@ -1124,7 +1247,7 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
       legend.text = ggplot2::element_text(size = 7)
     )
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 plot_enrich_network_pdf <- function(enrich_result, prefix, show_category = 8) {
@@ -1170,7 +1293,7 @@ plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, sho
     theme_publication(base_size = 8) +
     ggplot2::theme(axis.text.y = ggplot2::element_text(size = 6.8))
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 7.2, height = 6.2) {
@@ -1182,15 +1305,11 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
   if (!"p.adjust" %in% colnames(df)) df$p.adjust <- df$pvalue
   df <- df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
   df <- utils::head(df, show_category)
-  # KEGG results can carry NA or duplicated Descriptions (the online KEGG map
-  # supplies IDs without names). Fill missing labels from ID and deduplicate so
-  # the factor levels below are unique; otherwise factor() errors with
-  # "factor level is duplicated".
-  desc <- as.character(df$Description)
-  desc[is.na(desc) | desc == ""] <- as.character(df$ID)[is.na(desc) | desc == ""]
-  df$Description <- make.unique(desc, sep = " ")
+  # Preserve every term while filling missing labels and disambiguating shared
+  # descriptions with IDs.
+  df$Description_label <- make_enrich_display_labels(df)
   df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
-  wrapped_terms <- wrap_term_labels(df$Description, width = 44, max_lines = 2)
+  wrapped_terms <- make.unique(wrap_term_labels(df$Description_label, width = 44, max_lines = 2), sep = " · ")
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
   max_nes <- max(abs(df$NES), na.rm = TRUE)
   df$LabelX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
@@ -1221,7 +1340,7 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
       legend.text = ggplot2::element_text(size = 7)
     )
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category = 15) {
@@ -1373,7 +1492,7 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
   if (!is.null(filename)) {
     save_pdf_plot(p, filename, width = width, height = height, base_family = base_family)
   }
-  p
+  invisible(p)
 }
 
 # Plot publication-grade single-term GSEA figures for selected terms.
@@ -1400,11 +1519,18 @@ plot_gsea_term_figures_from_df <- function(gsea_result, term_df,
     term_desc <- gsea_df$Description[match(term_id, gsea_df$ID)]
     safe_name <- gsub("[^a-zA-Z0-9_-]", "_", tolower(term_desc))
     filename <- file.path(outdir, paste0(prefix, "_", safe_name, ".pdf"))
-    plot_gsea_term_figure_pdf(
-      gsea_result, term_id,
-      filename = filename,
-      contrast_label = contrast_label,
-      width = width, height = height
+    # A single degenerate term (e.g. too few genes on a small dataset) yields an
+    # incomplete gseaplot2 that save_pdf_plot() refuses; skip it rather than
+    # aborting the remaining terms and the whole run.
+    tryCatch(
+      plot_gsea_term_figure_pdf(
+        gsea_result, term_id,
+        filename = filename,
+        contrast_label = contrast_label,
+        width = width, height = height
+      ),
+      error = function(e) message("Skipping GSEA term figure for '", term_desc,
+                                  "': ", conditionMessage(e))
     )
   }
   invisible(TRUE)
@@ -1621,7 +1747,7 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
     height <- min(height, max_height)
   }
   save_pdf_plot(p, filename, width = width, height = height)
-  p
+  invisible(p)
 }
 
 # Wrapper: build a theme dot-heatmap directly from enrichment result objects or data frames.
