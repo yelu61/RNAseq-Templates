@@ -85,14 +85,43 @@ make_group_colors <- function(group_levels) {
 }
 
 save_pdf_plot <- function(plot, filename, width = 7, height = 6) {
+  if (is.null(plot)) {
+    message("Skipping PDF: plot object is NULL for ", filename)
+    return(invisible(NULL))
+  }
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
   device <- if (capabilities("cairo")) grDevices::cairo_pdf else grDevices::pdf
-  ggplot2::ggsave(filename, plot = plot, width = width, height = height, device = device)
+  # Write to a sibling temporary file first. If a plotting method errors while
+  # the device is open (a common failure mode for enrichplot/patchwork objects),
+  # no zero-content PDF is promoted to the canonical output path.
+  tmp <- tempfile(
+    pattern = paste0(".", basename(filename), "."),
+    tmpdir = dirname(filename), fileext = ".pdf"
+  )
+  on.exit(unlink(tmp), add = TRUE)
+  ggplot2::ggsave(tmp, plot = plot, width = width, height = height, device = device)
+  size <- file.info(tmp)$size
+  if (!file.exists(tmp) || is.na(size) || size < 1500) {
+    stop("Refusing to save an empty or incomplete PDF: ", filename, call. = FALSE)
+  }
+  if (!file.rename(tmp, filename)) {
+    if (!file.copy(tmp, filename, overwrite = TRUE)) {
+      stop("Could not promote validated PDF to: ", filename, call. = FALSE)
+    }
+  }
   invisible(filename)
 }
 
-wrap_term_labels <- function(x, width = 45) {
-  vapply(x, function(s) paste(strwrap(s, width = width), collapse = "\n"), character(1))
+wrap_term_labels <- function(x, width = 45, max_lines = 2) {
+  vapply(x, function(s) {
+    s <- trimws(gsub("[[:space:]]+", " ", as.character(s)))
+    lines <- strwrap(s, width = width)
+    if (length(lines) > max_lines) {
+      lines <- lines[seq_len(max_lines)]
+      lines[max_lines] <- paste0(sub("[[:punct:][:space:]]+$", "", lines[max_lines]), "…")
+    }
+    paste(lines, collapse = "\n")
+  }, character(1))
 }
 
 parse_ratio_numeric <- function(x) {
@@ -375,7 +404,7 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     use_raster = nrow(plot_mat) > 500 && .has_working_cairo(),
     show_heatmap_legend = TRUE,
         heatmap_legend_param = list(
-          title = expression(~'Z-score of VST'),
+          title = heatmap_name,
           title_gp = grid::gpar(col = "black", cex = 0.75),
           title_position = "leftcenter-rot"
         )
@@ -389,6 +418,16 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
 
 format_p_for_label <- function(p) {
   ifelse(is.na(p), "NA", ifelse(p < 0.001, formatC(p, format = "e", digits = 2), sprintf("%.3f", p)))
+}
+
+# Compact significance stars for an adjusted p-value vector (ns/*/**/***). Used
+# by the group plot helpers when `label_style = "stars"` is requested, which is
+# easier to read than the full "p.adj=...\nDelta=..." label on small or
+# many-comparison facets.
+format_p_stars <- function(p) {
+  ifelse(is.na(p), "ns",
+    ifelse(p < 0.001, "***", ifelse(p < 0.01, "**",
+      ifelse(p < 0.05, "*", "ns"))))
 }
 
 pairwise_effect_table <- function(data, value_col, group_col, comparisons = NULL,
@@ -439,17 +478,73 @@ pairwise_effect_table <- function(data, value_col, group_col, comparisons = NULL
   out
 }
 
+# Validate a caller-supplied pairwise table and add plot positions when absent.
+# This lets figures reuse the exact multiplicity correction reported in a result
+# table (for example, one global BH pass across a pathway panel) instead of
+# silently recomputing a different per-facet correction.
+.prepare_plot_stat_table <- function(stat_table, data, value_col, facet_col = NULL,
+                                     label_style = c("full", "stars")) {
+  label_style <- match.arg(label_style)
+  stat_tbl <- as.data.frame(stat_table)
+  if (nrow(stat_tbl) == 0) return(stat_tbl)
+  required <- c("group1", "group2")
+  if (!is.null(facet_col)) required <- c(required, facet_col)
+  missing_cols <- setdiff(required, colnames(stat_tbl))
+  if (length(missing_cols) > 0) {
+    stop("`stat_table` is missing columns: ", paste(missing_cols, collapse = ", "))
+  }
+  p_col <- if ("p.adj" %in% colnames(stat_tbl)) "p.adj" else if ("padj" %in% colnames(stat_tbl)) "padj" else NULL
+  if (is.null(p_col) && !"label" %in% colnames(stat_tbl)) {
+    stop("`stat_table` must contain `p.adj`, `padj`, or a preformatted `label` column.")
+  }
+  if (!is.null(p_col)) {
+    if (label_style == "stars") {
+      stat_tbl$label <- format_p_stars(stat_tbl[[p_col]])
+    } else if (!"label" %in% colnames(stat_tbl)) {
+      delta_text <- if ("delta" %in% colnames(stat_tbl)) {
+        paste0("\nDelta=", sprintf("%.2f", stat_tbl$delta))
+      } else ""
+      stat_tbl$label <- paste0("p.adj=", format_p_for_label(stat_tbl[[p_col]]), delta_text)
+    }
+  }
+  if (!"y.position" %in% colnames(stat_tbl)) {
+    stat_tbl$y.position <- NA_real_
+    facets <- if (is.null(facet_col)) NA_character_ else unique(as.character(stat_tbl[[facet_col]]))
+    for (facet in facets) {
+      stat_idx <- if (is.null(facet_col)) seq_len(nrow(stat_tbl)) else which(as.character(stat_tbl[[facet_col]]) == facet)
+      plot_values <- if (is.null(facet_col)) data[[value_col]] else data[as.character(data[[facet_col]]) == facet, value_col]
+      plot_values <- plot_values[is.finite(plot_values)]
+      if (length(plot_values) == 0) next
+      value_range <- range(plot_values)
+      value_span <- diff(value_range)
+      if (!is.finite(value_span) || value_span == 0) value_span <- max(abs(value_range)) * 0.1 + 1
+      stat_tbl$y.position[stat_idx] <- max(value_range) + value_span * (0.12 + 0.12 * (seq_along(stat_idx) - 1))
+    }
+  }
+  stat_tbl
+}
+
 plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_col = NULL,
                                    comparisons = NULL, method = "t.test", p_adjust_method = "BH",
                                    title = NULL, ylab = NULL, group_colors = NULL,
-                                   show_ns = TRUE, width = 7, height = 6) {
+                                   show_ns = TRUE, width = 7, height = 6,
+                                   label_style = c("full", "stars"),
+                                   stat_table = NULL) {
+  label_style <- match.arg(label_style)
   plot_data <- data
   plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(plot_data[[group_col]])))
-  stat_tbl <- pairwise_effect_table(
-    plot_data, value_col = value_col, group_col = group_col,
-    comparisons = comparisons, facet_col = facet_col,
-    method = method, p_adjust_method = p_adjust_method
-  )
+  stat_tbl <- if (is.null(stat_table)) {
+    pairwise_effect_table(
+      plot_data, value_col = value_col, group_col = group_col,
+      comparisons = comparisons, facet_col = facet_col,
+      method = method, p_adjust_method = p_adjust_method
+    )
+  } else {
+    .prepare_plot_stat_table(stat_table, plot_data, value_col, facet_col, label_style)
+  }
+  if (is.null(stat_table) && label_style == "stars" && nrow(stat_tbl) > 0) {
+    stat_tbl$label <- format_p_stars(stat_tbl$p.adj)
+  }
 
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
     ggplot2::geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.88, linewidth = 0.45) +
@@ -478,13 +573,23 @@ plot_group_violin_boxplot_pdf <- function(data, value_col, group_col, filename,
                                           comparisons = NULL, method = "t.test",
                                           p_adjust_method = "BH", title = NULL,
                                           ylab = NULL, group_colors = NULL,
-                                          show_ns = FALSE, width = 5.8, height = 6) {
+                                          show_ns = FALSE, width = 5.8, height = 6,
+                                          label_style = c("full", "stars"),
+                                          stat_table = NULL) {
+  label_style <- match.arg(label_style)
   plot_data <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
   plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(data[[group_col]])))
-  stat_tbl <- pairwise_effect_table(
-    plot_data, value_col = value_col, group_col = group_col,
-    comparisons = comparisons, method = method, p_adjust_method = p_adjust_method
-  )
+  stat_tbl <- if (is.null(stat_table)) {
+    pairwise_effect_table(
+      plot_data, value_col = value_col, group_col = group_col,
+      comparisons = comparisons, method = method, p_adjust_method = p_adjust_method
+    )
+  } else {
+    .prepare_plot_stat_table(stat_table, plot_data, value_col, NULL, label_style)
+  }
+  if (is.null(stat_table) && label_style == "stars" && nrow(stat_tbl) > 0) {
+    stat_tbl$label <- format_p_stars(stat_tbl$p.adj)
+  }
 
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
     ggplot2::geom_violin(trim = FALSE, width = 0.88, alpha = 0.34, color = NA) +
@@ -611,10 +716,27 @@ prepare_enrich_df <- function(enrich_result, show_category = 15) {
 }
 
 plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 15, width = 8, height = 10) {
-  p <- enrichplot::dotplot(enrich_result, showCategory = show_category, title = title) +
-    ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 48)) +
+  df <- prepare_enrich_df(enrich_result, show_category)
+  if (nrow(df) == 0) {
+    message("Skipping enrichment dotplot: no significant terms for ", title)
+    return(invisible(NULL))
+  }
+  labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
+  df$Term <- factor(labels, levels = rev(labels))
+  p <- ggplot2::ggplot(
+    df,
+    ggplot2::aes(x = GeneRatioNumeric, y = Term, size = Count, color = log10_padj)
+  ) +
+    ggplot2::geom_point(alpha = 0.9) +
+    ggplot2::scale_color_viridis_c(option = "magma", direction = -1, name = "-log10(FDR)") +
+    ggplot2::scale_size_continuous(name = "Gene count", range = c(2.5, 7)) +
+    ggplot2::labs(x = "Gene ratio", y = NULL, title = title) +
     theme_publication(base_size = 10) +
-    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 9))
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_text(size = 9, lineheight = 0.9),
+      panel.grid.major.y = ggplot2::element_line(color = "#ECECEC", linewidth = 0.3),
+      legend.position = "right"
+    )
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
@@ -630,25 +752,19 @@ plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_categor
   }
   df <- df[order(df$FoldEnrichment, decreasing = TRUE), , drop = FALSE]
   df <- utils::head(df, show_category)
-  df$Term <- factor(wrap_term_labels(df$Description, width = 55), levels = rev(wrap_term_labels(df$Description, width = 55)))
-  max_x <- max(df$FoldEnrichment, na.rm = TRUE)
-  label_x <- max_x * 0.015
-  df$TextX <- label_x
+  labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
+  df$Term <- factor(labels, levels = rev(labels))
   fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = FoldEnrichment, y = Term, fill = .data[[fill_col]])) +
     ggplot2::geom_col(width = 0.78, alpha = 0.78, color = "white", linewidth = 0.25) +
-    ggplot2::geom_text(
-      ggplot2::aes(x = TextX, label = wrap_term_labels(Description, width = 58)),
-      hjust = 0, size = 4.1, color = "#222222", lineheight = 0.92
-    ) +
     ggplot2::scale_fill_distiller(palette = "RdPu", direction = 1, name = fill_name) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.08))) +
     ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
     ggplot2::theme_classic(base_size = 12, base_family = "Times") +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_text(size = 9, color = "black", lineheight = 0.9),
       axis.ticks.y = ggplot2::element_blank(),
       axis.title = ggplot2::element_text(size = 12, face = "bold"),
       axis.text.x = ggplot2::element_text(size = 11, color = "black"),
@@ -676,6 +792,12 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   }
   if (nrow(up_df) > 0) up_df$Direction <- "UP"
   if (nrow(down_df) > 0) down_df$Direction <- "DOWN"
+  # Saved CSVs can infer unused columns such as geneID with different types
+  # when one direction is empty/sparse. Bind only the fields used by this plot
+  # so a presentation-only refresh does not depend on irrelevant CSV typing.
+  plot_cols <- c("Description", "FoldEnrichment", "log10_pvalue", "log10_padj", "Direction")
+  if (nrow(up_df) > 0) up_df <- up_df[, plot_cols, drop = FALSE]
+  if (nrow(down_df) > 0) down_df <- down_df[, plot_cols, drop = FALSE]
   df <- dplyr::bind_rows(up_df, down_df)
   if (nrow(df) == 0) {
     message("Skipping bidirectional barplot: no significant enrichment terms for ", title)
@@ -683,20 +805,14 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   }
   df$SignedFoldEnrichment <- ifelse(df$Direction == "UP", df$FoldEnrichment, -df$FoldEnrichment)
   df <- df[order(df$Direction, abs(df$FoldEnrichment), decreasing = TRUE), , drop = FALSE]
-  df$Term <- factor(wrap_term_labels(df$Description, width = 52), levels = unique(wrap_term_labels(df$Description[order(df$SignedFoldEnrichment)], width = 52)))
-  max_x <- max(abs(df$SignedFoldEnrichment), na.rm = TRUE)
-  df$TextX <- ifelse(df$Direction == "UP", -max_x * 0.025, max_x * 0.025)
-  df$TextHjust <- ifelse(df$Direction == "UP", 1, 0)
+  labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
+  df$Term <- factor(labels, levels = unique(labels[order(df$SignedFoldEnrichment)]))
   fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = SignedFoldEnrichment, y = Term, fill = .data[[fill_col]])) +
     ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#333333") +
     ggplot2::geom_col(width = 0.78, alpha = 0.78, color = "white", linewidth = 0.25) +
-    ggplot2::geom_text(
-      ggplot2::aes(x = TextX, label = wrap_term_labels(Description, width = 52), hjust = TextHjust),
-      size = 4.1, color = "#222222", lineheight = 0.92
-    ) +
     ggplot2::scale_fill_distiller(palette = "PuOr", direction = -1, name = fill_name) +
     ggplot2::scale_x_continuous(
       labels = function(x) abs(x),
@@ -705,7 +821,7 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
     ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
     ggplot2::theme_classic(base_size = 12, base_family = "Times") +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_text(size = 9, color = "black", lineheight = 0.9),
       axis.ticks.y = ggplot2::element_blank(),
       axis.title = ggplot2::element_text(size = 12, face = "bold"),
       axis.text.x = ggplot2::element_text(size = 11, color = "black"),
@@ -782,20 +898,14 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
   df$Description <- make.unique(desc, sep = " ")
   df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
   df$log10_padj <- -log10(pmax(df$p.adjust, .Machine$double.xmin))
-  wrapped_terms <- wrap_term_labels(df$Description, width = 54)
+  wrapped_terms <- wrap_term_labels(df$Description, width = 44, max_lines = 2)
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
   max_nes <- max(abs(df$NES), na.rm = TRUE)
-  df$TextX <- ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
-  df$TextHjust <- ifelse(df$NES >= 0, 0, 1)
   df$PointX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = NES, y = Description_wrapped, fill = Direction)) +
     ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#2F2F2F") +
     ggplot2::geom_col(width = 0.76, alpha = 0.88, color = "white", linewidth = 0.25) +
-    ggplot2::geom_text(
-      ggplot2::aes(x = TextX, label = wrap_term_labels(Description, width = 54), hjust = TextHjust),
-      size = 3.8, color = "#1F1F1F", lineheight = 0.9
-    ) +
     ggplot2::geom_point(
       ggplot2::aes(x = PointX, size = log10_padj),
       shape = 21, fill = "white", color = "#222222", stroke = 0.25,
@@ -807,7 +917,7 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
     ggplot2::labs(x = "Normalized enrichment score (NES)", y = NULL, title = title) +
     ggplot2::theme_classic(base_size = 12, base_family = "Times") +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_text(size = 9, color = "black", lineheight = 0.9),
       axis.ticks.y = ggplot2::element_blank(),
       axis.title = ggplot2::element_text(size = 12, face = "bold"),
       axis.text.x = ggplot2::element_text(size = 11, color = "black"),
@@ -840,27 +950,11 @@ plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category
       )
     save_pdf_plot(p_ridge, paste0(prefix, "_ridgeplot.pdf"), width = 9.5, height = 10)
   }, silent = TRUE)
-  gsea_df <- as.data.frame(gsea_result)
-  if ("p.adjust" %in% colnames(gsea_df)) {
-    gsea_df <- gsea_df[order(gsea_df$p.adjust, -abs(gsea_df$NES)), , drop = FALSE]
-  }
-  top_ids <- head(gsea_df$ID, 3)
-  if (length(top_ids) > 0) {
-    p_running <- enrichplot::gseaplot2(gsea_result, geneSetID = top_ids, title = paste(title_prefix, "Top terms")) +
-      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
-      ggplot2::theme(plot.title = ggplot2::element_text(size = 14, hjust = 0.5, face = "bold"))
-    save_pdf_plot(p_running, paste0(prefix, "_running.pdf"), width = 9, height = 7)
-  }
-  top_up <- head(gsea_df$ID[!is.na(gsea_df$NES) & gsea_df$NES > 0], 3)
-  top_down <- head(gsea_df$ID[!is.na(gsea_df$NES) & gsea_df$NES < 0], 3)
-  if (length(top_up) > 0) {
-    p_up <- plot_gsea_term_figure_pdf(gsea_result, top_up, title = paste(title_prefix, "Top activated terms"))
-    save_pdf_plot(p_up, paste0(prefix, "_running_top_activated.pdf"), width = 9, height = 7)
-  }
-  if (length(top_down) > 0) {
-    p_down <- plot_gsea_term_figure_pdf(gsea_result, top_down, title = paste(title_prefix, "Top suppressed terms"))
-    save_pdf_plot(p_down, paste0(prefix, "_running_top_suppressed.pdf"), width = 9, height = 7)
-  }
+  message(
+    "GSEA overview saved for ", title_prefix,
+    "; create one running curve per explicitly selected term with ",
+    "plot_gsea_term_figures_from_df()."
+  )
   invisible(TRUE)
 }
 
@@ -1168,6 +1262,8 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
                                        count_col = "Count",
                                        width = 12,
                                        height = NULL,
+                                       max_width = 30,
+                                       max_height = 30,
                                        fill_name = expression(-log[10]("adj. P")),
                                        size_name = "Gene count") {
   if (nrow(plot_df) == 0) {
@@ -1217,6 +1313,18 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
 
   if (is.null(height)) {
     height <- max(8, 0.32 * dplyr::n_distinct(plot_df$label) + 0.6 * dplyr::n_distinct(plot_df$facet_label))
+  }
+  if (!is.numeric(width) || length(width) != 1 || !is.finite(width) || width <= 0 ||
+      !is.numeric(height) || length(height) != 1 || !is.finite(height) || height <= 0) {
+    stop("Theme dot-heatmap dimensions must be finite positive numbers.")
+  }
+  if (width > max_width || height > max_height) {
+    warning(sprintf(
+      "Theme dot-heatmap dimensions capped from %.1f x %.1f to %.1f x %.1f inches; reduce `top_n` for a less dense figure.",
+      width, height, min(width, max_width), min(height, max_height)
+    ))
+    width <- min(width, max_width)
+    height <- min(height, max_height)
   }
   save_pdf_plot(p, filename, width = width, height = height)
   p

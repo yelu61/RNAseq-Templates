@@ -51,11 +51,19 @@ These defaults can be overridden in each `*_pdf()` helper.
 
 - All figures are saved as editable PDFs.
 - Where available, `save_pdf_plot()` uses `cairo_pdf` for anti-aliasing; otherwise it falls back to `pdf()`.
+- `save_pdf_plot()` writes to a temporary sibling file and promotes it only
+  after a non-trivial PDF is produced, preventing failed devices from leaving
+  blank/zero-page outputs at the canonical path.
 - ComplexHeatmap / pheatmap / Mfuzz / survminer plots manually open a `pdf()` device and call `dev.off()`.
 
 ## Empty Results
 
 Plot helpers return `invisible(NULL)` when there are no significant terms or genes, and now print a `message()` explaining why the plot was skipped. This keeps notebooks running smoothly while making empty results transparent.
+
+Enrichment term labels default to at most two wrapped lines. Longer labels are
+ellipsized; the full term remains in the result CSV. ORA dot/bar figures place
+labels on the y-axis rather than inside bars so threshold-specific plots remain
+readable and comparable.
 
 ## Modifying the Style
 

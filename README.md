@@ -183,7 +183,15 @@ Analysis_summary.txt
 sessionInfo.txt
 ```
 
-All major visualizations are saved as editable PDF files under `3-Visualization/`. Threshold-specific ORA figures are written to `3-Visualization/<threshold>/`.
+All major visualizations are saved as editable PDF files under `3-Visualization/`.
+Threshold-specific ORA figures are written to `3-Visualization/<threshold>/`.
+GSEA outputs have explicit roles:
+
+```text
+3-Visualization/GSEA/overview/        dotplot, NES and ridge summaries
+3-Visualization/GSEA/theme_maps/      theme-level exploratory maps
+3-Visualization/GSEA/running_curves/  one explicitly selected term per PDF
+```
 
 `RNAseq_General.ipynb` also exports reusable intermediate files for analyses that require variance-stabilized expression:
 
@@ -211,7 +219,8 @@ WGCNA and time-course clustering can use the exported VST matrix. TME deconvolut
 - volcano plots and annotated DEG heatmaps
 - key-gene and custom gene-set heatmaps
 - GO/KEGG ORA with expressed-gene background, including dotplot, barplot, UP/DOWN bidirectional barplot, and optional cnetplot/emapplot
-- GSEA GO/KEGG from full ranked gene lists, including dotplot, journal-style NES barplot, ridgeplot, and top activated/suppressed running enrichment curves
+- GSEA GO/KEGG from full ranked gene lists, including dotplot, journal-style
+  NES barplot, ridgeplot, and explicitly selected single-term running curves
 - GSVA for custom gene sets with heatmap, combined boxplot, and per-signature violin/box/jitter PDFs
 - single-gene expression plots with mean bar, SEM, sample points, and layered pairwise P values
 - optional DoRothEA/VIPER TF activity analysis

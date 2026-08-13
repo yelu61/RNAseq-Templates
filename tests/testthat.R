@@ -10,6 +10,7 @@ setwd(repo_root)
 lib_dir <- file.path(repo_root, "RNAseq_lib")
 
 source(file.path(lib_dir, "plot_utils.R"))
+source(file.path(lib_dir, "pathway_utils.R"))
 source(file.path(lib_dir, "io_utils.R"))
 source(file.path(lib_dir, "deg_utils.R"))
 source(file.path(lib_dir, "enrichment_utils.R"))

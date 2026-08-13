@@ -46,6 +46,21 @@ test_that("wrap_term_labels wraps long strings", {
   expect_true(grepl("\n", wrapped))
   # short strings stay on one line
   expect_false(grepl("\n", wrap_term_labels("short", width = 45)))
+  expect_lte(length(strsplit(wrapped, "\n", fixed = TRUE)[[1]]), 2)
+  expect_match(wrapped, "…$")
+})
+
+test_that("save_pdf_plot rejects NULL and writes a non-empty PDF", {
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  expect_null(save_pdf_plot(NULL, outfile))
+  expect_false(file.exists(outfile))
+
+  p <- ggplot2::ggplot(data.frame(x = 1:3, y = 1:3), ggplot2::aes(x, y)) +
+    ggplot2::geom_point()
+  save_pdf_plot(p, outfile, width = 4, height = 3)
+  expect_true(file.exists(outfile))
+  expect_gt(file.info(outfile)$size, 1500)
 })
 
 test_that("parse_ratio_numeric parses 'k/n' ratios", {
@@ -114,6 +129,30 @@ test_that("pairwise_effect_table returns empty frame when too few observations",
   expect_equal(nrow(tbl), 0)
 })
 
+test_that("group boxplot can reuse a precomputed globally adjusted statistic table", {
+  testthat::skip_if_not_installed("ggpubr")
+  df <- data.frame(
+    Pathway = rep(c("P1", "P2"), each = 6),
+    group = rep(rep(c("A", "B"), each = 3), 2),
+    value = c(1:3, 4:6, 2:4, 5:7)
+  )
+  stats <- data.frame(
+    Pathway = c("P1", "P2"), group1 = "A", group2 = "B",
+    delta = c(3, 3), p.adj = c(0.009, 0.20)
+  )
+  prepared <- .prepare_plot_stat_table(stats, df, "value", "Pathway", "stars")
+  expect_equal(prepared$label, c("**", "ns"))
+  expect_true(all(is.finite(prepared$y.position)))
+
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  plot_group_boxplot_pdf(
+    df, value_col = "value", group_col = "group", filename = outfile,
+    facet_col = "Pathway", label_style = "stars", stat_table = stats
+  )
+  expect_true(file.exists(outfile) && file.info(outfile)$size > 0)
+})
+
 # --- enrichment data prep ----------------------------------------------------
 
 # Build a minimal enrichResult-like data frame (as.data.frame(enrichResult))
@@ -129,6 +168,16 @@ make_enrich_df <- function() {
     stringsAsFactors = FALSE
   )
 }
+
+test_that("enrichment dotplot accepts saved-table data and limits label lines", {
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  df <- make_enrich_df()
+  df$Description[1] <- paste(rep("very long pathway label", 8), collapse = " ")
+  p <- plot_enrich_dotplot(df, outfile, "Saved ORA table", show_category = 5)
+  expect_s3_class(p, "ggplot")
+  expect_true(file.exists(outfile) && file.info(outfile)$size > 1500)
+})
 
 test_that("parse_ratio + prepare_enrich_df computes FoldEnrichment", {
   df <- make_enrich_df()
@@ -185,4 +234,22 @@ test_that("match_enrichment_themes returns empty frame when nothing matches", {
   df <- data.frame(Description = "zzz no theme here", stringsAsFactors = FALSE)
   out <- match_enrichment_themes(df, default_enrichment_themes())
   expect_equal(nrow(out), 0)
+})
+
+test_that("theme dot-heatmap caps unsafe PDF dimensions", {
+  df <- data.frame(
+    figure_group = "Immune", theme = "Interferon",
+    Description = c("term one", "term two"),
+    comparison = c("B_vs_A", "B_vs_A"),
+    Count = c(10, 8), neg_log10_padj = c(3, 2),
+    label = factor(c("term one", "term two")),
+    stringsAsFactors = FALSE
+  )
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  expect_warning(
+    plot_theme_dotheatmap_pdf(df, outfile, height = 60, max_height = 8),
+    "dimensions capped"
+  )
+  expect_true(file.exists(outfile) && file.info(outfile)$size > 0)
 })

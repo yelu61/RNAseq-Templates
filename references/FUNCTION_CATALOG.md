@@ -184,9 +184,9 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `make_group_colors(group_levels)`
   Generate group color palette.
 - `save_pdf_plot(plot, filename, width, height)`
-  Save ggplot as PDF via cairo/pdf.
-- `wrap_term_labels(x, width)`
-  Wrap long labels.
+  Save ggplot atomically via cairo/pdf; reject NULL and near-empty device output.
+- `wrap_term_labels(x, width, max_lines)`
+  Wrap long labels at word boundaries, cap line count and add an ellipsis.
 - `parse_ratio_numeric(x)`
   Parse "a/b" ratios.
 - `zscore_rows(mat, cap)`
@@ -215,16 +215,16 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Format p-value labels.
 - `pairwise_effect_table(...)`
   Pairwise test summary.
-- `plot_group_boxplot_pdf(...)`
-  Faceted boxplot with pairwise stats.
-- `plot_group_violin_boxplot_pdf(...)`
-  Violin + boxplot with pairwise stats.
+- `plot_group_boxplot_pdf(..., stat_table = NULL)`
+  Faceted boxplot with computed pairwise stats or an exact precomputed statistic table.
+- `plot_group_violin_boxplot_pdf(..., stat_table = NULL)`
+  Violin + boxplot with computed pairwise stats or an exact precomputed statistic table.
 - `plot_group_bar_sem_pdf(...)`
   Mean ± SEM barplot with adjusted pairwise stats.
 - `prepare_enrich_df(enrich_result, show_category)`
   Convert enrichment result to plot-ready df.
 - `plot_enrich_dotplot(...)`
-  Enrichment dotplot.
+  Table-compatible enrichment dotplot with bounded external term labels.
 - `plot_enrich_barplot_pdf(...)`
   Enrichment barplot.
 - `plot_enrich_bidirectional_barplot_pdf(...)`
@@ -238,7 +238,8 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `plot_gsea_nes_barplot_pdf(...)`
   GSEA NES barplot.
 - `plot_gsea_suite_pdf(...)`
-  GSEA plot suite.
+  GSEA overview suite (dotplot, NES barplot, ridgeplot). Running curves are
+  intentionally generated one term per file by `plot_gsea_term_figures_from_df()`.
 - `plot_gsea_term_figure_pdf(...)`
   Single-term GSEA running-enrichment figure.
 - `plot_gsea_term_figures_from_df(...)`
@@ -246,7 +247,22 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `default_enrichment_themes()` / `match_enrichment_themes()` / `prepare_theme_dotplot_df()`
   Theme dictionary and helpers.
 - `plot_theme_dotheatmap_pdf(...)` / `plot_theme_dotheatmap_from_results(...)`
-  Theme dot-heatmap.
+  Theme dot-heatmap with bounded automatic PDF dimensions.
+
+## `pathway_utils.R` — gene-set scoring & pathway visualization
+
+- `score_gene_sets(expr, gene_sets, method, kcdf, min_size, verbose)`
+  Validate and score custom gene sets via GSVA; defaults to five overlapping features and attaches an overlap audit.
+- `pathway_group_comparison(score_mat, group, group_levels, comparisons, ...)`
+  Sample-name-aligned per-set group comparison; delta = treatment - control, global BH.
+- `plot_pathway_delta_summary_pdf(comp_df, filename, ...)`
+  Bidirectional delta bar chart across pathways x comparisons with significance stars.
+- `plot_keygenes_log2fc_heatmap_pdf(fc_long, filename, row_group, ...)`
+  Gene x comparison log2FC heatmap with preserved NA values, duplicate-key validation, and optional row grouping.
+- `melt_gene_expression(expr, genes, group)`
+  Long-format selected genes for grouped plots.
+- `plot_gene_expression_pdf(expr, genes, group, group_levels, group_colors, filename, ...)`
+  Per-gene grouped expression plots (faceted boxplot or per-gene box/violin).
 
 ## `tme_utils.R` — TME deconvolution helpers
 

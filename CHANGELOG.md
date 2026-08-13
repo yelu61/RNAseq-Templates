@@ -59,6 +59,20 @@ fixed in the General template.
 
 ### Added
 
+- **`pathway_utils.R`** — validated custom gene-set scoring and pathway-focused
+  visualization, so projects no longer hand-roll GSVA/statistics/plots:
+  - `score_gene_sets()` wraps GSVA (gsva/ssgsea/zscore/plage), requires at least
+    five overlapping features by default, and attaches a gene-set overlap audit.
+  - `pathway_group_comparison()` aligns named groups by sample ID and computes
+    per-set statistics with one global BH pass.
+  - `plot_pathway_delta_summary_pdf()` renders a clipping-safe bidirectional
+    delta chart across pathways × comparisons.
+  - `plot_keygenes_log2fc_heatmap_pdf()` preserves missing log2FC as `NA`,
+    rejects duplicate gene-by-comparison rows, and supports readable row groups.
+  - `melt_gene_expression()` / `plot_gene_expression_pdf()` produce grouped
+    per-gene expression plots with validated sample alignment.
+- Group box/violin helpers accept a precomputed `stat_table`, allowing figures
+  to reuse the exact multiple-testing correction reported in result tables.
 - **`bulk-rnaseq-analysis` Codex/Claude Code Skill**:
   - Adds one user-facing entry point for generic local/GEO matrix workflows
     and the independent TCGA/TARGET/GTEx toolkit.
@@ -82,6 +96,31 @@ fixed in the General template.
 
 ### Fixed
 
+- **Empty/corrupt PDF promotion**: `save_pdf_plot()` now writes to a sibling
+  temporary PDF, validates that the device produced non-trivial content, and
+  only then promotes the file. A plotting error can no longer leave a
+  zero-page or blank canonical PDF behind.
+- **GSEA multi-term blank pages**: the overview suite no longer sends multiple
+  term IDs through a single-term running-curve helper. Overview plots are
+  dotplot/NES/ridgeplot; running curves are one explicitly selected term per
+  file via `plot_gsea_term_figures_from_df()`.
+- **Enrichment label readability**: ORA dot/bar/bidirectional plots and GSEA
+  NES bars use external y-axis labels capped at two lines with ellipsis, rather
+  than long text drawn inside bars. Saved ORA CSVs can be replotted without the
+  original enrichment object.
+- **GSEA output ownership**: the General notebook now writes overview, theme
+  maps and selected running curves under separate `3-Visualization/GSEA/`
+  subdirectories.
+- **General notebook theme-enrichment execution**: restored a code cell that
+  had been serialized as one comment containing literal `\\n` separators;
+  notebook validation now detects this otherwise syntactically valid failure.
+- **Theme dot-heatmap oversizing**: automatic PDF dimensions are capped at a
+  readable/safe maximum with an explicit warning instead of failing late when
+  `ggsave()` rejects dimensions over 50 inches.
+- **Pathway helper integrity**: named sample groups are aligned by sample ID;
+  malformed matrices, undersized gene-set overlap, duplicate heatmap keys, and
+  ambiguous row-group mappings fail explicitly. Missing log2FC remains `NA`
+  instead of being rendered as zero, and zero deltas are labelled `NO_CHANGE`.
 - `plot_gsea_nes_barplot_pdf()` no longer fails with `factor level is duplicated` when KEGG GSEA results carry `NA` or duplicated `Description` values (the online KEGG map supplies IDs without names); missing labels now fall back to the term ID and are deduplicated.
 - `build_multi_comparison_enrich_df()` no longer drops enrichment rows whose `ONTOLOGY` is `NA` when an `ontology_filter` is set — this previously blanked ORA theme dot-heatmaps built from csv-read results (e.g. in `visualize_results.R`).
 - Native-ESTIMATE table parsing in `run_analysis.R` now selects real sample columns explicitly instead of positionally, so the extra `Description.1` column ESTIMATE writes is not mistaken for a sample.

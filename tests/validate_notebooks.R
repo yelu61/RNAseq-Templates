@@ -29,6 +29,16 @@ for (file in notebook_files) {
     cell <- notebook$cells[[i]]
     if (!identical(cell$cell_type, "code")) next
     code <- paste(unlist(cell$source), collapse = "")
+    # A previous JSON edit collapsed the whole ThemeEnrichment cell into one
+    # comment containing literal "\\n" separators. R parses that as a valid
+    # comment, so syntax validation alone cannot catch the lost computation.
+    if (grepl("theme_outdir <-", code, fixed = TRUE) &&
+        grepl("----\\ntheme_outdir <-", code, fixed = TRUE)) {
+      errors <- c(errors, paste0(
+        file, " cell ", i,
+        ": code contains literal \\n separators; the cell would execute as one comment"
+      ))
+    }
     parse_error <- tryCatch({
       parse(text = code)
       NULL
