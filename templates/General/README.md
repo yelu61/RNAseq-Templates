@@ -20,6 +20,25 @@
 
 跑完产出与 notebook 相同的 `0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ Analysis_summary.txt sessionInfo.txt`，以及（若 `GENERATE_HTML_REPORT <- TRUE`)`RNAseq_report.html`。
 
+## 真实项目推荐目录
+
+不要把 runner 放进 `notebooks/` 后直接运行。相对路径会以当前工作目录
+为根，从而把全部 DEG、GSEA 和图形堆到 notebook 旁边。推荐每次运行使用
+不可覆盖的原生产物目录，再把审阅后的成果整理进 `results/`：
+
+```text
+analysis/config/                 # 项目配置
+analysis/scripts/                # runner 与项目专用脚本
+analysis/runs/<run_id>/          # 本次完整原生产物
+results/tables/                  # 精选、可交付表格
+results/figures/                 # 精选 PDF/SVG/TIFF 主文件
+results/reports/                 # HTML/Markdown 报告
+results/report_assets/           # 可重建的网页预览图
+```
+
+每次新分析使用新的 `run_id`，记录模板版本、配置与输入校验和；不要覆盖旧
+运行。完整约定见 [真实项目输出结构](../../references/PROJECT_OUTPUT_LAYOUT.md)。
+
 ## 可选分析开关(config.R)
 
 | 开关 | 作用 | 依赖 |

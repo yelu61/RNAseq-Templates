@@ -112,6 +112,40 @@ test_that("pathway_group_comparison reorders named groups and distinguishes zero
                "does not match")
 })
 
+test_that("pathway_group_comparison adds exact small-sample sensitivity statistics", {
+  sc <- rbind(P1 = c(0, 0.1, -0.1, 2, 2.1, 1.9))
+  colnames(sc) <- c("A1", "A2", "A3", "B1", "B2", "B3")
+  grp <- factor(rep(c("A", "B"), each = 3), levels = c("A", "B"))
+  cmp <- pathway_group_comparison(
+    sc, grp, c("A", "B"), comparisons = list(c("A", "B")),
+    exact_permutation = TRUE, include_effect_size = TRUE
+  )
+  expect_equal(cmp$n1, 3)
+  expect_equal(cmp$n2, 3)
+  expect_equal(cmp$permutation_count, 20)
+  expect_equal(cmp$p.permutation, 0.1)
+  expect_true(is.finite(cmp$hedges_g))
+  expect_equal(cmp$p.permutation.adj, cmp$p.permutation)
+})
+
+test_that("gene-set registries preserve provenance and audit overlap", {
+  path <- tempfile(fileext = ".tsv")
+  write.table(data.frame(
+    gene_set = c(rep("Set_A", 5), rep("Set_B", 5)),
+    theme = c(rep("Theme1", 5), rep("Theme2", 5)),
+    version = "v2",
+    source_type = "GO",
+    source_id = c(rep("GO:1", 5), rep("GO:2", 5)),
+    gene = paste0("G", 1:10)
+  ), path, sep = "\t", row.names = FALSE, quote = FALSE)
+  sets <- read_gene_set_registry(path)
+  expect_named(sets, c("Set_A", "Set_B"))
+  audit <- audit_gene_set_registry(sets, expression_features = paste0("G", 1:8), min_size = 4)
+  expect_equal(audit$overlap_size, c(5L, 3L))
+  expect_equal(audit$retained, c(TRUE, FALSE))
+  unlink(path)
+})
+
 test_that("pathway summary and key-gene heatmap render focused PDFs", {
   testthat::skip_if_not_installed("ComplexHeatmap")
   testthat::skip_if_not_installed("circlize")
@@ -141,4 +175,32 @@ test_that("pathway summary and key-gene heatmap render focused PDFs", {
   dup <- rbind(fc, fc[1, ])
   expect_error(plot_keygenes_log2fc_heatmap_pdf(dup, tempfile(fileext = ".pdf")),
                "duplicate gene-by-comparison")
+})
+
+test_that("pathway sensitivity and registry QC figures preserve full audit dimensions", {
+  tmp_sensitivity <- tempfile(fileext = ".pdf")
+  tmp_registry <- tempfile(fileext = ".pdf")
+  on.exit(unlink(c(tmp_sensitivity, tmp_registry)), add = TRUE)
+
+  comp <- expand.grid(
+    Pathway = c("Set_A", "Set_B"),
+    Comparison = c("B_vs_A", "C_vs_A"),
+    stringsAsFactors = FALSE
+  )
+  comp$delta <- c(-0.5, 0.2, 0.8, -0.1)
+  comp$p.adj <- c(0.04, 0.2, 0.01, 0.8)
+  comp$p.permutation.adj <- c(0.2, 0.5, 0.1, 1)
+  p1 <- plot_pathway_sensitivity_matrix_pdf(comp, tmp_sensitivity)
+  expect_true(file.exists(tmp_sensitivity) && file.info(tmp_sensitivity)$size > 0)
+  expect_equal(nrow(p1$data), 4)
+
+  audit <- data.frame(
+    gene_set = c("Set_A", "Set_B"),
+    source_type = c("database", "literature"),
+    input_size = c(20, 8), overlap_size = c(10, 8),
+    overlap_fraction = c(0.5, 1)
+  )
+  p2 <- plot_gene_set_registry_qc_pdf(audit, tmp_registry)
+  expect_true(file.exists(tmp_registry) && file.info(tmp_registry)$size > 0)
+  expect_equal(nrow(p2$data), 2)
 })

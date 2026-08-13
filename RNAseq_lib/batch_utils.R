@@ -30,7 +30,7 @@ plot_pca_by_batch_pdf <- function(vsd, batch_vec, filename,
     ggplot2::ggtitle("PCA of Gene Expression Profiles (colored by batch)") +
     ggplot2::scale_color_manual(values = group_colors) +
     ggplot2::scale_fill_manual(values = group_colors) +
-    theme_publication(base_size = 14) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "right", aspect.ratio = 1)
 
   save_pdf_plot(p, filename, width = width, height = height)
@@ -95,7 +95,7 @@ plot_batch_pve_pdf <- function(pve_df, filename,
     ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
     ggplot2::scale_fill_manual(values = c("batch" = "#E07B54", "condition" = "#6F6F6F")) +
     ggplot2::labs(x = NULL, y = "Variance explained", title = "Variance explained by batch and condition") +
-    theme_publication(base_size = 12) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "top", legend.title = ggplot2::element_blank())
   save_pdf_plot(p, filename, width = width, height = height)
   p

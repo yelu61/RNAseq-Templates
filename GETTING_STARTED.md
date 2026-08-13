@@ -61,6 +61,12 @@ Skill 会先判断输入是本地/GEO 表达矩阵，还是 TCGA/TARGET/GTEx
 TPM/VST 错当作 DESeq2 原始 counts，也不会把 VST/rlog 当作 TME 所需的
 TPM。
 
+真实项目中，推荐让 Skill 根据样本信息与研究背景生成项目配置，并优先
+使用 `templates/General/run_analysis.R` 完成可复现的标准运行。Notebook
+适合交互探索，但不要在 `notebooks/` 目录中直接生成结果；请指定独立的
+`analysis/runs/<run_id>/`，再把审阅后的表格、图和报告整理到 `results/`。
+详见 [真实项目输出结构](references/PROJECT_OUTPUT_LAYOUT.md)。
+
 ---
 
 ## 你需要准备的

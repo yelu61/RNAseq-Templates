@@ -41,3 +41,33 @@ test_that("list_report_figures finds PDFs recursively and returns relative paths
 test_that("list_report_figures returns empty for missing dir", {
   expect_equal(list_report_figures("/nonexistent/dir"), character(0))
 })
+
+test_that("report coverage makes missing and covered domains explicit", {
+  root <- tempfile()
+  dir.create(file.path(root, "1-DEG"), recursive = TRUE)
+  dir.create(file.path(root, "3-Visualization"), recursive = TRUE)
+  write.csv(data.frame(sample = c("S1", "S2"), condition = c("A", "B")),
+            file.path(root, "1-DEG", "colData.csv"), row.names = FALSE)
+  file.create(file.path(root, "3-Visualization", "PCA_plot.pdf"))
+  file.create(file.path(root, "1-DEG", "DEG_threshold_summary.csv"))
+  file.create(file.path(root, "sessionInfo.txt"))
+  manifest <- build_report_coverage_manifest(root)
+  expect_equal(manifest$status[manifest$domain == "sample_qc"], "covered")
+  expect_equal(manifest$report_location[manifest$domain == "sample_qc"],
+               "main_body_or_appendix_index")
+  expect_equal(manifest$status[manifest$domain == "gsea"], "not_available")
+  expect_error(validate_report_coverage(manifest), "Required report domains")
+  unlink(root, recursive = TRUE)
+})
+
+test_that("claim-evidence ledger requires calibrated levels and provenance", {
+  ledger <- data.frame(
+    claim_id = "C1", claim = "A differed from B", claim_level = "E1_association",
+    scope = "in vitro", evidence = "DE result", source_files = "1-DEG/result.csv",
+    assumptions = "valid design", alternatives = "batch", falsifier = "independent null",
+    next_evidence = "repeat experiment"
+  )
+  expect_true(validate_claim_evidence_ledger(ledger))
+  ledger$claim_level <- "mechanism_proved"
+  expect_error(validate_claim_evidence_ledger(ledger), "unsupported evidence levels")
+})

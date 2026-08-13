@@ -73,17 +73,16 @@ plot_mfuzz_trends_pdf <- function(eset, mfuzz_result, filename,
   if (is.null(time_labels)) {
     time_labels <- colnames(eset)
   }
-  .close_leaked_devices()
-  grDevices::pdf(filename, width = width, height = height)
-  Mfuzz::mfuzz.plot(
-    eset,
-    mfuzz_result,
-    mfrow = mfrow,
-    new.window = FALSE,
-    time.labels = time_labels,
-    min.mem = min_mem
-  )
-  grDevices::dev.off()
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    Mfuzz::mfuzz.plot(
+      eset,
+      mfuzz_result,
+      mfrow = mfrow,
+      new.window = FALSE,
+      time.labels = time_labels,
+      min.mem = min_mem
+    )
+  })
   invisible(filename)
 }
 
@@ -117,8 +116,6 @@ plot_timecourse_heatmap_pdf <- function(expr, cluster_df, group_vec, group_level
 
   col_fun <- circlize::colorRamp2(c(-z_cap, 0, z_cap), c("#2166ac", "white", "#b2182b"))
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  .close_leaked_devices()
-  grDevices::pdf(filename, width = width, height = height)
   ht <- ComplexHeatmap::Heatmap(
     z,
     name = "Z-score",
@@ -134,8 +131,9 @@ plot_timecourse_heatmap_pdf <- function(expr, cluster_df, group_vec, group_level
     use_raster = nrow(z) > 500 && .has_working_cairo(),
     row_names_gp = grid::gpar(fontsize = row_font_size)
   )
-  ComplexHeatmap::draw(ht)
-  grDevices::dev.off()
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    ComplexHeatmap::draw(ht)
+  })
   invisible(ht)
 }
 
@@ -289,7 +287,7 @@ plot_timepoint_deg_summary_pdf <- function(summary_df, filename,
     ggplot2::geom_col(position = "dodge", width = 0.7) +
     ggplot2::scale_fill_manual(values = c("UP" = "#d6604d", "DOWN" = "#4393c3")) +
     ggplot2::labs(x = NULL, y = "Number of DEGs", title = "Time-point vs Baseline DEGs") +
-    theme_publication(base_size = 12) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
   save_pdf_plot(p, filename, width = width, height = height)
   p

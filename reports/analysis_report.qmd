@@ -49,24 +49,67 @@ show_table <- function(df, caption = NULL, max_rows = 50) {
   knitr::kable(df, caption = caption, row.names = FALSE)
 }
 show_pdf <- function(rel_path, width = "100%") {
-  # Embed a PDF figure inline so it renders inside the HTML report.
+  # Render the first PDF page to PNG before embedding. Browser PDF objects are
+  # inconsistent and can turn an otherwise valid figure into a blank panel.
   full <- file.path(viz_dir, rel_path)
   if (!file.exists(full)) {
     cat("_Figure not found: ", rel_path, "_\n", sep = "")
     return(invisible(NULL))
   }
-  uri <- knitr::image_uri(full)
-  cat(sprintf('<object data="%s" type="application/pdf" width="%s" height="620px">', uri, width))
-  cat(sprintf('<p>PDF figure: <a href="%s">%s</a></p>', uri, rel_path))
-  cat('</object>')
+  if (!nzchar(Sys.which("pdftoppm"))) {
+    cat("_PDF preview unavailable because `pdftoppm` is not installed: ", rel_path, "_\n", sep = "")
+    return(invisible(NULL))
+  }
+  base <- tempfile(pattern = "rnaseq-report-")
+  png <- paste0(base, ".png")
+  code <- suppressWarnings(system2(
+    "pdftoppm",
+    c("-f", "1", "-l", "1", "-singlefile", "-r", "150", "-png",
+      shQuote(full), shQuote(base)),
+    stdout = FALSE, stderr = FALSE
+  ))
+  if (!identical(code, 0L) || !file.exists(png)) {
+    cat("_PDF preview failed: ", rel_path, "_\n", sep = "")
+    return(invisible(NULL))
+  }
+  uri <- knitr::image_uri(png)
+  cat(sprintf(
+    '<figure><img src="%s" alt="%s" style="width:%s;height:auto"><figcaption>%s</figcaption></figure>',
+    uri, rel_path, width, rel_path
+  ))
 }
+
+coverage <- read_csv_safe(file.path(outdir, "report_coverage_manifest.csv"))
+claim_ledger <- read_csv_safe(file.path(outdir, "claim_evidence_ledger.csv"), check.names = FALSE)
+inventory <- if (dir.exists(outdir)) {
+  paths <- list.files(outdir, recursive = TRUE, full.names = FALSE)
+  data.frame(path = paths, extension = tolower(tools::file_ext(paths)), stringsAsFactors = FALSE)
+} else NULL
 ```
 
-# Overview
+<style>
+.summary-box {background:#f3f7fb;border-left:5px solid #3778a8;padding:0.9rem 1.1rem;margin:1rem 0;}
+.caution-box {background:#fff8e8;border-left:5px solid #d99a2b;padding:0.9rem 1.1rem;margin:1rem 0;}
+figure {margin:1.2rem 0 1.6rem 0;}
+figure img {border:1px solid #e5e7eb;}
+figcaption {color:#5f6368;font-size:0.9rem;margin-top:0.45rem;}
+details {margin:0.8rem 0;}
+</style>
 
-This report summarizes a bulk RNA-seq analysis run with the **RNAseq-Templates**
-workflow. All figures are saved as editable PDFs under `3-Visualization/`; the
-sections below embed the key tables and figures for a single shareable document.
+# Technical summary
+
+<div class="summary-box">
+
+This report summarizes the saved outputs of an **RNAseq-Templates** run. It is
+designed as an evidence-linked technical report: primary results appear in the
+main reading path, sensitivity and exhaustive output indexes appear later, and
+missing analysis domains remain visible in the coverage table.
+
+Project-specific biological mechanisms are reported only when a validated
+`claim_evidence_ledger.csv` is supplied. In its absence, this report describes
+the observed statistical results without inventing a mechanism narrative.
+
+</div>
 
 **Analysis directory:** `r outdir`
 
@@ -79,7 +122,36 @@ if (file.exists(summary_txt)) {
 }
 ```
 
-# Differential Expression
+# Scope, samples, and inferential definitions
+
+The experimental unit, inclusion decisions, group sizes, design formula,
+contrasts, primary threshold and multiple-testing families should be defined
+before interpreting differential expression or enrichment. The saved metadata
+below is the report's source of truth for sample inclusion.
+
+```{r sample-design}
+coldata <- read_csv_safe(file.path(deg_dir, "colData.csv"), check.names = FALSE)
+show_table(coldata, caption = "Samples included in the analysis and their modeled groups.", max_rows = 100)
+```
+
+# Sample quality supports—or limits—the modeled comparisons
+
+QC figures are used to identify gross data-quality problems, unexpected sample
+structure and possible outliers. Visual separation is not evidence of a
+mechanism, and samples should not be removed simply because they weaken the
+expected result.
+
+```{r qc, results='asis'}
+qc_pdfs <- list_pdfs(viz_dir, pattern = "^(PCA_plot|Sample_distance_heatmap|Sample_correlation|Raw_count_distribution|Filter_retention|Sample_QC_metrics).*\\.pdf$")
+for (f in utils::head(qc_pdfs, 8)) {
+  cat("\n## ", sub("\\.pdf$", "", basename(f)), "\n\n")
+  show_pdf(f)
+  cat("\nRead this figure at the sample level; any exclusion requires a predeclared QC rule or an independently documented technical failure.\n")
+}
+if (length(qc_pdfs) == 0) cat("_No QC figures found._\n")
+```
+
+# Differential expression is reported at one primary threshold
 
 ## DEG counts by threshold
 
@@ -87,6 +159,11 @@ if (file.exists(summary_txt)) {
 deg_summary <- read_csv_safe(file.path(deg_dir, "DEG_threshold_summary.csv"))
 show_table(deg_summary, caption = "Number of differentially expressed genes per comparison and threshold.")
 ```
+
+The declared primary threshold should drive headline counts. Other rows are
+sensitivity analyses and must not be searched post hoc for the most favorable
+result. DEG counts depend on effect magnitude, dispersion, expression level and
+sample size; they are not a standalone measure of treatment strength.
 
 ## Raw vs shrunken log2FC strategy
 
@@ -106,61 +183,139 @@ for (f in volcano_pdfs) {
 }
 ```
 
-# Sample Quality Control
+## Expression heatmaps and selected genes
 
-```{r qc, results='asis'}
-qc_pdfs <- list_pdfs(viz_dir, pattern = "^(PCA_plot|Sample_distance_heatmap).*\\.pdf$")
-for (f in qc_pdfs) {
-  cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
+```{r heatmaps, results='asis'}
+hm_pdfs <- list_pdfs(viz_dir, pattern = "(Heatmap_topDEG|Heatmap_key_genes|DEG_barplot_).*\\.pdf$")
+if (length(hm_pdfs) == 0) cat("_No DEG or key-gene heatmaps/plots found._\n")
+for (f in utils::head(hm_pdfs, 12)) {
+  cat("\n### ", sub("\\.pdf$", "", basename(f)), "\n\n")
   show_pdf(f)
+  cat("\nSelected-gene views support candidate inspection but do not create an independent statistical test.\n")
 }
-if (length(qc_pdfs) == 0) cat("_No QC figures found._\n")
 ```
 
-# Enrichment (ORA)
+# ORA findings depend on the DEG threshold and tested background
 
 ```{r ora-summary}
 ora_summary <- read_csv_safe(file.path(gsea_dir, "ORA_threshold_summary.csv"))
 show_table(ora_summary, caption = "Over-representation analysis summary across thresholds.")
 ```
 
+ORA asks whether a thresholded DEG list contains more genes from a term than
+expected against the declared expressed-gene background. Direction, threshold,
+ontology and correction family must be retained when interpreting a term.
+
 ```{r ora-figures, results='asis'}
 ora_pdfs <- list_pdfs(viz_dir, pattern = "(ORA|GO_|KEGG_).*\\.pdf$")
 if (length(ora_pdfs) > 0) {
-  cat("\n## ORA figures\n\n")
-  for (f in utils::head(ora_pdfs, 12)) {
+  cat("\n## Representative ORA evidence\n\n")
+  preferred <- ora_pdfs[grepl("(^|/)standard/", ora_pdfs)]
+  if (!length(preferred)) preferred <- ora_pdfs
+  for (f in utils::head(preferred, 10)) {
     cat("\n### ", sub("\\.pdf$", "", f), "\n\n")
     show_pdf(f)
+    cat("\nInterpret the displayed term together with its gene count, direction, adjusted P value and threshold-specific source table.\n")
   }
+} else {
+  cat("_No ORA figures found or ORA was not applicable._\n")
 }
 ```
 
-# Enrichment (GSEA)
+# GSEA provides rank-based program evidence, not literal pathway function
+
+GSEA uses a full ranked gene list and therefore reduces dependence on a single
+DEG cutoff. GO terms can be redundant and disease-labelled KEGG terms often
+reflect shared ribosomal, mitochondrial or inflammatory genes. Leading-edge
+genes—not the pathway title alone—should anchor biological interpretation.
 
 ```{r gsea-figures, results='asis'}
 gsea_pdfs <- list_pdfs(viz_dir, pattern = "GSEA.*\\.pdf$")
 if (length(gsea_pdfs) == 0) {
   cat("_No GSEA figures found._\n")
 } else {
-  for (f in utils::head(gsea_pdfs, 12)) {
+  overview <- gsea_pdfs[!grepl("running|single_term", gsea_pdfs, ignore.case = TRUE)]
+  if (!length(overview)) overview <- gsea_pdfs
+  for (f in utils::head(overview, 10)) {
     cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
     show_pdf(f)
+    cat("\nThis visualization summarizes a ranked-list enrichment result; it does not by itself demonstrate pathway activity or cellular function.\n")
   }
 }
 ```
 
-# Expression Heatmaps
-
-```{r heatmaps, results='asis'}
-hm_pdfs <- list_pdfs(viz_dir, pattern = "Heatmap.*\\.pdf$")
-if (length(hm_pdfs) == 0) cat("_No heatmaps found._\n")
-for (f in utils::head(hm_pdfs, 8)) {
-  cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
-  show_pdf(f)
+```{r gsea-running, results='asis'}
+running <- gsea_pdfs[grepl("running|single_term", gsea_pdfs, ignore.case = TRUE)]
+if (length(running)) {
+  cat("<details><summary>Selected GSEA running curves</summary>\n\n")
+  for (f in utils::head(running, 12)) {
+    cat("\n### ", sub("\\.pdf$", "", f), "\n\n")
+    show_pdf(f)
+  }
+  cat("</details>\n")
 }
 ```
 
-# Reproducibility
+# Custom gene sets are a separate exploratory evidence layer
+
+Custom GSVA/ssGSEA scores should be versioned, sourced and separated from
+database enrichment. A significant transcript score supports a difference in
+the defined expression panel; it does not establish functional flux, pathway
+activation or a causal mechanism.
+
+```{r gsva, results='asis'}
+gsva_pdfs <- list_pdfs(viz_dir, pattern = "(GSVA|CustomGeneSets).*\\.pdf$")
+if (!length(gsva_pdfs)) cat("_No custom gene-set figures found or custom scoring was not requested._\n")
+for (f in utils::head(gsva_pdfs, 12)) {
+  cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
+  show_pdf(f)
+  cat("\nInterpret sample-level scores with effect size, multiplicity correction, gene-set provenance and overlap audit.\n")
+}
+```
+
+# Cross-contrast structure helps separate shared and treatment-specific signals
+
+```{r cross-contrast, results='asis'}
+cross_pdfs <- list_pdfs(viz_dir, pattern = "(CompareCluster|overlap|UpSet|Jaccard).*\\.pdf$")
+if (!length(cross_pdfs)) cat("_No cross-contrast figures found or only one contrast was analyzed._\n")
+for (f in utils::head(cross_pdfs, 8)) {
+  cat("\n## ", sub("\\.pdf$", "", f), "\n\n")
+  show_pdf(f)
+  cat("\nOverlap is descriptive unless a formal equivalence, interaction or differential-effect test was prespecified.\n")
+}
+```
+
+# Evidence-linked synthesis and hypotheses
+
+```{r claims}
+if (!is.null(claim_ledger) && nrow(claim_ledger)) {
+  public_cols <- intersect(c("claim_id", "claim", "claim_level", "scope", "evidence", "next_evidence"), colnames(claim_ledger))
+  show_table(claim_ledger[, public_cols, drop = FALSE],
+             caption = "Claim-evidence ledger: conclusions remain bounded by the listed evidence level.", max_rows = 100)
+} else {
+  cat('<div class="caution-box"><strong>No validated claim-evidence ledger was supplied.</strong> The report therefore stops at statistical description and does not generate project-specific mechanism claims. Add a reviewed <code>claim_evidence_ledger.csv</code> to include alternatives, falsifiers and prioritized validation.</div>')
+}
+```
+
+# Limitations, uncertainty, and robustness
+
+- Small groups limit precision and outlier robustness; show individual samples and effect sizes.
+- Unrecorded batch, culture, passage, dose or time variables can remain confounded with condition.
+- “Not significant” does not establish equivalence or absence of a biologically meaningful effect.
+- Transcript-level pathway scores do not establish protein activity, localization, secretion or functional flux.
+- ORA and GSEA term names require leading-edge or contributing-gene review before biological extrapolation.
+
+# Report coverage and unresolved questions
+
+The report coverage manifest is the audit trail connecting all analysis domains
+to the main body, a compact summary, an appendix, an explicit not-applicable
+decision or a documented omission. A missing optional analysis remains visible.
+
+```{r coverage}
+show_table(coverage, caption = "Analysis-domain coverage contract.", max_rows = 100)
+```
+
+# Reproducibility and methods handoff
 
 ```{r session-info, results='asis'}
 sess <- file.path(outdir, "sessionInfo.txt")
@@ -170,5 +325,22 @@ if (file.exists(sess)) {
   cat("\n```\n")
 } else {
   cat("_sessionInfo.txt not found._\n")
+}
+```
+
+# Complete output index {.appendix}
+
+The main narrative intentionally avoids embedding every redundant threshold or
+plot variant. This index provides exhaustive discoverability without turning
+the report into an unreadable figure dump.
+
+```{r inventory}
+if (!is.null(inventory) && nrow(inventory)) {
+  by_ext <- as.data.frame(table(inventory$extension), stringsAsFactors = FALSE)
+  colnames(by_ext) <- c("Extension", "Files")
+  show_table(by_ext, caption = "Saved output inventory by file type.")
+  cat("<details><summary>All saved output paths</summary>\n\n")
+  show_table(inventory, max_rows = 500)
+  cat("</details>\n")
 }
 ```

@@ -218,20 +218,17 @@ plot_km_by_median_pdf <- function(surv_df, value_col, filename,
     legend.labs = c(paste0("High (N=", n_high, ")"), paste0("Low (N=", n_low, ")")),
     palette = palette,
     pval = TRUE,
-    pval.size = 5,
+    pval.size = 3,
     risk.table = TRUE,
     risk.table.height = 0.25,
     risk.table.y.text = FALSE,
     surv.scale = "percent",
-    ggtheme = ggplot2::theme_classic(base_size = 12),
+    ggtheme = theme_publication(base_size = 8),
     xlim = xlim,
     ylim = ylim
   )
 
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  grDevices::pdf(filename, width = 7, height = 8)
-  print(p, newpage = FALSE)
-  grDevices::dev.off()
+  save_pdf_device(filename, width = 7.2, height = 7.2, draw = function() print(p, newpage = FALSE))
   invisible(p)
 }
 
@@ -255,7 +252,7 @@ plot_tcga_gene_boxplot_pdf <- function(expr_df, gene, group_vec, filename,
     ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.85, width = 0.55) +
     ggplot2::geom_jitter(width = 0.12, size = 2, shape = 21, color = "#222222", stroke = 0.25, fill = "white", alpha = 0.9) +
     ggplot2::labs(x = NULL, y = ylab, title = title %||% gene) +
-    theme_publication(base_size = 12) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "none")
   if (length(comparisons) > 0) {
     p <- p + ggpubr::stat_compare_means(

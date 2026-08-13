@@ -59,6 +59,15 @@ fixed in the General template.
 
 ### Added
 
+- **Final-size publication figure contract**: shared 89/183 mm dimensions,
+  portable sans-serif font resolution, 8 pt typography hierarchy, safe vector
+  and 600-dpi raster bundles, and transactional export for ggplot plus
+  grid/base devices.
+- **Real-project output contract** informed by `202607XXR_RPE`: complete
+  backend-native run bundles are separated from curated deliverables;
+  notebooks are source artifacts rather than output roots; report previews are
+  explicitly derived assets.
+
 - **`pathway_utils.R`** — validated custom gene-set scoring and pathway-focused
   visualization, so projects no longer hand-roll GSVA/statistics/plots:
   - `score_gene_sets()` wraps GSVA (gsva/ssgsea/zscore/plage), requires at least
@@ -95,6 +104,13 @@ fixed in the General template.
 - **Unit tests for `plot_utils.R`** (`tests/testthat/test-plot_utils.R`, 23 test blocks): palette/theme, label/ratio/z-score/SEM helpers, `pairwise_effect_table`, `prepare_enrich_df`, and theme matching.
 
 ### Fixed
+
+- Standardized mixed Times/sans typography, oversized titles/canvases, clipped
+  annotation headroom, and inconsistent label sizing across QC, DEG, pathway,
+  enrichment, GSEA, TME, time-course, TCGA, and survival figures.
+- ComplexHeatmap, pheatmap, Mfuzz, UpSet, voom, and KM figures now use the same
+  validated temporary-file promotion path as ggplot exports, preventing failed
+  devices from replacing canonical figures.
 
 - **Empty/corrupt PDF promotion**: `save_pdf_plot()` now writes to a sibling
   temporary PDF, validates that the device produced non-trivial content, and

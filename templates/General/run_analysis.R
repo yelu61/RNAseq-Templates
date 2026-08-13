@@ -385,7 +385,7 @@ if (exists("ora_summary") && nrow(ora_summary) > 0) {
     geom_col(position = "dodge", width = 0.7) +
     facet_wrap(~ Threshold, scales = "free_x") +
     labs(x = NULL, y = "Significant ORA terms", title = "ORA Term Counts Across DEG Thresholds") +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 8) +
     theme(axis.text.x = element_text(angle = 35, hjust = 1), legend.position = "top")
   save_pdf_plot(p_ora_summary, "./3-Visualization/ORA_threshold_summary_barplot.pdf", width = 10, height = 5)
 
@@ -399,7 +399,7 @@ if (exists("ora_summary") && nrow(ora_summary) > 0) {
       facet_grid(Database ~ Threshold, scales = "free_x") +
       scale_fill_manual(values = c("up" = "#d6604d", "down" = "#4393c3")) +
       labs(x = NULL, y = "Directional ORA terms", title = "UP/DOWN ORA Term Counts") +
-      theme_publication(base_size = 9) +
+      theme_publication(base_size = 8) +
       theme(axis.text.x = element_text(angle = 35, hjust = 1), legend.position = "top")
     save_pdf_plot(p_ora_direction, "./3-Visualization/ORA_directional_summary_barplot.pdf", width = 11, height = 7)
   }
@@ -407,18 +407,21 @@ if (exists("ora_summary") && nrow(ora_summary) > 0) {
 
 # GSEA (full ranked list)
 gsea_results <- list()
+gsea_root <- "./3-Visualization/GSEA"
+gsea_overview_outdir <- file.path(gsea_root, "overview")
+dir.create(gsea_overview_outdir, showWarnings = FALSE, recursive = TRUE)
 for (comp_name in names(ranked_lists)) {
   entrezList <- make_entrez_ranked_list(ranked_lists[[comp_name]], org_db)
   if (length(entrezList) > 10) {
     ggo <- run_go_gsea(entrezList, org_db = org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05)
     if (!is.null(ggo) && nrow(as.data.frame(ggo)) > 0) {
       write.csv(as.data.frame(ggo), paste0("./2-GSEA/GSEA_GO_", comp_name, ".csv"), row.names = FALSE)
-      plot_gsea_suite_pdf(ggo, paste0("./3-Visualization/GSEA_GO_", comp_name), paste("GSEA GO -", comp_name))
+      plot_gsea_suite_pdf(ggo, file.path(gsea_overview_outdir, paste0("GSEA_GO_", comp_name)), paste("GSEA GO -", comp_name))
     }
     gkegg <- run_kegg_gsea(entrezList, organism = org_code, min_size = 10, max_size = 500, p_cutoff = 0.05)
     if (!is.null(gkegg) && nrow(as.data.frame(gkegg)) > 0) {
       write.csv(as.data.frame(gkegg), paste0("./2-GSEA/GSEA_KEGG_", comp_name, ".csv"), row.names = FALSE)
-      plot_gsea_suite_pdf(gkegg, paste0("./3-Visualization/GSEA_KEGG_", comp_name), paste("GSEA KEGG -", comp_name))
+      plot_gsea_suite_pdf(gkegg, file.path(gsea_overview_outdir, paste0("GSEA_KEGG_", comp_name)), paste("GSEA KEGG -", comp_name))
     }
     gsea_results[[comp_name]] <- list(go = ggo, kegg = gkegg)
   }
@@ -428,7 +431,7 @@ for (comp_name in names(ranked_lists)) {
 saveRDS(gsea_results, "./2-GSEA/gsea_results.rds")
 
 # ---- Theme dot-heatmaps ----
-theme_outdir <- "./3-Visualization/ThemeEnrichment"
+theme_outdir <- file.path(gsea_root, "theme_maps")
 dir.create(theme_outdir, showWarnings = FALSE, recursive = TRUE)
 default_ora <- ora_threshold$results[[DEFAULT_THRESHOLD]]
 go_ora_map <- lapply(default_ora, function(x) x$go)
@@ -466,7 +469,7 @@ if (length(kegg_gsea_map) >= 1) {
 }
 
 # ---- Single-term GSEA figures ----
-single_term_outdir <- file.path(theme_outdir, "single_term_gsea")
+single_term_outdir <- file.path(gsea_root, "running_curves")
 dir.create(single_term_outdir, showWarnings = FALSE, recursive = TRUE)
 for (comp_name in names(gsea_results)) {
   ggo <- gsea_results[[comp_name]]$go
@@ -587,6 +590,8 @@ if (!is.null(custom_gene_sets)) {
 # =============================================================================
 # 12. Single-gene expression plots
 # =============================================================================
+single_gene_dir <- "./3-Visualization/SingleGene"
+dir.create(single_gene_dir, showWarnings = FALSE, recursive = TRUE)
 plot_gene_expression <- function(gene_name, vsd_mat_obj, dds_obj) {
   if (!gene_name %in% rownames(vsd_mat_obj)) return(NULL)
   plot_data <- data.frame(
@@ -598,11 +603,11 @@ plot_gene_expression <- function(gene_name, vsd_mat_obj, dds_obj) {
                          comparisons = combn(GROUP_LEVELS, 2, simplify = FALSE),
                          method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD,
                          title = gene_name, ylab = "VST Expression", group_colors = group_colors,
-                         filename = paste0("./3-Visualization/DEG_barplot_", gene_name, ".pdf"),
+                         filename = file.path(single_gene_dir, paste0("DEG_barplot_", gene_name, ".pdf")),
                          width = 5.5, height = 6, y_from_zero = TRUE)
 }
 found_genes <- intersect(KEY_GENES, rownames(vsd_mat))
-write.csv(data.frame(gene = found_genes), "./3-Visualization/key_genes_plotted.csv", row.names = FALSE)
+write.csv(data.frame(gene = found_genes), file.path(single_gene_dir, "key_genes_plotted.csv"), row.names = FALSE)
 for (gene in found_genes) plot_gene_expression(gene, vsd_mat, dds)
 
 # =============================================================================
@@ -810,7 +815,7 @@ if (RUN_TF_ANALYSIS) {
         geom_bar(stat = "identity", width = 0.7) + coord_flip() +
         scale_fill_manual(values = colors_direction) +
         labs(title = paste("Top Differentially Active TFs -", comp_name), x = NULL, y = "Log2 Fold Change (TF Activity)") +
-        theme_publication(base_size = 11) + theme(legend.position = "top")
+        theme_publication(base_size = 8) + theme(legend.position = "top")
       ggsave(paste0("./3-Visualization/TF_barplot_", comp_name, ".pdf"), plot = p_tf_bar, width = 7, height = 8)
     }
   }
@@ -849,7 +854,9 @@ summary_report <- paste0(summary_report, "\n3. Output Files\n",
                          "   - ./0-Config/analysis_config_used.R\n",
                          "   - ./1-DEG/ (all-gene, threshold, diagnostics, Excel, Rdata)\n",
                          "   - ./2-GSEA/ (ORA/GSEA/GSVA/TF results)\n",
-                         "   - ./3-Visualization/ (all PDF figures)\n",
+                         "   - ./3-Visualization/GSEA/ (overview, running curves, theme maps)\n",
+                         "   - ./3-Visualization/SingleGene/ (single-gene expression plots)\n",
+                         "   - ./3-Visualization/ (QC, DEG, ORA and other PDF figures)\n",
                          "\n========================================\n")
 cat(summary_report)
 writeLines(summary_report, "./Analysis_summary.txt")

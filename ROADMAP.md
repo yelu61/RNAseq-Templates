@@ -2,7 +2,11 @@
 
 ## Status
 
-This project provides notebook-first bulk RNA-seq analysis templates with a shared R helper library (`RNAseq_lib/`). The core pipeline and six topic templates are functional, the GitHub Actions smoke test is green across all six templates, and all 14 helper modules have unit tests. Ongoing work focuses on stability, documentation, and additional workflow helpers.
+This project provides production-oriented bulk RNA-seq analysis templates with
+a shared R helper library (`RNAseq_lib/`). The command-line runner is preferred
+for reproducible project execution; notebooks remain available for interactive
+exploration. The core pipeline and six topic templates are functional and all
+15 helper modules have unit tests.
 
 **Current release: v0.9.0** (see [CHANGELOG.md](CHANGELOG.md)).
 
@@ -33,11 +37,15 @@ This project provides notebook-first bulk RNA-seq analysis templates with a shar
 - [x] Added GEO SeriesMatrix download helpers (`geo_utils.R`)
 - [x] Added TCGA id-map fallback from `rowData(se)` and clinical-variable KM
 - [x] Created `references/` documentation and visualization style guide
+- [x] Added final-size publication typography, safe multi-format export, and
+      visual QA rules across shared plotting helpers
+- [x] Added a two-layer real-project output contract based on the
+      `202607XXR_RPE` implementation audit
 
 ## Planned / Future
 
 - [x] Add automated CI/GitHub Actions to run `examples/run_demo_smoke_test.R` on push
-- [x] Add formal unit tests for `RNAseq_lib` helpers (all 14 modules covered; 293 assertions)
+- [x] Add formal unit tests for all `RNAseq_lib` helpers
 - [x] Command-line runner for the General template (`templates/General/run_analysis.R` + `config.R`)
 - [x] Optional TME deconvolution switch (`RUN_TME`) inside `run_analysis.R` (output to `4-TME/`)
 - [x] Targeted re-visualization script (`templates/General/visualize_results.R`) from saved results

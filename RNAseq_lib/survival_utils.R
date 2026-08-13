@@ -116,7 +116,7 @@ plot_cox_forest_pdf <- function(cox_df, filename,
     ggplot2::geom_text(ggplot2::aes(label = .data$label), hjust = -0.15, size = 3) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.35))) +
     ggplot2::labs(x = "Hazard Ratio (95% CI)", y = NULL, title = title, color = "Significance") +
-    theme_publication(base_size = 11) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "top")
   save_pdf_plot(p, filename, width = width, height = height)
   p
@@ -158,20 +158,17 @@ plot_km_by_group_pdf <- function(surv_df, group_col, filename,
     ylab = ylab,
     legend.title = group_col,
     pval = TRUE,
-    pval.size = 5,
+    pval.size = 3,
     risk.table = TRUE,
     risk.table.height = 0.25,
     risk.table.y.text = FALSE,
     surv.scale = "percent",
-    ggtheme = ggplot2::theme_classic(base_size = 12),
+    ggtheme = theme_publication(base_size = 8),
     xlim = xlim,
     ylim = ylim
   )
 
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  grDevices::pdf(filename, width = 7, height = 8)
-  print(p, newpage = FALSE)
-  grDevices::dev.off()
+  save_pdf_device(filename, width = 7.2, height = 7.2, draw = function() print(p, newpage = FALSE))
   invisible(p)
 }
 

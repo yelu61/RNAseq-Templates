@@ -24,6 +24,16 @@ test_that("theme_publication returns a ggplot2 theme", {
   expect_s3_class(th, "theme")
 })
 
+test_that("publication dimensions use final physical sizes", {
+  expect_equal(mm_to_in(25.4), 1)
+  single <- publication_dimensions("single", height_mm = 100)
+  double <- publication_dimensions("double", height_mm = 100)
+  expect_equal(unname(single[["width"]]), 89 / 25.4)
+  expect_equal(unname(double[["width"]]), 183 / 25.4)
+  expect_error(publication_dimensions("double", height_mm = 300), "no larger")
+  expect_true(nzchar(resolve_publication_font()))
+})
+
 test_that("make_group_colors names colors by group level", {
   cols <- make_group_colors(c("Ctrl", "Treat"))
   expect_named(cols, c("Ctrl", "Treat"))
@@ -61,6 +71,32 @@ test_that("save_pdf_plot rejects NULL and writes a non-empty PDF", {
   save_pdf_plot(p, outfile, width = 4, height = 3)
   expect_true(file.exists(outfile))
   expect_gt(file.info(outfile)$size, 1500)
+})
+
+test_that("save_pdf_device validates grid/base output before promotion", {
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  save_pdf_device(outfile, width = 4, height = 3, draw = function() {
+    graphics::plot(1:5, 1:5, type = "b")
+  })
+  expect_true(file.exists(outfile))
+  expect_gt(file.info(outfile)$size, 1500)
+})
+
+test_that("save_plot_bundle exports final-size review assets", {
+  skip_if_not_installed("ragg")
+  stem <- tempfile()
+  paths <- paste0(stem, c(".pdf", ".png"))
+  on.exit(unlink(paths), add = TRUE)
+  p <- ggplot2::ggplot(data.frame(x = 1:3, y = 3:1), ggplot2::aes(x, y)) +
+    ggplot2::geom_point() + theme_publication()
+  out <- save_plot_bundle(
+    p, stem, width_mm = 89, height_mm = 70,
+    formats = c("pdf", "png")
+  )
+  expect_setequal(out, paths)
+  expect_true(all(file.exists(paths)))
+  expect_true(all(file.info(paths)$size > 1500))
 })
 
 test_that("parse_ratio_numeric parses 'k/n' ratios", {

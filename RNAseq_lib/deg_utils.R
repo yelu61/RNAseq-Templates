@@ -375,21 +375,20 @@ plot_deg_upset_pdf <- function(gene_sets, filename, title = "DEG Set Overlaps",
   }
   upset_df <- prepare_upset_df(gene_sets)
   if (is.null(upset_df) || nrow(upset_df) == 0) return(invisible(NULL))
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  grDevices::pdf(filename, width = width, height = height)
-  UpSetR::upset(
-    upset_df,
-    nsets = ncol(upset_df),
-    nintersects = nintersects,
-    order.by = c("freq", "degree"),
-    decreasing = c(TRUE, TRUE),
-    main.bar.color = "#4E79A7",
-    sets.bar.color = "#F28E2B",
-    sets.x.label = "Set size",
-    mainbar.y.label = "Intersection size",
-    text.scale = c(1.3, 1.3, 1, 1, 1.3, 1.3)
-  )
-  grDevices::dev.off()
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    UpSetR::upset(
+      upset_df,
+      nsets = ncol(upset_df),
+      nintersects = nintersects,
+      order.by = c("freq", "degree"),
+      decreasing = c(TRUE, TRUE),
+      main.bar.color = "#4E79A7",
+      sets.bar.color = "#F28E2B",
+      sets.x.label = "Set size",
+      mainbar.y.label = "Intersection size",
+      text.scale = c(1.05, 1.05, 0.85, 0.85, 1.05, 1.05)
+    )
+  })
   invisible(filename)
 }
 
@@ -415,18 +414,23 @@ plot_deg_overlap_heatmap_pdf <- function(gene_sets, filename,
                                          width = 8, height = 7) {
   mat <- jaccard_overlap_matrix(gene_sets)
   if (nrow(mat) == 0) return(invisible(NULL))
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  grDevices::pdf(filename, width = width, height = height)
-  pheatmap::pheatmap(
-    mat,
-    color = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(100),
-    display_numbers = TRUE,
-    number_format = "%.2f",
-    main = title,
-    cluster_rows = TRUE,
-    cluster_cols = TRUE
-  )
-  grDevices::dev.off()
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    ph <- pheatmap::pheatmap(
+      mat,
+      color = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(9, "Blues")))(100),
+      display_numbers = TRUE,
+      number_format = "%.2f",
+      main = title,
+      cluster_rows = TRUE,
+      cluster_cols = TRUE,
+      fontsize = 8,
+      fontsize_number = 7,
+      border_color = NA,
+      silent = TRUE
+    )
+    grid::grid.newpage()
+    grid::grid.draw(ph$gtable)
+  })
   invisible(mat)
 }
 

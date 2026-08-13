@@ -333,7 +333,7 @@ plot_tme_barplot_pdf <- function(long_df, group_col = "condition", sample_col = 
     ggplot2::geom_col(position = "stack", width = 0.85, color = "white", linewidth = 0.15) +
     ggplot2::scale_fill_manual(values = setNames(fill_colors, unique(long_df$cell_type))) +
     ggplot2::labs(x = NULL, y = "Fraction / Score", title = title, fill = "Cell type") +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 8),
       legend.position = "right"
@@ -376,7 +376,7 @@ plot_tme_boxplot_pdf <- function(long_df, group_col = "condition", value_col = "
     ggplot2::geom_jitter(width = 0.1, size = 1.8, shape = 21, color = "#222222", stroke = 0.25, alpha = 0.9) +
     ggplot2::facet_wrap(~ cell_type, scales = "free_y", ncol = 4) +
     ggplot2::labs(x = NULL, y = value_col, title = title) +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, size = 8),
       legend.position = "none",
@@ -447,7 +447,7 @@ plot_tme_per_celltype_pdf <- function(long_df, group_col = "condition", value_co
       ggplot2::geom_jitter(width = 0.08, size = 2.2, shape = 21, color = "#222222", stroke = 0.25, alpha = 0.9) +
       ggplot2::labs(title = paste(title_prefix, ct), x = NULL, y = value_col) +
       ggplot2::scale_fill_manual(values = group_colors) +
-      theme_publication(base_size = 12) +
+      theme_publication(base_size = 8) +
       ggplot2::theme(
         legend.position = "none",
         plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 14),
@@ -597,7 +597,7 @@ plot_estimate_boxplot_pdf <- function(long_df, group_col = "condition", filename
     ggplot2::geom_jitter(width = 0.12, size = 2, shape = 21, color = "#222222", stroke = 0.25, fill = "white", alpha = 0.9) +
     ggplot2::facet_wrap(~ score_type, scales = "free_y", ncol = ncol) +
     ggplot2::labs(x = NULL, y = "Score", title = title) +
-    theme_publication(base_size = 11) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 30, hjust = 1),
       legend.position = "none"
@@ -627,7 +627,7 @@ plot_estimate_boxplot_pdf <- function(long_df, group_col = "condition", filename
         ggplot2::geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.85, linewidth = 0.4) +
         ggplot2::geom_jitter(width = 0.12, size = 2.5, shape = 21, color = "#222222", stroke = 0.25, fill = "white", alpha = 0.9) +
         ggplot2::labs(x = NULL, y = "Score", title = paste(title, "-", st)) +
-        theme_publication(base_size = 12) +
+        theme_publication(base_size = 8) +
         ggplot2::theme(
           axis.text.x = ggplot2::element_text(angle = 30, hjust = 1),
           legend.position = "none"
@@ -932,7 +932,7 @@ plot_cibersort_correlation_pdf <- function(long_df,
       y = "IOBR CIBERSORT fraction",
       title = title
     ) +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       aspect.ratio = 1,
       strip.text = ggplot2::element_text(size = 8, face = "bold")
@@ -995,7 +995,7 @@ plot_cibersort_difference_pdf <- function(long_df,
       y = expression(Native - IOBR),
       title = title
     ) +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       aspect.ratio = 1,
       strip.text = ggplot2::element_text(size = 8, face = "bold")

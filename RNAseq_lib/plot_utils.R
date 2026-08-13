@@ -50,23 +50,88 @@ RNAseq_PALETTE <- list(
   gsea_suppressed = "#3778A8"
 )
 
-theme_publication <- function(base_size = 12, base_family = "sans") {
-  ggplot2::theme_bw(base_size = base_size, base_family = base_family) +
+# Journal-scale defaults are defined at final physical size rather than at a
+# slide or notebook-preview size. 89 mm and 183 mm are conservative single- and
+# double-column widths used by many Nature-family journals; target-journal
+# instructions remain authoritative at submission.
+RNAseq_FIGURE_SPEC <- list(
+  single_column_width_mm = 89,
+  double_column_width_mm = 183,
+  max_height_mm = 247,
+  base_text_pt = 8,
+  small_text_pt = 6.5,
+  panel_label_pt = 9,
+  raster_dpi = 600,
+  font_candidates = c("Arial", "Helvetica", "Liberation Sans", "DejaVu Sans")
+)
+
+mm_to_in <- function(x) as.numeric(x) / 25.4
+
+publication_dimensions <- function(column = c("double", "single"), height_mm = 120) {
+  column <- match.arg(column)
+  width_mm <- if (column == "single") {
+    RNAseq_FIGURE_SPEC$single_column_width_mm
+  } else {
+    RNAseq_FIGURE_SPEC$double_column_width_mm
+  }
+  if (!is.numeric(height_mm) || length(height_mm) != 1 ||
+      !is.finite(height_mm) || height_mm <= 0 ||
+      height_mm > RNAseq_FIGURE_SPEC$max_height_mm) {
+    stop("`height_mm` must be a positive value no larger than ",
+         RNAseq_FIGURE_SPEC$max_height_mm, " mm.")
+  }
+  c(width = mm_to_in(width_mm), height = mm_to_in(height_mm))
+}
+
+resolve_publication_font <- function(preferred = NULL) {
+  requested <- unique(c(preferred, getOption("RNAseq.figure_family", NULL)))
+  requested <- requested[!is.na(requested) & nzchar(requested)]
+  # Generic sans maps to Helvetica-compatible faces across PDF, Cairo, SVG and
+  # ragg devices. Auto-selecting an installed GUI font (for example Arial) is
+  # unsafe because base PDF/PostScript devices may not have it registered.
+  if (!length(requested)) return("sans")
+  if (requireNamespace("systemfonts", quietly = TRUE)) {
+    installed <- unique(systemfonts::system_fonts()$family)
+    hit <- requested[tolower(requested) %in% tolower(installed)]
+    if (length(hit)) return(installed[match(tolower(hit[[1]]), tolower(installed))])
+  }
+  # The generic family is portable on minimal Linux/CI systems and resolves to
+  # an installed Helvetica-compatible sans face through the graphics device.
+  "sans"
+}
+
+theme_publication <- function(base_size = RNAseq_FIGURE_SPEC$base_text_pt,
+                              base_family = NULL) {
+  base_family <- resolve_publication_font(base_family)
+  ggplot2::theme_classic(base_size = base_size, base_family = base_family) +
     ggplot2::theme(
       panel.grid.major = ggplot2::element_blank(),
       panel.grid.minor = ggplot2::element_blank(),
-      panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 0.8),
-      axis.line = ggplot2::element_line(color = "black", linewidth = 0.5),
-      axis.ticks = ggplot2::element_line(color = "black", linewidth = 0.5),
-      axis.text = ggplot2::element_text(color = "black", size = base_size),
-      axis.title = ggplot2::element_text(color = "black", size = base_size + 2, face = "bold"),
-      plot.title = ggplot2::element_text(color = "black", size = base_size + 4, face = "bold", hjust = 0.5),
+      panel.border = ggplot2::element_blank(),
+      axis.line = ggplot2::element_line(color = "black", linewidth = 0.35),
+      axis.ticks = ggplot2::element_line(color = "black", linewidth = 0.35),
+      axis.ticks.length = grid::unit(1.5, "mm"),
+      axis.text = ggplot2::element_text(color = "black", size = base_size - 0.5),
+      axis.title = ggplot2::element_text(color = "black", size = base_size),
+      plot.title = ggplot2::element_text(
+        color = "black", size = base_size + 1, face = "bold", hjust = 0,
+        margin = ggplot2::margin(b = 4)
+      ),
+      plot.subtitle = ggplot2::element_text(
+        color = "#4D4D4D", size = base_size - 0.5, hjust = 0,
+        lineheight = 1.05, margin = ggplot2::margin(b = 5)
+      ),
+      plot.caption = ggplot2::element_text(
+        color = "#595959", size = max(base_size - 1.5, 5), hjust = 0
+      ),
       legend.background = ggplot2::element_rect(fill = NA, color = NA),
       legend.key = ggplot2::element_rect(fill = NA, color = NA),
-      legend.text = ggplot2::element_text(size = base_size),
-      legend.title = ggplot2::element_text(size = base_size, face = "bold"),
-      strip.background = ggplot2::element_rect(fill = "#E8E8E8", color = "black"),
-      strip.text = ggplot2::element_text(face = "bold", size = base_size)
+      legend.text = ggplot2::element_text(size = max(base_size - 1, 5.5)),
+      legend.title = ggplot2::element_text(size = max(base_size - 0.5, 6), face = "bold"),
+      legend.box.margin = ggplot2::margin(0, 0, 0, 0),
+      strip.background = ggplot2::element_rect(fill = "#F2F2F2", color = NA),
+      strip.text = ggplot2::element_text(face = "bold", size = base_size - 0.5),
+      plot.margin = ggplot2::margin(6, 8, 6, 6)
     )
 }
 
@@ -84,13 +149,62 @@ make_group_colors <- function(group_levels) {
   stats::setNames(colors, group_levels)
 }
 
-save_pdf_plot <- function(plot, filename, width = 7, height = 6) {
+.validate_figure_dimensions <- function(width, height) {
+  if (!is.numeric(width) || length(width) != 1 || !is.finite(width) || width <= 0 ||
+      !is.numeric(height) || length(height) != 1 || !is.finite(height) || height <= 0) {
+    stop("Figure width and height must be finite positive values in inches.")
+  }
+  if (height > mm_to_in(RNAseq_FIGURE_SPEC$max_height_mm)) {
+    warning(sprintf(
+      "Figure height %.2f in exceeds the conservative journal-page height %.2f in; treat it as an analysis/supplementary archive figure.",
+      height, mm_to_in(RNAseq_FIGURE_SPEC$max_height_mm)
+    ))
+  }
+  invisible(TRUE)
+}
+
+.promote_validated_figure <- function(tmp, filename, min_bytes = 1500) {
+  size <- file.info(tmp)$size
+  if (!file.exists(tmp) || is.na(size) || size < min_bytes) {
+    stop("Refusing to save an empty or incomplete figure: ", filename, call. = FALSE)
+  }
+  if (!file.rename(tmp, filename) && !file.copy(tmp, filename, overwrite = TRUE)) {
+    stop("Could not promote validated figure to: ", filename, call. = FALSE)
+  }
+  invisible(filename)
+}
+
+.publication_pdf_device <- function(filename, width, height, bg = "white",
+                                    family = resolve_publication_font(), ...) {
+  if (.has_working_cairo()) {
+    grDevices::cairo_pdf(filename, width = width, height = height,
+                         family = family, bg = bg, ...)
+  } else {
+    # Base pdf() only accepts registered PostScript families. A font can be
+    # present in systemfonts yet still be invalid for this device, so use its
+    # portable built-in sans alias when Cairo embedding is unavailable.
+    if (!family %in% names(grDevices::pdfFonts())) family <- "sans"
+    grDevices::pdf(filename, width = width, height = height,
+                   family = family, bg = bg, useDingbats = FALSE, ...)
+  }
+}
+
+save_pdf_plot <- function(plot, filename, width = 7.2, height = 5.2,
+                          base_family = NULL, bg = "white") {
   if (is.null(plot)) {
     message("Skipping PDF: plot object is NULL for ", filename)
     return(invisible(NULL))
   }
+  .validate_figure_dimensions(width, height)
   dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  device <- if (capabilities("cairo")) grDevices::cairo_pdf else grDevices::pdf
+  # The device-native sans alias is Helvetica-compatible and is the most
+  # portable PDF default; callers can request an installed family explicitly.
+  family <- if (is.null(base_family)) "sans" else resolve_publication_font(base_family)
+  if (!.has_working_cairo()) family <- "sans"
+  plot <- tryCatch(
+    plot + ggplot2::theme(text = ggplot2::element_text(family = family)),
+    error = function(e) plot
+  )
   # Write to a sibling temporary file first. If a plotting method errors while
   # the device is open (a common failure mode for enrichplot/patchwork objects),
   # no zero-content PDF is promoted to the canonical output path.
@@ -99,16 +213,120 @@ save_pdf_plot <- function(plot, filename, width = 7, height = 6) {
     tmpdir = dirname(filename), fileext = ".pdf"
   )
   on.exit(unlink(tmp), add = TRUE)
-  ggplot2::ggsave(tmp, plot = plot, width = width, height = height, device = device)
-  size <- file.info(tmp)$size
-  if (!file.exists(tmp) || is.na(size) || size < 1500) {
-    stop("Refusing to save an empty or incomplete PDF: ", filename, call. = FALSE)
+  bg_value <- bg
+  device <- function(filename, width, height, bg = bg_value, ...) {
+    .publication_pdf_device(filename, width, height, bg = bg, family = family, ...)
   }
-  if (!file.rename(tmp, filename)) {
-    if (!file.copy(tmp, filename, overwrite = TRUE)) {
-      stop("Could not promote validated PDF to: ", filename, call. = FALSE)
+  ggplot2::ggsave(
+    tmp, plot = plot, width = width, height = height, units = "in",
+    device = device, bg = bg, limitsize = FALSE
+  )
+  .promote_validated_figure(tmp, filename)
+  invisible(filename)
+}
+
+# Export a selected manuscript-facing ggplot as an editable PDF/SVG pair and,
+# when requested, a 600-dpi TIFF or review PNG. The routine is intentionally opt-in so a
+# routine analysis does not multiply every diagnostic figure into three files.
+save_plot_bundle <- function(plot, filename_stem,
+                             width_mm = RNAseq_FIGURE_SPEC$double_column_width_mm,
+                             height_mm = 120,
+                             formats = c("pdf", "svg"),
+                             dpi = RNAseq_FIGURE_SPEC$raster_dpi,
+                             base_family = NULL,
+                             bg = "white") {
+  formats <- unique(tolower(formats))
+  unsupported <- setdiff(formats, c("pdf", "svg", "tiff", "png"))
+  if (length(unsupported)) stop("Unsupported figure format(s): ", paste(unsupported, collapse = ", "))
+  width <- mm_to_in(width_mm)
+  height <- mm_to_in(height_mm)
+  .validate_figure_dimensions(width, height)
+  # Keep the same portable PDF font in vector and raster companions unless a
+  # project explicitly requests another installed family.
+  family <- if (is.null(base_family)) "sans" else resolve_publication_font(base_family)
+  if (!.has_working_cairo()) family <- "sans"
+  plot <- tryCatch(
+    plot + ggplot2::theme(text = ggplot2::element_text(family = family)),
+    error = function(e) plot
+  )
+  outputs <- character(0)
+
+  if ("pdf" %in% formats) {
+    outputs <- c(outputs, save_pdf_plot(
+      plot, paste0(filename_stem, ".pdf"), width = width, height = height,
+      base_family = family, bg = bg
+    ))
+  }
+  if ("svg" %in% formats) {
+    if (!requireNamespace("svglite", quietly = TRUE)) {
+      stop("Package 'svglite' is required for editable SVG export.")
     }
+    path <- paste0(filename_stem, ".svg")
+    dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+    ggplot2::ggsave(
+      path, plot = plot, width = width, height = height, units = "in",
+      device = svglite::svglite, bg = bg, limitsize = FALSE
+    )
+    outputs <- c(outputs, path)
   }
+  if ("tiff" %in% formats) {
+    if (!requireNamespace("ragg", quietly = TRUE)) {
+      stop("Package 'ragg' is required for TIFF export.")
+    }
+    path <- paste0(filename_stem, ".tiff")
+    ggplot2::ggsave(
+      path, plot = plot, width = width, height = height, units = "in",
+      device = ragg::agg_tiff, dpi = dpi, bg = bg, limitsize = FALSE,
+      compression = "lzw"
+    )
+    outputs <- c(outputs, path)
+  }
+  if ("png" %in% formats) {
+    if (!requireNamespace("ragg", quietly = TRUE)) {
+      stop("Package 'ragg' is required for PNG export.")
+    }
+    path <- paste0(filename_stem, ".png")
+    ggplot2::ggsave(
+      path, plot = plot, width = width, height = height, units = "in",
+      device = ragg::agg_png, dpi = min(dpi, 300), bg = bg, limitsize = FALSE
+    )
+    outputs <- c(outputs, path)
+  }
+  invisible(outputs)
+}
+
+# Safe device wrapper for ComplexHeatmap, pheatmap, Mfuzz and survival objects
+# that are drawn with grid/base graphics rather than saved as a ggplot object.
+save_pdf_device <- function(filename, width = 7.2, height = 5.2, draw,
+                            base_family = NULL, bg = "white") {
+  if (!is.function(draw)) stop("`draw` must be a zero-argument function.")
+  .validate_figure_dimensions(width, height)
+  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
+  # Grid/base plotting packages often create text grobs before the destination
+  # device is opened. The native sans alias avoids pheatmap/ComplexHeatmap
+  # font-type failures on mixed macOS/headless setups.
+  family <- if (is.null(base_family)) "sans" else resolve_publication_font(base_family)
+  before <- grDevices::dev.list()
+  before_ids <- if (is.null(before)) integer(0) else as.integer(before)
+  tmp <- tempfile(
+    pattern = paste0(".", basename(filename), "."),
+    tmpdir = dirname(filename), fileext = ".pdf"
+  )
+  on.exit({
+    current <- grDevices::dev.list()
+    extra_ids <- if (is.null(current)) integer(0) else setdiff(as.integer(current), before_ids)
+    for (device_id in rev(extra_ids)) {
+      try({
+        grDevices::dev.set(device_id)
+        grDevices::dev.off()
+      }, silent = TRUE)
+    }
+    unlink(tmp)
+  }, add = TRUE)
+  .publication_pdf_device(tmp, width = width, height = height, bg = bg, family = family)
+  draw()
+  grDevices::dev.off()
+  .promote_validated_figure(tmp, filename)
   invisible(filename)
 }
 
@@ -151,19 +369,22 @@ plot_pca_pdf <- function(vsd, group_levels, group_colors, filename, intgroup = "
   percent_var <- round(100 * attr(pca_data, "percentVar"))
 
   p <- ggplot2::ggplot(pca_data, ggplot2::aes(x = PC1, y = PC2, color = .data[[intgroup]], fill = .data[[intgroup]])) +
-    ggplot2::geom_point(size = 4, alpha = 0.85) +
+    ggplot2::geom_point(size = 2.6, alpha = 0.9, stroke = 0.25) +
     ggplot2::xlab(paste0("PC1: ", percent_var[1], "% variance")) +
     ggplot2::ylab(paste0("PC2: ", percent_var[2], "% variance")) +
     ggplot2::ggtitle("PCA of Gene Expression Profiles") +
     ggplot2::scale_color_manual(values = group_colors) +
     ggplot2::scale_fill_manual(values = group_colors) +
-    theme_publication(base_size = 14) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "right", aspect.ratio = 1)
 
   if (all(table(pca_data[[intgroup]]) >= 3)) {
-    p <- p + ggplot2::stat_ellipse(type = "norm", level = 0.95, geom = "polygon", alpha = 0.12, linewidth = 0.5)
+    p <- p + ggplot2::stat_ellipse(
+      type = "norm", level = 0.95, geom = "polygon",
+      alpha = 0.10, linewidth = 0.35, show.legend = FALSE
+    )
   }
-  save_pdf_plot(p, filename, width = 7, height = 6)
+  save_pdf_plot(p, filename, width = 7.2, height = 5.4)
   p
 }
 
@@ -181,13 +402,15 @@ plot_sample_distance_pdf <- function(vsd, filename) {
     main = "Sample-to-Sample Distance Heatmap",
     display_numbers = TRUE,
     number_format = "%.1f",
-    fontsize_number = 8
+    fontsize = 7,
+    fontsize_number = 6.5,
+    border_color = NA,
+    silent = TRUE
   )
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  grDevices::pdf(filename, width = 7, height = 6)
-  grid::grid.newpage()
-  grid::grid.draw(p$gtable)
-  grDevices::dev.off()
+  save_pdf_device(filename, width = 7.2, height = 5.4, draw = function() {
+    grid::grid.newpage()
+    grid::grid.draw(p$gtable)
+  })
   invisible(p)
 }
 
@@ -204,7 +427,7 @@ plot_sample_qc_pdf <- function(sample_qc, filename, group_colors = NULL) {
     ggplot2::geom_col(width = 0.75) +
     ggplot2::facet_wrap(~ metric, scales = "free_y", ncol = 1) +
     ggplot2::labs(x = NULL, y = NULL, title = "Sample-level QC Metrics") +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 7.5) +
     ggplot2::theme(
       axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
       legend.position = "top"
@@ -212,7 +435,7 @@ plot_sample_qc_pdf <- function(sample_qc, filename, group_colors = NULL) {
   if (!is.null(group_colors) && "group" %in% colnames(sample_qc)) {
     p <- p + ggplot2::scale_fill_manual(values = group_colors, na.value = "#999999")
   }
-  save_pdf_plot(p, filename, width = max(8, 0.55 * nrow(sample_qc)), height = 10)
+  save_pdf_plot(p, filename, width = min(12, max(7.2, 0.45 * nrow(sample_qc))), height = 8)
   p
 }
 
@@ -220,34 +443,35 @@ plot_sample_correlation_pdf <- function(sample_qc, filename) {
   sample_cor <- attr(sample_qc, "sample_cor")
   if (is.null(sample_cor)) return(invisible(NULL))
   diag(sample_cor) <- 1
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-  grDevices::pdf(filename, width = 7, height = 6)
-  pheatmap::pheatmap(
+  p <- pheatmap::pheatmap(
     sample_cor,
     color = grDevices::colorRampPalette(rev(RColorBrewer::brewer.pal(9, "RdBu")))(255),
-    main = "Sample Spearman Correlation"
+    main = "Sample Spearman Correlation",
+    fontsize = 7,
+    border_color = NA,
+    silent = TRUE
   )
-  grDevices::dev.off()
+  save_pdf_device(filename, width = 7.2, height = 5.4, draw = function() {
+    grid::grid.newpage()
+    grid::grid.draw(p$gtable)
+  })
   invisible(sample_cor)
 }
 
-plot_count_distribution_pdf <- function(count_data, filename, max_points_per_sample = 5000) {
+plot_count_distribution_pdf <- function(count_data, filename, max_points_per_sample = NULL) {
   count_df <- as.data.frame(count_data, check.names = FALSE)
   count_df$gene <- rownames(count_df)
   count_long <- tidyr::pivot_longer(count_df, cols = -gene, names_to = "sample", values_to = "count")
   count_long$log10_count <- log10(count_long$count + 1)
   if (!is.null(max_points_per_sample)) {
-    count_long <- count_long |>
-      dplyr::group_by(sample) |>
-      dplyr::slice_sample(n = max_points_per_sample) |>
-      dplyr::ungroup()
+    warning("`max_points_per_sample` is deprecated: boxplot summaries now use all genes.")
   }
   p <- ggplot2::ggplot(count_long, ggplot2::aes(x = sample, y = log10_count)) +
     ggplot2::geom_boxplot(outlier.shape = NA, width = 0.65, fill = "#B7D7E8", color = "black") +
     ggplot2::labs(x = NULL, y = "log10(count + 1)", title = "Raw Count Distribution by Sample") +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 7.5) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-  save_pdf_plot(p, filename, width = max(8, 0.55 * ncol(count_data)), height = 5)
+  save_pdf_plot(p, filename, width = min(12, max(7.2, 0.45 * ncol(count_data))), height = 4.8)
   p
 }
 
@@ -256,9 +480,9 @@ plot_filter_retention_pdf <- function(retention_df, filename) {
     ggplot2::geom_col(fill = "#7AA6C2", width = 0.75) +
     ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
     ggplot2::labs(x = NULL, y = "Retained count fraction", title = "Library Size Retained After Gene Filtering") +
-    theme_publication(base_size = 10) +
+    theme_publication(base_size = 7.5) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-  save_pdf_plot(p, filename, width = max(8, 0.55 * nrow(retention_df)), height = 5)
+  save_pdf_plot(p, filename, width = min(12, max(7.2, 0.45 * nrow(retention_df))), height = 4.8)
   p
 }
 
@@ -267,15 +491,24 @@ plot_deg_summary_pdf <- function(deg_summary, filename, threshold_col = "Thresho
   deg_long <- tidyr::pivot_longer(deg_summary, cols = c("UP", "DOWN"), names_to = "Change", values_to = "Number")
   p <- ggplot2::ggplot(deg_long, ggplot2::aes(x = Comparison, y = Number, fill = Change)) +
     ggplot2::geom_col(position = "dodge", width = 0.7) +
-    ggplot2::geom_text(ggplot2::aes(label = Number), position = ggplot2::position_dodge(width = 0.7), vjust = -0.5, size = 3.5, fontface = "bold") +
+    ggplot2::geom_text(
+      ggplot2::aes(label = Number),
+      position = ggplot2::position_dodge(width = 0.7),
+      vjust = -0.35, size = 2.6, fontface = "bold"
+    ) +
     ggplot2::scale_fill_manual(values = c("UP" = "#d6604d", "DOWN" = "#4393c3")) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.14))) +
     ggplot2::labs(x = NULL, y = "Number of DEGs", title = "DEG Statistics") +
-    theme_publication(base_size = 10) +
-    ggplot2::theme(legend.position = "top", axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+    theme_publication(base_size = 7.5) +
+    ggplot2::theme(legend.position = "top", axis.text.x = ggplot2::element_text(angle = 25, hjust = 1))
   if (has_threshold) {
     p <- p + ggplot2::facet_wrap(~ .data[[threshold_col]], scales = "free_x")
   }
-  save_pdf_plot(p, filename, width = max(8, ifelse(has_threshold, 3 * length(unique(deg_summary[[threshold_col]])), 6)), height = 5)
+  save_pdf_plot(
+    p, filename,
+    width = min(12, max(7.2, ifelse(has_threshold, 2.45 * length(unique(deg_summary[[threshold_col]])), 6))),
+    height = 4.8
+  )
   p
 }
 
@@ -291,16 +524,21 @@ plot_lfc_strategy_summary_pdf <- function(lfc_strategy_summary, filename) {
     ggplot2::geom_text(
       ggplot2::aes(label = Total),
       position = ggplot2::position_dodge(width = 0.75),
-      vjust = -0.45,
-      size = 3.1,
+      vjust = -0.35,
+      size = 2.6,
       fontface = "bold"
     ) +
     ggplot2::facet_wrap(~ Threshold, scales = "free_x") +
     ggplot2::scale_fill_manual(values = c("raw" = "#7AA6C2", "shrunken" = "#D9896A"), drop = FALSE) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.14))) +
     ggplot2::labs(x = NULL, y = "Number of DEGs", fill = "LFC strategy", title = "Raw vs Shrunken LFC DEG Counts") +
-    theme_publication(base_size = 10) +
-    ggplot2::theme(legend.position = "top", axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
-  save_pdf_plot(p, filename, width = max(8, 3 * length(unique(lfc_strategy_summary$Threshold))), height = 5)
+    theme_publication(base_size = 7.5) +
+    ggplot2::theme(legend.position = "top", axis.text.x = ggplot2::element_text(angle = 25, hjust = 1))
+  save_pdf_plot(
+    p, filename,
+    width = min(12, max(7.2, 2.45 * length(unique(lfc_strategy_summary$Threshold)))),
+    height = 4.8
+  )
   p
 }
 
@@ -330,21 +568,38 @@ plot_volcano_pdf <- function(res_df, comp_name, pvalue_thresh, log2fc_thresh, fi
     selectLab = top_genes,
     max.overlaps = 30,
     drawConnectors = TRUE,
-    widthConnectors = 0.75,
-    boxedLabels = TRUE,
+    widthConnectors = 0.4,
+    boxedLabels = FALSE,
     xlim = c(-max_fc * 1.1, max_fc * 1.1),
     title = comp_name,
+    subtitle = NULL,
+    caption = NULL,
     pCutoff = pvalue_thresh,
     FCcutoff = log2fc_thresh,
     xlab = bquote(~Log[2]~"fold change"),
     ylab = bquote(~-Log[10]~.(pvalue_column)),
-    pointSize = 1.5,
-    labSize = 3.5,
+    pointSize = 1.25,
+    labSize = 3,
+    titleLabSize = 9,
+    subtitleLabSize = 7,
+    captionLabSize = 6,
+    legendLabSize = 7,
+    legendIconSize = 3,
     colCustom = keyvals,
     colAlpha = 4/5,
     legendPosition = "bottom"
   )
-  save_pdf_plot(p, filename, width = 8, height = 10)
+  p <- p + theme_publication(base_size = 8) +
+    ggplot2::labs(color = NULL) +
+    ggplot2::guides(color = ggplot2::guide_legend(title = NULL)) +
+    ggplot2::theme(
+      legend.position = "bottom",
+      legend.title = ggplot2::element_blank(),
+      plot.subtitle = ggplot2::element_blank(),
+      plot.caption = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(8, 10, 8, 8)
+    )
+  save_pdf_plot(p, filename, width = 7.2, height = 6.2)
   p
 }
 
@@ -379,9 +634,7 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     if (isTRUE(column_split)) split_vec <- group
   }
 
-  dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
   .close_leaked_devices()
-  grDevices::pdf(filename, width = width, height = height)
   ht <- ComplexHeatmap::Heatmap(
     plot_mat,
     name = heatmap_name,
@@ -395,8 +648,8 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
     show_column_names = show_column_names,
     show_row_dend = FALSE,
     show_column_dend = FALSE,
-    row_names_gp = grid::gpar(fontsize = row_font_size),
-    column_names_gp = grid::gpar(fontsize = column_font_size),
+    row_names_gp = grid::gpar(fontsize = row_font_size, fontfamily = "sans"),
+    column_names_gp = grid::gpar(fontsize = column_font_size, fontfamily = "sans"),
     column_title = title,
     # Rasterization goes through ImageMagick, which needs a working graphics
     # device. Disable it when no usable cairo device exists (e.g. minimal or
@@ -409,8 +662,9 @@ plot_expression_heatmap_pdf <- function(mat, filename, title = NULL, group = NUL
           title_position = "leftcenter-rot"
         )
   )
-  ComplexHeatmap::draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right")
-  grDevices::dev.off()
+  save_pdf_device(filename, width = width, height = height, draw = function() {
+    ComplexHeatmap::draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right")
+  })
   invisible(ht)
 }
 
@@ -548,20 +802,25 @@ plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_c
 
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
     ggplot2::geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.88, linewidth = 0.45) +
-    ggplot2::geom_jitter(width = 0.12, size = 2, color = "black", shape = 21, fill = "white", alpha = 0.9) +
+    ggplot2::geom_jitter(width = 0.12, size = 1.7, color = "black", shape = 21, fill = "white", alpha = 0.9) +
     ggplot2::labs(title = title, x = NULL, y = ylab %||% value_col) +
-    theme_publication(base_size = 11) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(legend.position = "none", strip.text = ggplot2::element_text(face = "bold"))
   if (!is.null(group_colors)) p <- p + ggplot2::scale_fill_manual(values = group_colors)
   if (!is.null(facet_col)) p <- p + ggplot2::facet_wrap(stats::as.formula(paste("~", facet_col)), scales = "free_y")
-  if (nrow(stat_tbl) > 0) {
+  plot_stat_tbl <- stat_tbl
+  if (!show_ns && nrow(plot_stat_tbl) > 0) {
+    p_col <- if ("p.adj" %in% names(plot_stat_tbl)) "p.adj" else if ("padj" %in% names(plot_stat_tbl)) "padj" else NULL
+    if (!is.null(p_col)) plot_stat_tbl <- plot_stat_tbl[plot_stat_tbl[[p_col]] < 0.05, , drop = FALSE]
+  }
+  if (nrow(plot_stat_tbl) > 0) {
     p <- p + ggpubr::stat_pvalue_manual(
-      stat_tbl,
+      plot_stat_tbl,
       label = "label",
       hide.ns = !show_ns,
       tip.length = 0.01,
       bracket.size = 0.35,
-      size = 2.8
+      size = 2.5
     ) +
       ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.28)))
   }
@@ -595,24 +854,29 @@ plot_group_violin_boxplot_pdf <- function(data, value_col, group_col, filename,
     ggplot2::geom_violin(trim = FALSE, width = 0.88, alpha = 0.34, color = NA) +
     ggplot2::geom_boxplot(width = 0.22, outlier.shape = NA, fill = "white", alpha = 0.82, linewidth = 0.42, color = "#2F2F2F") +
     ggplot2::stat_summary(fun = stats::median, geom = "point", shape = 95, size = 7, color = "#2F2F2F") +
-    ggplot2::geom_jitter(width = 0.08, size = 2.2, shape = 21, color = "#222222", stroke = 0.25, alpha = 0.9) +
+    ggplot2::geom_jitter(width = 0.08, size = 1.7, shape = 21, color = "#222222", stroke = 0.25, alpha = 0.9) +
     ggplot2::labs(title = title, x = NULL, y = ylab %||% value_col) +
-    theme_publication(base_size = 12) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       legend.position = "none",
-      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 14),
+      plot.title = ggplot2::element_text(hjust = 0, face = "bold", size = 9),
       panel.grid.major.y = ggplot2::element_line(color = "#E7E7E7", linewidth = 0.25),
       axis.text.x = ggplot2::element_text(angle = 25, hjust = 1, vjust = 1)
     )
   if (!is.null(group_colors)) p <- p + ggplot2::scale_fill_manual(values = group_colors)
-  if (nrow(stat_tbl) > 0) {
+  plot_stat_tbl <- stat_tbl
+  if (!show_ns && nrow(plot_stat_tbl) > 0) {
+    p_col <- if ("p.adj" %in% names(plot_stat_tbl)) "p.adj" else if ("padj" %in% names(plot_stat_tbl)) "padj" else NULL
+    if (!is.null(p_col)) plot_stat_tbl <- plot_stat_tbl[plot_stat_tbl[[p_col]] < 0.05, , drop = FALSE]
+  }
+  if (nrow(plot_stat_tbl) > 0) {
     p <- p + ggpubr::stat_pvalue_manual(
-      stat_tbl,
+      plot_stat_tbl,
       label = "label",
       hide.ns = !show_ns,
       tip.length = 0.01,
       bracket.size = 0.35,
-      size = 3
+      size = 2.5
     ) +
       ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.07, 0.30)))
   } else {
@@ -662,13 +926,13 @@ plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +
     ggplot2::stat_summary(geom = "bar", fun = mean, width = 0.6, color = "white", alpha = 0.95) +
     ggplot2::stat_summary(geom = "errorbar", fun.min = sem_lower, fun.max = sem_upper, width = 0.2, linewidth = 0.45, color = "black") +
-    ggplot2::geom_jitter(width = 0.12, size = 2.1, color = "black", alpha = 0.85, shape = 21, fill = "white") +
+    ggplot2::geom_jitter(width = 0.12, size = 1.7, color = "black", alpha = 0.85, shape = 21, fill = "white") +
     ggplot2::labs(title = title, x = NULL, y = ylab %||% value_col) +
-    ggplot2::theme_test(base_size = 13) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       legend.position = "none",
       axis.text = ggplot2::element_text(color = "black"),
-      plot.title = ggplot2::element_text(hjust = 0.5, size = 15, face = "bold")
+      plot.title = ggplot2::element_text(hjust = 0, size = 9, face = "bold")
     )
   if (!is.null(group_colors)) p <- p + ggplot2::scale_fill_manual(values = group_colors)
   if (nrow(stat_tbl) > 0) {
@@ -697,6 +961,8 @@ prepare_enrich_df <- function(enrich_result, show_category = 15) {
   df <- df[order(df$p.adjust, df$pvalue), , drop = FALSE]
   df <- utils::head(df, show_category)
   df$Description_wrapped <- factor(wrap_term_labels(df$Description), levels = rev(wrap_term_labels(df$Description)))
+  if (!"Count" %in% colnames(df) && "setSize" %in% colnames(df)) df$Count <- df$setSize
+  if (!"Count" %in% colnames(df)) df$Count <- 1L
   if ("GeneRatio" %in% colnames(df)) {
     df$GeneRatioNumeric <- parse_ratio_numeric(df$GeneRatio)
   } else {
@@ -715,25 +981,43 @@ prepare_enrich_df <- function(enrich_result, show_category = 15) {
   df
 }
 
-plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 15, width = 8, height = 10) {
+plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 15,
+                                width = 7.2, height = 6.2,
+                                x_metric = c("fold_enrichment", "gene_ratio", "nes")) {
+  x_metric <- match.arg(x_metric)
   df <- prepare_enrich_df(enrich_result, show_category)
   if (nrow(df) == 0) {
     message("Skipping enrichment dotplot: no significant terms for ", title)
     return(invisible(NULL))
   }
+  if (x_metric == "nes" && !"NES" %in% colnames(df)) {
+    stop("`x_metric = 'nes'` requires an NES column.")
+  }
+  x_col <- switch(x_metric,
+                  fold_enrichment = "FoldEnrichment",
+                  gene_ratio = "GeneRatioNumeric",
+                  nes = "NES")
+  x_label <- switch(x_metric,
+                    fold_enrichment = "Fold enrichment vs expressed background",
+                    gene_ratio = "Gene ratio",
+                    nes = "Normalized enrichment score (NES)")
+  # Select terms by adjusted P value, then sort the displayed rows by the
+  # quantity readers compare on the x axis. This preserves inferential priority
+  # without leaving an apparently random y-axis order.
+  df <- df[order(df[[x_col]], decreasing = TRUE), , drop = FALSE]
   labels <- wrap_term_labels(df$Description, width = 42, max_lines = 2)
   df$Term <- factor(labels, levels = rev(labels))
   p <- ggplot2::ggplot(
     df,
-    ggplot2::aes(x = GeneRatioNumeric, y = Term, size = Count, color = log10_padj)
+    ggplot2::aes(x = .data[[x_col]], y = Term, size = Count, color = log10_padj)
   ) +
     ggplot2::geom_point(alpha = 0.9) +
     ggplot2::scale_color_viridis_c(option = "magma", direction = -1, name = "-log10(FDR)") +
-    ggplot2::scale_size_continuous(name = "Gene count", range = c(2.5, 7)) +
-    ggplot2::labs(x = "Gene ratio", y = NULL, title = title) +
-    theme_publication(base_size = 10) +
+    ggplot2::scale_size_continuous(name = "Gene count", range = c(2, 5.5)) +
+    ggplot2::labs(x = x_label, y = NULL, title = title) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 9, lineheight = 0.9),
+      axis.text.y = ggplot2::element_text(size = 7, lineheight = 0.92),
       panel.grid.major.y = ggplot2::element_line(color = "#ECECEC", linewidth = 0.3),
       legend.position = "right"
     )
@@ -741,7 +1025,7 @@ plot_enrich_dotplot <- function(enrich_result, filename, title, show_category = 
   p
 }
 
-plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_category = 20, width = 8.5, height = 6,
+plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_category = 20, width = 7.2, height = 5.8,
                                     ontology = NULL, fill_by = c("pvalue", "padj")) {
   fill_by <- match.arg(fill_by)
   df <- prepare_enrich_df(enrich_result, show_category)
@@ -757,27 +1041,36 @@ plot_enrich_barplot_pdf <- function(enrich_result, filename, title, show_categor
   fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
 
+  # Put wrapped term labels directly on the bars to keep multi-panel figures
+  # compact and make the label-mark correspondence immediate. Use plain dark
+  # text without a backing box or count annotation so the mark stays uncluttered.
+  df$LabelX <- max(df$FoldEnrichment, na.rm = TRUE) * 0.015
   p <- ggplot2::ggplot(df, ggplot2::aes(x = FoldEnrichment, y = Term, fill = .data[[fill_col]])) +
     ggplot2::geom_col(width = 0.78, alpha = 0.78, color = "white", linewidth = 0.25) +
+    ggplot2::geom_text(
+      ggplot2::aes(x = LabelX, label = Term),
+      hjust = 0, size = 2.55, color = "#222222", lineheight = 0.92,
+      show.legend = FALSE
+    ) +
     ggplot2::scale_fill_distiller(palette = "RdPu", direction = 1, name = fill_name) +
-    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.08))) +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.04))) +
     ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
-    ggplot2::theme_classic(base_size = 12, base_family = "Times") +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 9, color = "black", lineheight = 0.9),
+      axis.text.y = ggplot2::element_blank(),
       axis.ticks.y = ggplot2::element_blank(),
-      axis.title = ggplot2::element_text(size = 12, face = "bold"),
-      axis.text.x = ggplot2::element_text(size = 11, color = "black"),
-      plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
-      legend.title = ggplot2::element_text(size = 12, face = "bold"),
-      legend.text = ggplot2::element_text(size = 10)
+      axis.title = ggplot2::element_text(size = 8),
+      axis.text.x = ggplot2::element_text(size = 7.5, color = "black"),
+      plot.title = ggplot2::element_text(size = 9, hjust = 0, face = "bold"),
+      legend.title = ggplot2::element_text(size = 7.5, face = "bold"),
+      legend.text = ggplot2::element_text(size = 7)
     )
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
 
 plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filename, title,
-                                                  show_category = 15, width = 16, height = 10,
+                                                  show_category = 15, width = 7.2, height = 7.2,
                                                   ontology = NULL, fill_by = c("pvalue", "padj")) {
   fill_by <- match.arg(fill_by)
   up_df <- prepare_enrich_df(up_result, show_category)
@@ -819,16 +1112,16 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
       expand = ggplot2::expansion(mult = c(0.08, 0.08))
     ) +
     ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
-    ggplot2::theme_classic(base_size = 12, base_family = "Times") +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 9, color = "black", lineheight = 0.9),
+      axis.text.y = ggplot2::element_text(size = 6.8, color = "black", lineheight = 0.92),
       axis.ticks.y = ggplot2::element_blank(),
-      axis.title = ggplot2::element_text(size = 12, face = "bold"),
-      axis.text.x = ggplot2::element_text(size = 11, color = "black"),
-      plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+      axis.title = ggplot2::element_text(size = 8),
+      axis.text.x = ggplot2::element_text(size = 7.5, color = "black"),
+      plot.title = ggplot2::element_text(size = 9, hjust = 0, face = "bold"),
       legend.position = "right",
-      legend.title = ggplot2::element_text(size = 12, face = "bold"),
-      legend.text = ggplot2::element_text(size = 10)
+      legend.title = ggplot2::element_text(size = 7.5, face = "bold"),
+      legend.text = ggplot2::element_text(size = 7)
     )
   save_pdf_plot(p, filename, width = width, height = height)
   p
@@ -867,20 +1160,20 @@ plot_enrich_suite_pdf <- function(enrich_result, prefix, title_prefix, show_cate
 }
 
 plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, show_category = 10,
-                                            include_all = TRUE, width = 10, height = 12) {
+                                            include_all = TRUE, width = 7.2, height = 7.2) {
   if (is.null(compare_result) || nrow(as.data.frame(compare_result)) == 0) {
     message("Skipping compareCluster dotplot: no significant terms for ", title)
     return(invisible(NULL))
   }
   p <- enrichplot::dotplot(compare_result, showCategory = show_category, includeAll = include_all, title = title) +
     ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 48)) +
-    theme_publication(base_size = 10) +
-    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 8.5))
+    theme_publication(base_size = 8) +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(size = 6.8))
   save_pdf_plot(p, filename, width = width, height = height)
   p
 }
 
-plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 9.5, height = 8) {
+plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 7.2, height = 6.2) {
   df <- as.data.frame(gsea_result)
   if (nrow(df) == 0 || !"NES" %in% colnames(df)) {
     message("Skipping GSEA NES barplot: no significant terms for ", title)
@@ -897,34 +1190,35 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
   desc[is.na(desc) | desc == ""] <- as.character(df$ID)[is.na(desc) | desc == ""]
   df$Description <- make.unique(desc, sep = " ")
   df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
-  df$log10_padj <- -log10(pmax(df$p.adjust, .Machine$double.xmin))
   wrapped_terms <- wrap_term_labels(df$Description, width = 44, max_lines = 2)
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
   max_nes <- max(abs(df$NES), na.rm = TRUE)
-  df$PointX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
+  df$LabelX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
+  df$FDRLabel <- ifelse(df$p.adjust < 0.001,
+                        paste0("FDR=", formatC(df$p.adjust, format = "e", digits = 1)),
+                        paste0("FDR=", formatC(df$p.adjust, format = "f", digits = 3)))
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = NES, y = Description_wrapped, fill = Direction)) +
     ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#2F2F2F") +
     ggplot2::geom_col(width = 0.76, alpha = 0.88, color = "white", linewidth = 0.25) +
-    ggplot2::geom_point(
-      ggplot2::aes(x = PointX, size = log10_padj),
-      shape = 21, fill = "white", color = "#222222", stroke = 0.25,
-      inherit.aes = TRUE
+    ggplot2::geom_text(
+      ggplot2::aes(x = LabelX, label = FDRLabel,
+                   hjust = ifelse(NES >= 0, -0.05, 1.05)),
+      size = 2.8, color = "#222222", inherit.aes = TRUE
     ) +
     ggplot2::scale_fill_manual(values = c("Activated" = "#C8473E", "Suppressed" = "#3778A8")) +
-    ggplot2::scale_size_continuous(name = "-log10(FDR)", range = c(2.2, 5.2)) +
-    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.14, 0.14))) +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.25, 0.25))) +
     ggplot2::labs(x = "Normalized enrichment score (NES)", y = NULL, title = title) +
-    ggplot2::theme_classic(base_size = 12, base_family = "Times") +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 9, color = "black", lineheight = 0.9),
+      axis.text.y = ggplot2::element_text(size = 6.8, color = "black", lineheight = 0.92),
       axis.ticks.y = ggplot2::element_blank(),
-      axis.title = ggplot2::element_text(size = 12, face = "bold"),
-      axis.text.x = ggplot2::element_text(size = 11, color = "black"),
-      plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+      axis.title = ggplot2::element_text(size = 8),
+      axis.text.x = ggplot2::element_text(size = 7.5, color = "black"),
+      plot.title = ggplot2::element_text(size = 9, hjust = 0, face = "bold"),
       legend.position = "right",
-      legend.title = ggplot2::element_text(size = 11, face = "bold"),
-      legend.text = ggplot2::element_text(size = 10)
+      legend.title = ggplot2::element_text(size = 7.5, face = "bold"),
+      legend.text = ggplot2::element_text(size = 7)
     )
   save_pdf_plot(p, filename, width = width, height = height)
   p
@@ -935,20 +1229,21 @@ plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category
     message("Skipping GSEA plot suite: no significant terms for ", title_prefix)
     return(invisible(NULL))
   }
-  plot_enrich_dotplot(gsea_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"), show_category = show_category)
+  plot_enrich_dotplot(gsea_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"),
+                      show_category = show_category, x_metric = "nes")
   plot_gsea_nes_barplot_pdf(gsea_result, paste0(prefix, "_NES_barplot.pdf"), paste(title_prefix, "NES"), show_category = show_category)
   try({
     p_ridge <- enrichplot::ridgeplot(gsea_result, showCategory = show_category) +
       ggplot2::labs(title = paste(title_prefix, "Ridgeplot")) +
       ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 46)) +
-      ggplot2::theme_classic(base_size = 11, base_family = "Times") +
+      theme_publication(base_size = 8) +
       ggplot2::theme(
-        axis.title = ggplot2::element_text(size = 12, face = "bold"),
+        axis.title = ggplot2::element_text(size = 8),
         axis.text = ggplot2::element_text(color = "black"),
-        plot.title = ggplot2::element_text(size = 15, hjust = 0.5, face = "bold"),
+        plot.title = ggplot2::element_text(size = 9, hjust = 0, face = "bold"),
         legend.position = "right"
       )
-    save_pdf_plot(p_ridge, paste0(prefix, "_ridgeplot.pdf"), width = 9.5, height = 10)
+    save_pdf_plot(p_ridge, paste0(prefix, "_ridgeplot.pdf"), width = 7.2, height = 7.2)
   }, silent = TRUE)
   message(
     "GSEA overview saved for ", title_prefix,
@@ -966,10 +1261,10 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
                                        title = NULL,
                                        subtitle = NULL,
                                        contrast_label = NULL,
-                                       width = 10, height = 7.5,
+                                       width = 7.2, height = 5.6,
                                        panel_heights = c(1.5, 0.25, 0.4),
                                        pvalue_table = FALSE,
-                                       base_family = "Times") {
+                                       base_family = NULL) {
   if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) {
     message("Skipping single-term GSEA figure: no significant terms")
     return(invisible(NULL))
@@ -1022,11 +1317,12 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
 
   p <- enrichplot::gseaplot2(gsea_result, geneSetID = gene_set_id, pvalue_table = pvalue_table, color = cols$es, title = "")
 
+  base_family <- resolve_publication_font(base_family)
   p <- lapply(p, function(x) {
     x + ggplot2::theme(
       text = ggplot2::element_text(family = base_family),
-      axis.text = ggplot2::element_text(size = 10, color = "grey20", family = base_family),
-      axis.title = ggplot2::element_text(size = 11, color = "grey20", family = base_family),
+      axis.text = ggplot2::element_text(size = 7, color = "grey20", family = base_family),
+      axis.title = ggplot2::element_text(size = 8, color = "grey20", family = base_family),
       axis.ticks = ggplot2::element_line(color = "grey40"),
       panel.grid.major = ggplot2::element_line(color = "grey92", linewidth = 0.3),
       panel.grid.minor = ggplot2::element_blank()
@@ -1059,25 +1355,23 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
     ggplot2::coord_cartesian(ylim = c(-10, 10)) +
     ggplot2::labs(y = "Ranking metric", x = "Rank in ordered gene list") +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 9),
-      axis.title.y = ggplot2::element_text(size = 10),
+      axis.text.y = ggplot2::element_text(size = 7),
+      axis.title.y = ggplot2::element_text(size = 8),
       plot.margin = ggplot2::margin(6, 20, 12, 12)
     )
 
   p[[1]] <- p[[1]] +
     ggplot2::labs(title = title_text, subtitle = subtitle_text) +
     ggplot2::theme(
-      plot.title = ggplot2::element_text(size = 17, face = "bold", hjust = 0.5, color = "black", margin = ggplot2::margin(b = 5)),
-      plot.subtitle = ggplot2::element_text(size = 12, hjust = 0.5, color = "grey45", margin = ggplot2::margin(b = 8), lineheight = 1.25)
+      plot.title = ggplot2::element_text(size = 9, face = "bold", hjust = 0, color = "black", margin = ggplot2::margin(b = 4)),
+      plot.subtitle = ggplot2::element_text(size = 7, hjust = 0, color = "grey45", margin = ggplot2::margin(b = 6), lineheight = 1.15)
     )
 
   attr(p, "params") <- list(ncol = 1, heights = panel_heights)
   class(p) <- c("gglist", "list")
 
   if (!is.null(filename)) {
-    dir.create(dirname(filename), showWarnings = FALSE, recursive = TRUE)
-    device <- if (capabilities("cairo")) grDevices::cairo_pdf else grDevices::pdf
-    ggplot2::ggsave(filename, plot = p, width = width, height = height, device = device, limitsize = FALSE)
+    save_pdf_plot(p, filename, width = width, height = height, base_family = base_family)
   }
   p
 }
@@ -1088,7 +1382,7 @@ plot_gsea_term_figures_from_df <- function(gsea_result, term_df,
                                            outdir,
                                            contrast_label = NULL,
                                            id_col = "ID",
-                                           width = 10, height = 7.5,
+                                           width = 7.2, height = 5.6,
                                            prefix = "gseaplot2") {
   if (nrow(term_df) == 0) return(invisible(NULL))
   if (!id_col %in% colnames(term_df) && !"Description" %in% colnames(term_df)) {
@@ -1260,10 +1554,10 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
                                        subtitle = NULL,
                                        comparison_col = "comparison",
                                        count_col = "Count",
-                                       width = 12,
+                                       width = 7.2,
                                        height = NULL,
-                                       max_width = 30,
-                                       max_height = 30,
+                                       max_width = 12,
+                                       max_height = 12,
                                        fill_name = expression(-log[10]("adj. P")),
                                        size_name = "Gene count") {
   if (nrow(plot_df) == 0) {
@@ -1289,12 +1583,12 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
       colors = c("#E8EDF1", "#94C5B2", "#3E8E7E", "#B74949"),
       name = fill_name
     ) +
-    ggplot2::scale_size_continuous(range = c(1.8, 8.5), name = size_name) +
+    ggplot2::scale_size_continuous(range = c(1.6, 5.8), name = size_name) +
     ggplot2::facet_grid(
       facet_label ~ ., scales = "free_y", space = "free_y", switch = "y"
     ) +
     ggplot2::labs(title = title, subtitle = subtitle, x = NULL, y = NULL) +
-    ggplot2::theme_bw(base_size = 11) +
+    theme_publication(base_size = 8) +
     ggplot2::theme(
       legend.position = "right",
       panel.grid.major.x = ggplot2::element_line(color = "grey90", linewidth = 0.3),
@@ -1302,17 +1596,17 @@ plot_theme_dotheatmap_pdf <- function(plot_df,
       panel.grid.minor = ggplot2::element_blank(),
       strip.placement = "outside",
       strip.background.y = ggplot2::element_rect(fill = "#464C55", color = NA),
-      strip.text.y.left = ggplot2::element_text(angle = 0, face = "bold", color = "white", size = 9.5),
-      axis.text.x = ggplot2::element_text(angle = 35, hjust = 1, vjust = 1, size = 10),
-      axis.text.y = ggplot2::element_text(size = 9, hjust = 0),
+      strip.text.y.left = ggplot2::element_text(angle = 0, face = "bold", color = "white", size = 7),
+      axis.text.x = ggplot2::element_text(angle = 35, hjust = 1, vjust = 1, size = 7),
+      axis.text.y = ggplot2::element_text(size = 6.5, hjust = 0),
       axis.ticks.y = ggplot2::element_blank(),
-      plot.title = ggplot2::element_text(face = "bold", size = 15),
-      plot.subtitle = ggplot2::element_text(size = 10, color = "grey35"),
+      plot.title = ggplot2::element_text(face = "bold", size = 9),
+      plot.subtitle = ggplot2::element_text(size = 7, color = "grey35"),
       plot.margin = ggplot2::margin(8, 12, 8, 12)
     )
 
   if (is.null(height)) {
-    height <- max(8, 0.32 * dplyr::n_distinct(plot_df$label) + 0.6 * dplyr::n_distinct(plot_df$facet_label))
+    height <- max(5.2, 0.22 * dplyr::n_distinct(plot_df$label) + 0.42 * dplyr::n_distinct(plot_df$facet_label))
   }
   if (!is.numeric(width) || length(width) != 1 || !is.finite(width) || width <= 0 ||
       !is.numeric(height) || length(height) != 1 || !is.finite(height) || height <= 0) {
@@ -1339,7 +1633,7 @@ plot_theme_dotheatmap_from_results <- function(result_map,
                                               ontology_filter = "BP",
                                               top_n = 6,
                                               comparison_col = "comparison",
-                                              width = 12,
+                                              width = 7.2,
                                               height = NULL) {
   df <- build_multi_comparison_enrich_df(
     result_map,

@@ -179,12 +179,23 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 
 ## `plot_utils.R` — plotting & visualization
 
+- `RNAseq_FIGURE_SPEC`
+  Final-size journal dimensions, typography, raster resolution and font stack.
+- `publication_dimensions(column, height_mm)` / `mm_to_in(x)`
+  Convert final physical dimensions to export dimensions.
+- `resolve_publication_font(preferred)`
+  Select an installed Helvetica-compatible sans face with a portable fallback.
 - `theme_publication(base_size, base_family)`
-  Default publication theme.
+  Final-size 8 pt publication theme with a consistent typographic hierarchy.
 - `make_group_colors(group_levels)`
   Generate group color palette.
 - `save_pdf_plot(plot, filename, width, height)`
   Save ggplot atomically via cairo/pdf; reject NULL and near-empty device output.
+- `save_pdf_device(filename, width, height, draw)`
+  Transactional PDF export for grid/base graphics such as ComplexHeatmap,
+  pheatmap, Mfuzz, UpSet, voom and survminer.
+- `save_plot_bundle(plot, filename_stem, width_mm, height_mm, formats, dpi)`
+  Export selected figures as PDF/SVG plus optional TIFF/PNG at final size.
 - `wrap_term_labels(x, width, max_lines)`
   Wrap long labels at word boundaries, cap line count and add an ellipsis.
 - `parse_ratio_numeric(x)`
@@ -255,8 +266,14 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Validate and score custom gene sets via GSVA; defaults to five overlapping features and attaches an overlap audit.
 - `pathway_group_comparison(score_mat, group, group_levels, comparisons, ...)`
   Sample-name-aligned per-set group comparison; delta = treatment - control, global BH.
+- `read_gene_set_registry(path, ...)` / `audit_gene_set_registry(gene_sets, ...)`
+  Preserve version/source metadata and audit registered-gene overlap with the analyzed expression matrix.
 - `plot_pathway_delta_summary_pdf(comp_df, filename, ...)`
   Bidirectional delta bar chart across pathways x comparisons with significance stars.
+- `plot_pathway_sensitivity_matrix_pdf(comp_df, filename, ...)`
+  Complete module-by-contrast matrix combining delta color with parametric and exact-permutation adjusted-P labels.
+- `plot_gene_set_registry_qc_pdf(audit_df, filename, ...)`
+  Registry coverage chart showing expressed-gene overlap fraction, overlap/input denominators, and source type.
 - `plot_keygenes_log2fc_heatmap_pdf(fc_long, filename, row_group, ...)`
   Gene x comparison log2FC heatmap with preserved NA values, duplicate-key validation, and optional row grouping.
 - `melt_gene_expression(expr, genes, group)`
@@ -377,11 +394,17 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 ## `report_utils.R` — unified HTML report
 
 - `render_analysis_report(outdir, report_file, template, params)`
-  Render `reports/analysis_report.qmd` into a single self-contained HTML report from the saved DEG/ORA/GSEA/QC outputs (no re-analysis). Uses the quarto CLI when available, else `rmarkdown`.
+  Render `reports/analysis_report.qmd` into a single self-contained HTML report from the saved DEG/ORA/GSEA/QC outputs (no re-analysis). A `.qmd` requires Quarto; `rmarkdown` is used only when an `.Rmd` template is supplied explicitly.
 - `list_report_figures(dir, pattern, base)`
   List PDF figures under a directory as portable relative paths.
 - `read_csv_safe(path, ...)`
   Read a CSV if it exists, else return `NULL` (for conditional report tables).
+- `default_report_coverage_rules()` / `build_report_coverage_manifest(...)`
+  Define and audit the required/optional analysis domains represented in a comprehensive report.
+- `write_report_coverage_manifest(...)` / `validate_report_coverage(...)`
+  Persist the coverage contract and reject unresolved required domains or undocumented omissions.
+- `validate_claim_evidence_ledger(...)`
+  Validate project-specific conclusions, evidence levels, alternatives, falsifiers, next evidence, and source-file provenance before report rendering.
 
 ## TME constants
 

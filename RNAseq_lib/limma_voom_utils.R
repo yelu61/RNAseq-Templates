@@ -25,10 +25,9 @@ run_voom <- function(dge, design = NULL, plot_file = NULL) {
   }
   v <- limma::voom(dge, design = design, plot = !is.null(plot_file))
   if (!is.null(plot_file)) {
-    dir.create(dirname(plot_file), showWarnings = FALSE, recursive = TRUE)
-    grDevices::pdf(plot_file, width = 6, height = 6)
-    limma::voom(dge, design = design, plot = TRUE, save.plot = TRUE)
-    grDevices::dev.off()
+    save_pdf_device(plot_file, width = 5.2, height = 4.6, draw = function() {
+      limma::voom(dge, design = design, plot = TRUE, save.plot = TRUE)
+    })
   }
   v
 }
