@@ -376,7 +376,10 @@ plot_deg_upset_pdf <- function(gene_sets, filename, title = "DEG Set Overlaps",
   upset_df <- prepare_upset_df(gene_sets)
   if (is.null(upset_df) || nrow(upset_df) == 0) return(invisible(NULL))
   save_pdf_device(filename, width = width, height = height, draw = function() {
-    UpSetR::upset(
+    # UpSetR returns a grid object that is only auto-printed at the top level;
+    # inside this closure it must be printed explicitly or the device stays blank
+    # (and .promote_validated_figure refuses the empty PDF) in non-interactive runs.
+    print(UpSetR::upset(
       upset_df,
       nsets = ncol(upset_df),
       nintersects = nintersects,
@@ -387,7 +390,7 @@ plot_deg_upset_pdf <- function(gene_sets, filename, title = "DEG Set Overlaps",
       sets.x.label = "Set size",
       mainbar.y.label = "Intersection size",
       text.scale = c(1.05, 1.05, 0.85, 0.85, 1.05, 1.05)
-    )
+    ))
   })
   invisible(filename)
 }

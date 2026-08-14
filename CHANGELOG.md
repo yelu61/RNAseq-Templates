@@ -4,8 +4,48 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Offline-deterministic mouse→human ortholog conversion (`tme_utils.R`)**:
+  `convert_mouse_symbols_to_human()` gains `fallback_hosts` and `ortholog_cache`,
+  and `prepare_tme_expression()` forwards both. The pinned archive host
+  (`dec2021.archive.ensembl.org`) avoids dataset drift but is intermittently
+  unreachable (and `www.ensembl.org` retired its biomart endpoint with HTTP 404),
+  which previously aborted any mouse TME run mid-pipeline. The converter now tries
+  each host in turn before failing, and — when `ortholog_cache` (an `.rds` path) is
+  set — caches the mapping so repeat runs are offline-deterministic: only genes
+  absent from the cache hit the network, and newly mapped genes are written back.
+  Genes queried but having no ortholog are recorded so they are not re-queried.
+  Backfilled after a real project run failed when the archive host timed out;
+  regression tests cover the offline cache path and the unmapped-but-queried case.
+
+- **`collapse_by_symbol()` (`data_utils.R`)**: collapse a count/expression matrix
+  to unique gene symbols, keeping the highest-total-signal row per symbol and
+  optionally carrying a per-row annotation (e.g. gene length, biotype) through to
+  the retained row. Generalizes `deduplicate_expression_by_symbol()` (which does
+  not carry annotation) for use when preparing runner-ready count tables that also
+  need a gene-length column for TPM/TME. Backfilled from real project use;
+  regression tests cover max-count selection, annotation carrying, and NA/empty
+  symbol dropping.
+
 ### Fixed
 
+- **Blank grid-composite figures in non-interactive runs (`deg_utils.R`,
+  `plot_utils.R`)**: `UpSetR::upset()` and `enrichplot::gseaplot2()` both return
+  grid objects that are only auto-printed at the top level. Called inside a
+  `save_pdf_device()`/`ggsave()` path from `Rscript`, they produced a blank
+  single-page PDF (< 1500 bytes), which `.promote_validated_figure()` then
+  refused — silently skipping every GSEA running-curve and, for the DEG-overlap
+  UpSet, aborting the whole run before `Analysis_summary.txt`. This only
+  surfaced on the first multi-comparison design (which actually reaches the
+  UpSet branch). `plot_deg_upset_pdf()` now wraps `upset()` in `print()`, and
+  `plot_gsea_term_figure_pdf()` renders its re-classed `gglist` via
+  `save_pdf_device(..., draw = function() print(p))` instead of `ggsave()`
+  (which has no `grid.draw` method for `gglist`). Both now emit valid PDFs.
+- **DEG-overlap block no longer fatal (`templates/General/run_analysis.R`)**:
+  the optional DEG-overlap UpSet/Jaccard figures are wrapped in `tryCatch`, so a
+  single diagnostic-figure failure logs a message and skips instead of killing
+  the completed DEG/GSEA/GSVA work and the run summary.
 - **GSEA run-to-run jitter (`enrichment_utils.R`)**: `run_go_gsea()` and
   `run_kegg_gsea()` wrap `clusterProfiler::gseGO()`/`gseKEGG()`, which use
   adaptive fgsea permutation with no exposed seed argument (clusterProfiler

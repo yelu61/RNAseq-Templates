@@ -1490,7 +1490,11 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
   class(p) <- c("gglist", "list")
 
   if (!is.null(filename)) {
-    save_pdf_plot(p, filename, width = width, height = height, base_family = base_family)
+    # `p` is a multi-panel gglist (re-classed gseaplot2 output). ggsave() has no
+    # grid.draw method for it and errors, so render through the PDF device with an
+    # explicit print(), which is also safe in non-interactive runs.
+    save_pdf_device(filename, width = width, height = height, base_family = base_family,
+                    draw = function() print(p))
   }
   invisible(p)
 }

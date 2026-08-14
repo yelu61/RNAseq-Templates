@@ -492,6 +492,34 @@ counts_to_tpm <- function(counts_mat, gene_lengths_kb) {
   tpm
 }
 
+#' Collapse a count/expression matrix to unique gene symbols.
+#'
+#' Keeps, for each duplicated symbol, the row with the highest total signal
+#' (row sum). Rows with missing/empty symbols are dropped. Optionally carries a
+#' per-row annotation (e.g. gene length, biotype) through to the retained row so
+#' downstream steps (TPM, TME) stay aligned to the kept feature.
+#'
+#' @param symbols Character vector of gene symbols, one per row of `mat`.
+#' @param mat Numeric matrix/data.frame (features x samples) to collapse.
+#' @param extra Optional vector (or single-column frame) aligned to the rows of
+#'   `mat`; the value from the retained row is returned. `NULL` to skip.
+#' @return A list with `gene_name` (unique symbols), `counts` (collapsed matrix),
+#'   `n_in`/`n_out` (input/output feature counts), and `extra` when supplied.
+collapse_by_symbol <- function(symbols, mat, extra = NULL) {
+  mat <- as.matrix(mat)
+  keep <- !is.na(symbols) & symbols != ""
+  symbols <- symbols[keep]; mat <- mat[keep, , drop = FALSE]
+  if (!is.null(extra)) extra <- extra[keep]
+  ord <- order(rowSums(mat, na.rm = TRUE), decreasing = TRUE)
+  symbols <- symbols[ord]; mat <- mat[ord, , drop = FALSE]
+  if (!is.null(extra)) extra <- extra[ord]
+  dup <- duplicated(symbols)
+  out <- list(gene_name = symbols[!dup], counts = mat[!dup, , drop = FALSE],
+              n_in = length(keep), n_out = sum(!dup))
+  if (!is.null(extra)) out$extra <- extra[!dup]
+  out
+}
+
 #' Convert raw counts to FPKM.
 #'
 #' @param counts_mat Numeric count matrix (genes x samples).

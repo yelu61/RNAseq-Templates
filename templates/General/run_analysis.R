@@ -622,22 +622,26 @@ for (gene in found_genes) plot_gene_expression(gene, vsd_mat, dds)
 # =============================================================================
 RUN_DEG_OVERLAP <- length(COMPARISONS) >= 2 || nrow(THRESHOLD_GRID) > 1
 if (RUN_DEG_OVERLAP) {
-  sig_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                                  pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "sig")
-  if (length(sig_sets) >= 2) {
-    plot_deg_upset_pdf(sig_sets, filename = "./3-Visualization/DEG_overlap_upset.pdf",
-                       title = paste("DEG Overlaps -", DEFAULT_THRESHOLD), width = 14, height = 8)
-    plot_deg_overlap_heatmap_pdf(sig_sets, filename = "./3-Visualization/DEG_overlap_jaccard_heatmap.pdf",
-                                 title = paste("DEG Set Overlap (Jaccard) -", DEFAULT_THRESHOLD))
-    common_genes <- extract_intersection_genes(sig_sets, mode = "all")
-    write.csv(data.frame(gene = common_genes), "./3-Visualization/DEG_overlap_common_genes.csv", row.names = FALSE)
-  }
-  up_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                                 pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "up")
-  down_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                                   pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "down")
-  if (length(up_sets) >= 2) plot_deg_upset_pdf(up_sets, filename = "./3-Visualization/DEG_UP_overlap_upset.pdf", title = "UP DEG Overlaps")
-  if (length(down_sets) >= 2) plot_deg_upset_pdf(down_sets, filename = "./3-Visualization/DEG_DOWN_overlap_upset.pdf", title = "DOWN DEG Overlaps")
+  # Overlap figures are diagnostic; a single failure must not abort the whole run
+  # (and skip Analysis_summary.txt) after the expensive DEG/GSEA/GSVA steps.
+  tryCatch({
+    sig_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
+                                    pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "sig")
+    if (length(sig_sets) >= 2) {
+      plot_deg_upset_pdf(sig_sets, filename = "./3-Visualization/DEG_overlap_upset.pdf",
+                         title = paste("DEG Overlaps -", DEFAULT_THRESHOLD), width = 14, height = 8)
+      plot_deg_overlap_heatmap_pdf(sig_sets, filename = "./3-Visualization/DEG_overlap_jaccard_heatmap.pdf",
+                                   title = paste("DEG Set Overlap (Jaccard) -", DEFAULT_THRESHOLD))
+      common_genes <- extract_intersection_genes(sig_sets, mode = "all")
+      write.csv(data.frame(gene = common_genes), "./3-Visualization/DEG_overlap_common_genes.csv", row.names = FALSE)
+    }
+    up_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
+                                   pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "up")
+    down_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
+                                     pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "down")
+    if (length(up_sets) >= 2) plot_deg_upset_pdf(up_sets, filename = "./3-Visualization/DEG_UP_overlap_upset.pdf", title = "UP DEG Overlaps")
+    if (length(down_sets) >= 2) plot_deg_upset_pdf(down_sets, filename = "./3-Visualization/DEG_DOWN_overlap_upset.pdf", title = "DOWN DEG Overlaps")
+  }, error = function(e) message("Skipping DEG overlap figures: ", conditionMessage(e)))
 }
 
 # =============================================================================

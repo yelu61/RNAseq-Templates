@@ -77,3 +77,20 @@ test_that("ranked_gene_list returns sorted named vector", {
   expect_equal(names(rnk), c("A", "C", "B"))
   expect_equal(unname(rnk), c(3, 2, 1))
 })
+
+test_that("plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure", {
+  testthat::skip_if_not_installed("UpSetR")
+  # Regression: UpSetR::upset() returns a grid object that is only auto-printed at
+  # the top level; inside the save closure it must be print()ed or the device stays
+  # blank and .promote_validated_figure() refuses the <1500-byte PDF.
+  sets <- list(
+    S1 = c("g1", "g2", "g3", "g9"),
+    S2 = c("g2", "g3", "g4"),
+    S3 = c("g3", "g5", "g6")
+  )
+  outfile <- file.path(tempdir(), "test_deg_upset.pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  expect_invisible(plot_deg_upset_pdf(sets, outfile, title = "test"))
+  expect_true(file.exists(outfile))
+  expect_gt(file.info(outfile)$size, 1500)
+})

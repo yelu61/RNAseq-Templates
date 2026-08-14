@@ -77,6 +77,50 @@ test_that("prepare_tme_expression mouse path attempts conversion", {
   }
 })
 
+test_that("convert_mouse_symbols_to_human uses ortholog_cache offline", {
+  # Pre-populate a cache covering every input gene so no network is touched.
+  # If the function tried biomaRt here it would error in a network-less test
+  # env, so a successful return proves the cache path is honoured.
+  cache <- file.path(tempdir(), "orthologs_test.rds")
+  on.exit(unlink(cache), add = TRUE)
+  saveRDS(list(
+    mapping = data.frame(
+      mgi_symbol  = c("ACTB", "GAPDH", "CD274"),
+      hgnc_symbol = c("ACTB", "GAPDH", "CD274"),
+      stringsAsFactors = FALSE
+    ),
+    queried = c("ACTB", "GAPDH", "CD274")
+  ), cache)
+
+  mat <- matrix(
+    c(10, 5, 8, 4, 6, 9),
+    nrow = 3,
+    dimnames = list(c("Actb", "Gapdh", "Cd274"), c("S1", "S2"))
+  )
+  out <- convert_mouse_symbols_to_human(mat, ortholog_cache = cache, verbose = FALSE)
+  expect_equal(sort(rownames(out)), c("ACTB", "CD274", "GAPDH"))
+  expect_equal(as.numeric(out["CD274", ]), as.numeric(mat["Cd274", ]))
+})
+
+test_that("convert_mouse_symbols_to_human cache ignores unmapped-but-queried genes", {
+  # A gene that was queried before but has no ortholog must not be re-queried:
+  # it lives in `queried` but not `mapping`, and is simply dropped.
+  cache <- file.path(tempdir(), "orthologs_test2.rds")
+  on.exit(unlink(cache), add = TRUE)
+  saveRDS(list(
+    mapping = data.frame(mgi_symbol = "ACTB", hgnc_symbol = "ACTB", stringsAsFactors = FALSE),
+    queried = c("ACTB", "NOORTHOLOG")
+  ), cache)
+
+  mat <- matrix(
+    c(10, 5, 8, 4),
+    nrow = 2,
+    dimnames = list(c("Actb", "Noortholog"), c("S1", "S2"))
+  )
+  out <- convert_mouse_symbols_to_human(mat, ortholog_cache = cache, verbose = FALSE)
+  expect_equal(rownames(out), "ACTB")
+})
+
 test_that("prepare_tme_expression rejects invalid species", {
   mat <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
   expect_error(prepare_tme_expression(mat, species = "rat"), "'arg' should be one of")

@@ -334,3 +334,26 @@ test_that("validate_expression_contract enforces method input units", {
                    dimnames = list(c("A", "B"), c("S1", "S2")))
   expect_error(validate_expression_contract(counts, expected = "vst"), "raw counts")
 })
+
+test_that("collapse_by_symbol keeps the max-count row and carries annotation", {
+  mat <- matrix(c(1, 1, 1,   10, 20, 30,   2, 2, 2,   5, 5, 5), nrow = 4, byrow = TRUE,
+                dimnames = list(NULL, c("S1", "S2", "S3")))
+  sym <- c("A", "B", "A", "C")          # A duplicated; B has highest total
+  len <- c(100, 2000, 150, 500)
+  cc <- collapse_by_symbol(sym, mat, extra = len)
+  expect_equal(cc$gene_name, c("B", "C", "A"))   # ordered by total signal desc
+  # for duplicated symbol A, the retained row is the one with higher rowSum (row 3: 6 > 3)
+  expect_equal(as.numeric(cc$counts[cc$gene_name == "A", ]), c(2, 2, 2))
+  expect_equal(cc$extra[cc$gene_name == "A"], 150)  # length carried from the retained A row
+  expect_equal(cc$extra[cc$gene_name == "B"], 2000)
+  expect_equal(cc$n_in, 4); expect_equal(cc$n_out, 3)
+})
+
+test_that("collapse_by_symbol drops NA/empty symbols and works without extra", {
+  mat <- matrix(c(1, 2, 3, 4), nrow = 4, ncol = 1)
+  sym <- c("A", NA, "", "B")
+  cc <- collapse_by_symbol(sym, mat)
+  expect_equal(sort(cc$gene_name), c("A", "B"))
+  expect_null(cc$extra)
+  expect_equal(cc$n_out, 2)
+})

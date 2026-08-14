@@ -150,6 +150,8 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Convert raw counts to FPKM.
 - `extract_gene_lengths(raw_annot, id_col, length_col, start_col, end_col, length_unit)`
   Extract gene lengths in kb from annotation columns.
+- `collapse_by_symbol(symbols, mat, extra)`
+  Collapse a count/expression matrix to unique symbols, keeping the highest-total-signal row per symbol; optionally carries a per-row annotation (e.g. gene length) through to the retained row for TPM/TME-ready tables.
 - `validate_count_matrix(mat, require_integer, require_non_negative, min_samples)`
   Validate numeric, non-negative, optionally integer count matrix.
 - `detect_gene_id_type(ids)`
@@ -289,10 +291,13 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Validate expression matrix: numeric, non-negative, rownames present; warn on Ensembl IDs.
 - `deduplicate_expression_by_symbol(expr, symbol_col)`
   Deduplicate rows by gene symbol, keeping the row with highest mean expression.
-- `convert_mouse_symbols_to_human(expr, mouse_attr, human_attr, host, verbose)`
-  Convert mouse MGI symbols to human HGNC symbols via `biomaRt::getLDS`.
-- `prepare_tme_expression(expr, is_log, species, log_base, verbose)`
-  One-stop preparation: undo log + optional mouse-to-human conversion.
+- `convert_mouse_symbols_to_human(expr, mouse_attr, human_attr, host, fallback_hosts, ortholog_cache, verbose)`
+  Convert mouse MGI symbols to human HGNC symbols via `biomaRt::getLDS`. Tries
+  `host` then `fallback_hosts`; with `ortholog_cache` (`.rds` path) the mapping is
+  cached so repeat runs are offline-deterministic (only uncached genes hit network).
+- `prepare_tme_expression(expr, is_log, species, log_base, ortholog_cache, host, fallback_hosts, verbose)`
+  One-stop preparation: undo log + optional mouse-to-human conversion. Set
+  `ortholog_cache` for offline-deterministic repeat runs of mouse data.
 - `calc_tme_barplot_size(n_samples, ...)` / `calc_tme_boxplot_size(n_celltypes, ...)`
   Automatic figure-size calculation based on sample/cell-type counts.
 - `read_cibersort_signature(signature_file)`

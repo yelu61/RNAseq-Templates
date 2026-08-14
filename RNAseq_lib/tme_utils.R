@@ -101,67 +101,107 @@ deduplicate_expression_by_symbol <- function(expr, symbol_col = NULL) {
   expr
 }
 
-# Convert a mouse gene-symbol expression matrix to human orthologs using biomaRt.
-# The input should have MGI symbols as rownames. Output has HGNC symbols as rownames.
-convert_mouse_symbols_to_human <- function(expr,
-                                           mouse_attr = "mgi_symbol",
-                                           human_attr = "hgnc_symbol",
-                                           host = "https://dec2021.archive.ensembl.org/",
-                                           verbose = TRUE) {
+# Query mouse->human orthologs for the given (already upper-case) MGI symbols,
+# trying `host` then each of `fallback_hosts` in turn. Returns the raw
+# biomaRt::getLDS result. Errors only when every host fails, so a pinned archive
+# host being offline does not by itself break the run.
+.tme_fetch_orthologs_online <- function(symbols, mouse_attr, human_attr, host, fallback_hosts) {
   if (!requireNamespace("biomaRt", quietly = TRUE)) {
     stop("Package 'biomaRt' is required for mouse-to-human conversion.\n",
          "Run: BiocManager::install('biomaRt')")
   }
+  hosts <- unique(c(host, fallback_hosts))
+  last_err <- NULL
+  for (h in hosts) {
+    lds <- tryCatch({
+      human <- biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl", host = h)
+      mouse <- biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl", host = h)
+      biomaRt::getLDS(
+        attributes  = mouse_attr,
+        filters     = mouse_attr,
+        mart        = mouse,
+        values      = symbols,
+        attributesL = human_attr,
+        martL       = human,
+        uniqueRows  = TRUE
+      )
+    }, error = function(e) { last_err <<- e; NULL })
+    if (!is.null(lds)) {
+      if (h != host) message("Mouse-to-human orthologs retrieved via fallback host: ", h)
+      return(lds)
+    }
+  }
+  stop("Failed to retrieve mouse-human orthologs from all Ensembl hosts (",
+       paste(hosts, collapse = ", "), "). Last error: ",
+       if (is.null(last_err)) "unknown" else conditionMessage(last_err),
+       "\nSupply `ortholog_cache` covering these genes for an offline-deterministic run.")
+}
 
+# Convert a mouse gene-symbol expression matrix to human orthologs using biomaRt.
+# The input should have MGI symbols as rownames. Output has HGNC symbols as rownames.
+#
+# Reproducibility: the pinned archive `host` avoids dataset version drift but can
+# be unreachable; `fallback_hosts` are tried in order before giving up. Pass
+# `ortholog_cache` (an .rds path) to cache the mapping so repeat runs are
+# offline-deterministic — only genes absent from the cache trigger a network
+# query, and newly mapped genes are written back for reuse.
+convert_mouse_symbols_to_human <- function(expr,
+                                           mouse_attr = "mgi_symbol",
+                                           human_attr = "hgnc_symbol",
+                                           host = "https://dec2021.archive.ensembl.org/",
+                                           fallback_hosts = c("https://www.ensembl.org/",
+                                                              "https://useast.ensembl.org/",
+                                                              "https://asia.ensembl.org/"),
+                                           ortholog_cache = NULL,
+                                           verbose = TRUE) {
   expr <- as.data.frame(expr, check.names = FALSE)
   validate_tme_input(expr)
 
   mouse_symbols <- rownames(expr)
   mouse_symbols <- mouse_symbols[mouse_symbols != "" & !is.na(mouse_symbols)]
 
-  # Connect to Ensembl marts. Archive host avoids dataset version drift.
-  human <- tryCatch(
-    biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl", host = host),
-    error = function(e) stop("Failed to connect to human Ensembl mart: ", conditionMessage(e))
-  )
-  mouse <- tryCatch(
-    biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl", host = host),
-    error = function(e) stop("Failed to connect to mouse Ensembl mart: ", conditionMessage(e))
-  )
-
-  lds <- tryCatch(
-    biomaRt::getLDS(
-      attributes  = mouse_attr,
-      filters     = mouse_attr,
-      mart        = mouse,
-      values      = mouse_symbols,
-      attributesL = human_attr,
-      martL       = human,
-      uniqueRows  = TRUE
-    ),
-    error = function(e) stop("biomaRt::getLDS failed: ", conditionMessage(e))
-  )
-
-  if (nrow(lds) == 0) {
-    stop("No mouse-to-human ortholog mappings were found. Check that rownames are MGI gene symbols.")
+  # Load any cached mapping (upper-case MGI -> HGNC) plus the set of symbols
+  # already queried (so genes with no ortholog are not re-queried every run).
+  mapping <- data.frame(mgi_symbol = character(0), hgnc_symbol = character(0),
+                        stringsAsFactors = FALSE)
+  queried <- character(0)
+  if (!is.null(ortholog_cache) && file.exists(ortholog_cache)) {
+    oc <- readRDS(ortholog_cache)
+    if (is.list(oc) && all(c("mapping", "queried") %in% names(oc))) {
+      mapping <- oc$mapping
+      queried <- oc$queried
+      if (verbose) message("Loaded ", nrow(mapping), " cached mouse-human orthologs from ", ortholog_cache)
+    }
   }
 
-  mgi_col <- grep("^MGI\\.symbol$|^mgi_symbol$", colnames(lds), value = TRUE)[1]
-  hgnc_col <- grep("^HGNC\\.symbol$|^hgnc_symbol$", colnames(lds), value = TRUE)[1]
-  if (is.na(mgi_col) || is.na(hgnc_col)) {
-    stop("Unexpected columns returned by biomaRt::getLDS: ", paste(colnames(lds), collapse = ", "))
+  # Only genes not already in the cache need the network.
+  need <- setdiff(toupper(mouse_symbols), queried)
+  if (length(need) > 0) {
+    lds <- .tme_fetch_orthologs_online(need, mouse_attr, human_attr, host, fallback_hosts)
+    if (nrow(lds) > 0) {
+      mgi_col <- grep("^MGI\\.symbol$|^mgi_symbol$", colnames(lds), value = TRUE)[1]
+      hgnc_col <- grep("^HGNC\\.symbol$|^hgnc_symbol$", colnames(lds), value = TRUE)[1]
+      if (is.na(mgi_col) || is.na(hgnc_col)) {
+        stop("Unexpected columns returned by biomaRt::getLDS: ", paste(colnames(lds), collapse = ", "))
+      }
+      fresh <- data.frame(
+        mgi_symbol = toupper(as.character(lds[[mgi_col]])),
+        hgnc_symbol = as.character(lds[[hgnc_col]]),
+        stringsAsFactors = FALSE
+      )
+      fresh <- fresh[fresh$hgnc_symbol != "" & !is.na(fresh$hgnc_symbol), ]
+      mapping <- unique(rbind(mapping, fresh))
+    }
+    queried <- union(queried, need)
+    if (!is.null(ortholog_cache)) {
+      dir.create(dirname(ortholog_cache), showWarnings = FALSE, recursive = TRUE)
+      saveRDS(list(mapping = mapping, queried = queried), ortholog_cache)
+      if (verbose) message("Cached mouse-human orthologs -> ", ortholog_cache)
+    }
   }
-
-  # Build a clean mapping table
-  mapping <- data.frame(
-    mgi_symbol = toupper(as.character(lds[[mgi_col]])),
-    hgnc_symbol = as.character(lds[[hgnc_col]]),
-    stringsAsFactors = FALSE
-  )
-  mapping <- mapping[mapping$hgnc_symbol != "" & !is.na(mapping$hgnc_symbol), ]
 
   if (nrow(mapping) == 0) {
-    stop("All mouse-to-human mappings returned empty HGNC symbols.")
+    stop("No mouse-to-human ortholog mappings were found. Check that rownames are MGI gene symbols.")
   }
 
   # Work with upper-case MGI symbols for matching
@@ -190,7 +230,7 @@ convert_mouse_symbols_to_human <- function(expr,
       " input genes = ", length(mouse_symbols),
       "; mapped to human = ", nrow(mapping),
       "; unique HGNC genes after dedup = ", nrow(expr_human),
-      "; unmapped = ", length(setdiff(mouse_symbols, mapping$mgi_symbol))
+      "; unmapped = ", length(setdiff(toupper(mouse_symbols), mapping$mgi_symbol))
     )
   }
 
@@ -200,10 +240,18 @@ convert_mouse_symbols_to_human <- function(expr,
 # One-stop preparation for TME deconvolution.
 # - Reverses log transformation if requested.
 # - If species == "mouse", converts MGI symbols to HGNC symbols via biomaRt.
+# `ortholog_cache` / `host` / `fallback_hosts` are forwarded to
+# convert_mouse_symbols_to_human(); set `ortholog_cache` for offline-deterministic
+# repeat runs of mouse data.
 prepare_tme_expression <- function(expr,
                                    is_log = FALSE,
                                    species = c("human", "mouse"),
                                    log_base = 2,
+                                   ortholog_cache = NULL,
+                                   host = "https://dec2021.archive.ensembl.org/",
+                                   fallback_hosts = c("https://www.ensembl.org/",
+                                                      "https://useast.ensembl.org/",
+                                                      "https://asia.ensembl.org/"),
                                    verbose = TRUE) {
   species <- match.arg(species)
   expr <- as.data.frame(expr, check.names = FALSE)
@@ -216,7 +264,8 @@ prepare_tme_expression <- function(expr,
 
   if (species == "mouse") {
     if (verbose) message("Converting mouse expression matrix to human orthologs for TME deconvolution...")
-    expr <- convert_mouse_symbols_to_human(expr, verbose = verbose)
+    expr <- convert_mouse_symbols_to_human(expr, host = host, fallback_hosts = fallback_hosts,
+                                           ortholog_cache = ortholog_cache, verbose = verbose)
   } else {
     if (verbose) message("Using human expression matrix for TME deconvolution.")
     expr <- deduplicate_expression_by_symbol(expr)
