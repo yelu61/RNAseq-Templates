@@ -63,11 +63,16 @@ run_kegg_ora <- function(symbols, org_db, universe, organism, p_cutoff = 0.05, m
   })
 }
 
-run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05) {
+# clusterProfiler gseGO/gseKEGG use adaptive fgsea permutation (no exposed seed
+# arg as of 4.20), so NES/pvalue/p.adjust jitter run-to-run. Seeding immediately
+# before the call makes the permutation reproducible. `seed` defaults to a fixed
+# value so every existing caller becomes reproducible without modification.
+run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05, seed = 123) {
   if (length(entrez_list) < min_size) {
     message("GO GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
     return(NULL)
   }
+  if (!is.null(seed)) set.seed(seed)
   tryCatch(clusterProfiler::gseGO(
     geneList = entrez_list,
     OrgDb = org_db,
@@ -83,11 +88,12 @@ run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_siz
   })
 }
 
-run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, p_cutoff = 0.05) {
+run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, p_cutoff = 0.05, seed = 123) {
   if (length(entrez_list) < min_size) {
     message("KEGG GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
     return(NULL)
   }
+  if (!is.null(seed)) set.seed(seed)
   tryCatch(clusterProfiler::gseKEGG(
     geneList = entrez_list,
     organism = organism,

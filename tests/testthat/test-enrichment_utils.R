@@ -58,3 +58,26 @@ test_that("build_multi_comparison_enrich_df applies ontology filter", {
   expect_equal(nrow(out), 1)
   expect_equal(out$ID, "GO:001")
 })
+
+test_that("run_go_gsea is reproducible with a fixed seed", {
+  skip_if_not_installed("clusterProfiler")
+  skip_if_not_installed("org.Hs.eg.db")
+  skip_if_not_installed("AnnotationDbi")
+
+  # Fixed ranked ENTREZ list; the function's internal seed governs permutation.
+  set.seed(42)
+  ids <- AnnotationDbi::keys(org.Hs.eg.db::org.Hs.eg.db, keytype = "ENTREZID")
+  ids <- sample(ids, 2000)
+  ranked <- sort(stats::setNames(stats::rnorm(length(ids)), ids), decreasing = TRUE)
+
+  r1 <- run_go_gsea(ranked, org_db = org.Hs.eg.db::org.Hs.eg.db, ont = "BP", p_cutoff = 0.05)
+  r2 <- run_go_gsea(ranked, org_db = org.Hs.eg.db::org.Hs.eg.db, ont = "BP", p_cutoff = 0.05)
+  skip_if(is.null(r1) || is.null(r2), "gseGO unavailable in this environment")
+  expect_identical(as.data.frame(r1), as.data.frame(r2))
+})
+
+test_that("run_go_gsea returns NULL for a too-short ranked list", {
+  skip_if_not_installed("clusterProfiler")
+  out <- run_go_gsea(c("1" = 1, "2" = 2), org_db = NULL, min_size = 10)
+  expect_null(out)
+})

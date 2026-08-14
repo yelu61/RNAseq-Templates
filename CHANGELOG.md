@@ -2,6 +2,21 @@
 
 All notable changes to RNAseq-Templates are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **GSEA run-to-run jitter (`enrichment_utils.R`)**: `run_go_gsea()` and
+  `run_kegg_gsea()` wrap `clusterProfiler::gseGO()`/`gseKEGG()`, which use
+  adaptive fgsea permutation with no exposed seed argument (clusterProfiler
+  4.20), so NES/pvalue/p.adjust jittered between otherwise-identical runs and
+  two runs of the same config could look spuriously different. Both helpers now
+  take a `seed` argument (default `123`) and call `set.seed(seed)` immediately
+  before the permutation, making GSEA output bit-reproducible across the
+  General, Limma_Voom and TCGA_GEO runners without any runner change. Pass
+  `seed = NULL` to restore stochastic behaviour. New regression test asserts
+  two calls with the default seed return identical result frames.
+
 ## [0.9.0] - 2026-07-27
 
 Reliability and CI hardening release. The headline: the GitHub Actions smoke
