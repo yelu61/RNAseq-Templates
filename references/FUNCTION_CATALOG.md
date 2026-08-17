@@ -399,7 +399,7 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 ## `report_utils.R` — unified HTML report
 
 - `render_analysis_report(outdir, report_file, template, params)`
-  Render `reports/analysis_report.qmd` into a single self-contained HTML report from the saved DEG/ORA/GSEA/QC outputs (no re-analysis). A `.qmd` requires Quarto; `rmarkdown` is used only when an `.Rmd` template is supplied explicitly.
+  Render `reports/analysis_report.qmd` into a single self-contained HTML report from the saved DEG/ORA/GSEA/QC outputs (no re-analysis). A `.qmd` uses Quarto when available; otherwise it automatically falls back to the sibling `reports/analysis_report.Rmd` twin via `rmarkdown` (same body, rmarkdown YAML).
 - `list_report_figures(dir, pattern, base)`
   List PDF figures under a directory as portable relative paths.
 - `read_csv_safe(path, ...)`

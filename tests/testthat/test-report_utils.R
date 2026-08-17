@@ -71,3 +71,36 @@ test_that("claim-evidence ledger requires calibrated levels and provenance", {
   ledger$claim_level <- "mechanism_proved"
   expect_error(validate_claim_evidence_ledger(ledger), "unsupported evidence levels")
 })
+
+test_that("rmarkdown twin of the .qmd report template exists and does not drift", {
+  repo <- tryCatch(rprojroot::find_root(rprojroot::is_git_root), error = function(e) getwd())
+  qmd <- file.path(repo, "reports", "analysis_report.qmd")
+  rmd <- file.path(repo, "reports", "analysis_report.Rmd")
+  expect_true(file.exists(qmd))
+  expect_true(file.exists(rmd))
+  strip_yaml <- function(path) {
+    lines <- readLines(path, warn = FALSE)
+    stopifnot(lines[1] == "---")
+    lines[-seq_len(which(lines == "---")[2])]
+  }
+  # Bodies must stay identical; only the YAML front matter differs by design.
+  expect_identical(strip_yaml(rmd), strip_yaml(qmd))
+})
+
+test_that("render_analysis_report falls back to the .Rmd twin without Quarto", {
+  skip_if(requireNamespace("quarto", quietly = TRUE) && nzchar(Sys.which("quarto")),
+          "Quarto available: fallback path not exercised")
+  skip_if_not(requireNamespace("rmarkdown", quietly = TRUE), "rmarkdown not installed")
+  skip_if_not(rmarkdown::pandoc_available(), "pandoc not available")
+  outdir <- tempfile()
+  dir.create(outdir)
+  for (d in c("1-DEG", "2-GSEA", "3-Visualization")) dir.create(file.path(outdir, d))
+  report <- file.path(outdir, "RNAseq_report.html")
+  expect_message(
+    render_analysis_report(outdir = outdir, report_file = report),
+    "rmarkdown twin"
+  )
+  expect_true(file.exists(report))
+  expect_gt(file.info(report)$size, 10000)
+  unlink(outdir, recursive = TRUE)
+})

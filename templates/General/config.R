@@ -104,6 +104,10 @@ RUN_TME_IOBR     <- TRUE          # IOBR multi-algorithm deconvolution
 TME_IOBR_METHODS <- c("estimate", "cibersort", "epic", "xcell")
 TME_IOBR_PERM    <- 1000
 RUN_TME_SSGSEA   <- TRUE          # ssGSEA over 28 built-in immune signatures
+# Mouse->human ortholog mapping cache (.rds path). The first run queries biomaRt
+# online and writes the mapping here; later runs are offline-deterministic.
+# NULL = always query online (old behaviour).
+TME_ORTHOLOG_CACHE <- NULL        # e.g. file.path(PROJECT_ROOT, "data/processed/mouse_human_orthologs.rds")
 
 # ---- 1.10 Excel export --------------------------------------------------------
 EXPORT_EXCEL <- TRUE              # write multi-threshold DEG table to 1-DEG/DEG_results.xlsx

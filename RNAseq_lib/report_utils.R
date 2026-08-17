@@ -44,6 +44,18 @@ render_analysis_report <- function(outdir = ".",
 
   template_ext <- tolower(tools::file_ext(template))
   quarto_available <- requireNamespace("quarto", quietly = TRUE) && nzchar(Sys.which("quarto"))
+  if (!quarto_available && template_ext == "qmd" && requireNamespace("rmarkdown", quietly = TRUE)) {
+    # Out-of-the-box fallback: a sibling .Rmd twin of the .qmd template renders
+    # via rmarkdown when the Quarto CLI is not installed (the common case on
+    # fresh machines; surfaced by three real projects that silently skipped the
+    # report). The twin must carry the same body with rmarkdown YAML.
+    sibling <- sub("[.]qmd$", ".Rmd", template, ignore.case = TRUE)
+    if (file.exists(sibling)) {
+      message("Quarto CLI not found; rendering rmarkdown twin instead: ", sibling)
+      template <- sibling
+      template_ext <- "rmd"
+    }
+  }
   if (quarto_available) {
     quarto::quarto_render(
       input = template,
@@ -67,8 +79,8 @@ render_analysis_report <- function(outdir = ".",
       quiet = TRUE
     )
   } else if (template_ext == "qmd") {
-    stop("The selected .qmd report requires the Quarto CLI and R 'quarto' package. ",
-         "Install Quarto or supply an .Rmd template explicitly.")
+    stop("The selected .qmd report requires the Quarto CLI and R 'quarto' package, ",
+         "or an .Rmd twin next to the template plus the 'rmarkdown' package.")
   } else {
     stop("HTML report requires the Quarto CLI, or rmarkdown for an .Rmd template.")
   }

@@ -96,7 +96,7 @@ This guide lists common issues and how to fix them.
 
 ### Q: HTML report is skipped
 
-- Report generation needs the **quarto** CLI (https://quarto.org) plus the R `quarto` package, or the **rmarkdown** package. If neither is present the notebook prints a message and continues.
+- Report generation prefers the **quarto** CLI (https://quarto.org) plus the R `quarto` package. Without Quarto it automatically falls back to **rmarkdown** rendering the bundled `reports/analysis_report.Rmd` twin, so the report works out of the box. Only if neither renderer is installed does the notebook print a message and continue.
 - The report only assembles already-saved CSV/PDF outputs, so re-running just the report cell after installing quarto/rmarkdown is enough.
 
 ## TCGA / GEO

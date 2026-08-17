@@ -6,6 +6,35 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Added
 
+- **`TME_ORTHOLOG_CACHE` runner option (`templates/General/`)**: the General
+  runner's TME block now passes `ortholog_cache = TME_ORTHOLOG_CACHE` through to
+  `prepare_tme_expression()`, exposing the offline-deterministic ortholog cache
+  (see below) to config-driven production runs. `config.R` documents the option
+  (default `NULL` = always online, the old behaviour); the runner defaults it
+  defensively for configs written before the option existed, and the config
+  snapshot records it. Backfilled from 202603AK112, where the cache had only
+  existed in project-local notebooks.
+- **rmarkdown fallback for the HTML report (`report_utils.R`,
+  `reports/analysis_report.Rmd`)**: `render_analysis_report()` previously
+  required the Quarto CLI for the default `.qmd` template, so on machines
+  without Quarto `GENERATE_HTML_REPORT <- TRUE` silently produced no report —
+  observed in all three real-template projects (202507LPJ, 202607XXR_RPE,
+  202603AK112). The repo now ships an `.Rmd` twin of
+  `reports/analysis_report.qmd` (identical body, rmarkdown YAML); when Quarto
+  is unavailable but `rmarkdown` is, the helper automatically renders the twin
+  instead of stopping. Regression tests pin the twin body to the `.qmd` (drift
+  guard) and exercise the fallback render end-to-end when Quarto is absent.
+
+### Fixed
+
+- **`4-TME/` missing from run summaries (`templates/General/run_analysis.R`)**:
+  with `RUN_TME <- TRUE` the runner wrote a full `4-TME/` deconvolution bundle
+  but neither `Analysis_summary.txt` ("3. Output Files") nor the final
+  `Outputs:` log line listed it — surfaced by the 202603AK112 three-model runs.
+  Both now include `4-TME/` when `RUN_TME` is on.
+
+### Added (continued)
+
 - **Offline-deterministic mouse→human ortholog conversion (`tme_utils.R`)**:
   `convert_mouse_symbols_to_human()` gains `fallback_hosts` and `ortholog_cache`,
   and `prepare_tme_expression()` forwards both. The pinned archive host

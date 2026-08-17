@@ -30,7 +30,7 @@
 | `RUN_TF_ANALYSIS` | logical | `FALSE` | 是否运行 DoRothEA/VIPER TF 活性分析 |
 | `RUN_COMPARECLUSTER` | logical | `TRUE` | 是否运行 compareCluster（≥3 组才有效） |
 | `EXPORT_EXCEL` | logical | `TRUE` | 是否输出 `1-DEG/DEG_results.xlsx` |
-| `GENERATE_HTML_REPORT` | logical | `TRUE` | 是否渲染统一 HTML 报告 `RNAseq_report.html`（需 quarto CLI 或 rmarkdown） |
+| `GENERATE_HTML_REPORT` | logical | `TRUE` | 是否渲染统一 HTML 报告 `RNAseq_report.html`（无 quarto CLI 时自动回退 rmarkdown 渲染 `.Rmd` 双胞胎模板） |
 | `REPORT_TITLE` | character | `"RNA-seq Analysis Report"` | HTML 报告标题 |
 
 ## `RNAseq_limma_voom_Template.ipynb`

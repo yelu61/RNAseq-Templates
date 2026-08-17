@@ -104,6 +104,7 @@ suppressPackageStartupMessages({
 # helpers only when requested so a base run does not require IOBR/estimate.
 if (isTRUE(RUN_TME)) {
   source(file.path(lib_dir, "tme_utils.R"))
+  if (!exists("TME_ORTHOLOG_CACHE")) TME_ORTHOLOG_CACHE <- NULL  # configs predating this option
   if (isTRUE(RUN_TME_IOBR) && !requireNamespace("IOBR", quietly = TRUE)) {
     message("RUN_TME_IOBR is TRUE but the 'IOBR' package is not installed; skipping IOBR deconvolution.")
     RUN_TME_IOBR <- FALSE
@@ -140,7 +141,7 @@ config_objects <- c(
   "COMPARECLUSTER_ONTOLOGY", "EXPORT_EXCEL", "GENERATE_HTML_REPORT",
   "RUN_TME", "TME_GENE_LENGTH_COLUMN", "TME_GENE_LENGTH_UNIT", "TME_GENE_START_COL",
   "TME_GENE_END_COL", "RUN_TME_ESTIMATE", "RUN_TME_IOBR", "TME_IOBR_METHODS",
-  "TME_IOBR_PERM", "RUN_TME_SSGSEA"
+  "TME_IOBR_PERM", "RUN_TME_SSGSEA", "TME_ORTHOLOG_CACHE"
 )
 config_lines <- c(
   "# RNAseq_General analysis configuration snapshot",
@@ -667,8 +668,10 @@ if (isTRUE(RUN_TME)) {
             file.path(tme_outdir, "TPM_matrix.csv"), row.names = FALSE)
 
   # Prepare (dedup; mouse->human ortholog conversion when SPECIES == "mouse").
+  # ortholog_cache makes repeat runs offline-deterministic (NULL = always online).
   expr_tme <- prepare_tme_expression(as.data.frame(expr_tpm, check.names = FALSE),
-                                     is_log = FALSE, species = SPECIES, verbose = TRUE)
+                                     is_log = FALSE, species = SPECIES,
+                                     ortholog_cache = TME_ORTHOLOG_CACHE, verbose = TRUE)
   validate_tme_input(expr_tme)
 
   tme_meta <- data.frame(sample = colnames(countData),
@@ -872,8 +875,12 @@ summary_report <- paste0(summary_report, "\n3. Output Files\n",
                          "   - ./2-GSEA/ (ORA/GSEA/GSVA/TF results)\n",
                          "   - ./3-Visualization/GSEA/ (overview, running curves, theme maps)\n",
                          "   - ./3-Visualization/SingleGene/ (single-gene expression plots)\n",
-                         "   - ./3-Visualization/ (QC, DEG, ORA and other PDF figures)\n",
-                         "\n========================================\n")
+                         "   - ./3-Visualization/ (QC, DEG, ORA and other PDF figures)\n")
+if (isTRUE(RUN_TME)) {
+  summary_report <- paste0(summary_report,
+                           "   - ./4-TME/ (TPM matrix, ESTIMATE/IOBR/ssGSEA deconvolution)\n")
+}
+summary_report <- paste0(summary_report, "\n========================================\n")
 cat(summary_report)
 writeLines(summary_report, "./Analysis_summary.txt")
 writeLines(capture.output(sessionInfo()), "./sessionInfo.txt")
@@ -898,6 +905,8 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
 
 cat("\n========================================\n")
 cat("RNAseq_General analysis COMPLETE.\n")
-cat("Outputs: 1-DEG/  2-GSEA/  3-Visualization/  Analysis_summary.txt")
+cat("Outputs: 1-DEG/  2-GSEA/  3-Visualization/")
+if (isTRUE(RUN_TME)) cat("  4-TME/")
+cat("  Analysis_summary.txt")
 if (isTRUE(GENERATE_HTML_REPORT)) cat("  RNAseq_report.html")
 cat("\n========================================\n")
