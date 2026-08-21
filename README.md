@@ -1,7 +1,7 @@
 # RNAseq-Templates
 
 ![Smoke Test](https://github.com/yelu61/RNAseq-Templates/actions/workflows/smoke-test.yml/badge.svg)
-![Version](https://img.shields.io/badge/version-0.9.0-blue)
+![Version](https://img.shields.io/badge/version-0.10.0-blue)
 
 Notebook-first bulk RNA-seq **downstream** analysis templates, backed by a lightweight shared R helper library (`RNAseq_lib/`).
 
@@ -153,6 +153,10 @@ All six `demo_RNAseq_*` demos are exercised by the CI smoke test on every push.
 </details>
 
 ## Recommended Usage
+
+> Running a real project end-to-end? Follow the ordered lifecycle in
+> [BEST_PRACTICES.md](BEST_PRACTICES.md); the options below are the individual
+> execution entry points.
 
 ### Option A — command line (reproducible / batch)
 
@@ -359,6 +363,7 @@ For low-DEG projects, append a clearly labelled exploratory row such as `name = 
 
 ## Documentation
 
+- [BEST_PRACTICES.md](BEST_PRACTICES.md): the canonical end-to-end project lifecycle (configure → run → register → report → publish → curate) and the definition of done.
 - [GETTING_STARTED.md](GETTING_STARTED.md): zero-programming-experience guide (Chinese).
 - [references/PARAMETER_REFERENCE.md](references/PARAMETER_REFERENCE.md): glossary of all notebook parameters.
 - [references/FUNCTION_CATALOG.md](references/FUNCTION_CATALOG.md): index of `RNAseq_lib` helpers.
