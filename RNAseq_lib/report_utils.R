@@ -45,7 +45,10 @@ render_analysis_report <- function(outdir = ".",
     previous <- tryCatch(utils::read.csv(coverage_file, stringsAsFactors = FALSE,
                                          check.names = FALSE), error = function(e) NULL)
     if (!is.null(previous) && all(c("domain", "status") %in% colnames(previous))) {
-      overrides <- previous[previous$status %in% c("not_applicable", "omitted_with_reason"), , drop = FALSE]
+      decision_columns <- intersect(c("domain", "status", "report_location", "omission_reason"),
+                                    colnames(previous))
+      overrides <- previous[previous$status %in% c("not_applicable", "omitted_with_reason"),
+                            decision_columns, drop = FALSE]
     }
   }
   write_report_coverage_manifest(outdir, coverage_file, overrides = overrides)
@@ -190,7 +193,8 @@ build_report_coverage_manifest <- function(outdir = ".",
     for (i in seq_len(nrow(overrides))) {
       idx <- match(overrides$domain[[i]], manifest$domain)
       if (is.na(idx)) stop("Unknown report coverage domain: ", overrides$domain[[i]])
-      for (column in setdiff(intersect(colnames(overrides), colnames(manifest)), "domain")) {
+      editable <- c("status", "report_location", "omission_reason")
+      for (column in intersect(colnames(overrides), editable)) {
         manifest[idx, column] <- overrides[i, column]
       }
     }
@@ -312,6 +316,25 @@ validate_report_headline_values <- function(outdir = ".") {
   invisible(TRUE)
 }
 
+# Verify that the rendered HTML did not silently lose report figures. The
+# report template converts referenced PDFs to embedded PNG data URIs; any
+# conversion marker is therefore a hard asset failure for publication.
+validate_report_html_assets <- function(report_file, expect_figures = FALSE) {
+  if (!file.exists(report_file)) stop("Rendered HTML report not found: ", report_file)
+  html <- paste(readLines(report_file, warn = FALSE), collapse = "\n")
+  markers <- c("Figure not found:", "PDF preview unavailable", "PDF preview failed")
+  present <- markers[vapply(markers, grepl, logical(1), x = html, fixed = TRUE)]
+  if (length(present)) {
+    stop("Rendered HTML contains figure-asset failure markers: ", paste(present, collapse = ", "))
+  }
+  hits <- gregexpr("data:image/(png|jpeg);base64,", html, perl = TRUE)[[1]]
+  n_embedded <- if (identical(hits, -1L)) 0L else length(hits)
+  if (isTRUE(expect_figures) && n_embedded == 0L) {
+    stop("Run contains PDF figures but the HTML has no embedded figure previews.")
+  }
+  invisible(list(embedded_figures = n_embedded, passed = TRUE))
+}
+
 # Human scientific-review gate. Rendering is allowed while items are pending;
 # publication requires every item to be approved or explicitly not applicable.
 report_review_items <- function() {
@@ -391,6 +414,13 @@ validate_analysis_report <- function(outdir = ".",
   html_ok <- file.exists(report_file) && is.finite(file.info(report_file)$size) && file.info(report_file)$size > 10000
   add_check("rendered_html", html_ok, if (html_ok) "HTML exists and is non-trivial." else "HTML missing or too small.")
 
+  pdfs <- list.files(outdir, pattern = "[.]pdf$", recursive = TRUE, full.names = TRUE)
+  html_asset_error <- tryCatch({
+    validate_report_html_assets(report_file, expect_figures = length(pdfs) > 0L); NULL
+  }, error = function(e) conditionMessage(e))
+  add_check("html_figure_assets", is.null(html_asset_error),
+            .report_or(html_asset_error, "No missing-preview markers; expected figures are embedded."))
+
   coverage_file <- file.path(outdir, "report_coverage_manifest.csv")
   coverage_error <- tryCatch({
     coverage <- utils::read.csv(coverage_file, stringsAsFactors = FALSE, check.names = FALSE)
@@ -417,7 +447,6 @@ validate_analysis_report <- function(outdir = ".",
   add_check("headline_recomputation", is.null(headline_error),
             .report_or(headline_error, "Headline DEG counts match the saved threshold table."))
 
-  pdfs <- list.files(outdir, pattern = "[.]pdf$", recursive = TRUE, full.names = TRUE)
   bad_pdfs <- pdfs[is.na(file.info(pdfs)$size) | file.info(pdfs)$size <= 1500]
   add_check("pdf_structure", !length(bad_pdfs),
             if (!length(bad_pdfs)) paste(length(pdfs), "PDF files passed the non-empty check.") else

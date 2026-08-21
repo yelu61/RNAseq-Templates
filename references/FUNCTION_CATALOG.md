@@ -416,6 +416,8 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Write `report_validation.csv` after checking HTML, coverage, claim ledger, reproducibility metadata, PDF integrity and scientific-review status.
 - `validate_report_headline_values(outdir)`
   Reconcile primary-tier DEG headline counts in `Analysis_summary.txt` against `DEG_threshold_summary.csv` to detect stale report prose.
+- `validate_report_html_assets(report_file, expect_figures)`
+  Reject missing/failed PDF-preview markers and require embedded figure previews when a run contains reportable PDFs.
 
 ## `narrative_utils.R` — project-specific narrative reports
 
@@ -429,9 +431,9 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 ## `run_utils.R` — run provenance and duplicate governance
 
 - `write_run_manifest(...)`
-  Write one run-local manifest with input/config checksums, an analysis signature, lifecycle role, parent, retention class and size.
+  Write one run-local manifest with input/config checksums, analysis and backend-code signatures, git revision/dirty state, lifecycle role, parent, retention class and size.
 - `build_run_registry(runs_dir, path)`
-  Rebuild `RUN_REGISTRY.csv` from run-local manifests and mark exact duplicate runs without deleting them.
+  Rebuild `RUN_REGISTRY.csv` across mixed manifest schema versions and mark exact input+analysis+code duplicates without deleting them.
 
 ## TME constants
 

@@ -31,6 +31,35 @@
   .run_md5_file(tmp)
 }
 
+.run_git_state <- function(root) {
+  out <- list(revision = NA_character_, dirty = NA)
+  if (is.null(root) || length(root) != 1L || is.na(root) || !dir.exists(root) || !nzchar(Sys.which("git"))) {
+    return(out)
+  }
+  old <- getwd()
+  on.exit(setwd(old), add = TRUE)
+  setwd(root)
+  revision <- suppressWarnings(tryCatch(
+    system2("git", c("rev-parse", "HEAD"), stdout = TRUE, stderr = FALSE),
+    error = function(e) character(0)
+  ))
+  status <- suppressWarnings(tryCatch(
+    system2("git", c("status", "--porcelain", "--untracked-files=no"), stdout = TRUE, stderr = FALSE),
+    error = function(e) character(0)
+  ))
+  if (length(revision) && is.null(attr(revision, "status"))) out$revision <- revision[[1]]
+  if (!is.na(out$revision)) out$dirty <- length(status) > 0L
+  out
+}
+
+.run_backend_signature <- function(files = character(0), revision = NA_character_) {
+  files <- unique(normalizePath(files[file.exists(files)], mustWork = TRUE))
+  files <- sort(files)
+  checksums <- if (length(files)) unname(tools::md5sum(files)) else character(0)
+  names(checksums) <- if (length(files)) basename(files) else character(0)
+  .run_md5_object(list(revision = revision, file_md5 = checksums))
+}
+
 .run_relative_path <- function(path, run_dir) {
   if (is.null(path) || length(path) != 1 || is.na(path) || !nzchar(path)) return(NA_character_)
   absolute <- normalizePath(path, mustWork = FALSE)
@@ -56,7 +85,9 @@ write_run_manifest <- function(run_dir = ".",
                                retention = "full",
                                change_note = "",
                                status = "completed",
-                               completed_at = Sys.time()) {
+                               completed_at = Sys.time(),
+                               backend_root = NULL,
+                               backend_files = character(0)) {
   allowed_roles <- c("candidate", "canonical", "sensitivity", "repro_check", "superseded")
   allowed_retention <- c("full", "slim", "metadata_only")
   if (!role %in% allowed_roles) stop("Unsupported run role: ", role)
@@ -70,6 +101,7 @@ write_run_manifest <- function(run_dir = ".",
   files <- list.files(run_dir, recursive = TRUE, full.names = TRUE, all.files = FALSE)
   files <- files[file.info(files)$isdir %in% FALSE]
   run_bytes <- sum(file.info(files)$size, na.rm = TRUE)
+  backend <- .run_git_state(backend_root)
   manifest <- data.frame(
     run_id = basename(run_dir),
     status = status,
@@ -82,6 +114,9 @@ write_run_manifest <- function(run_dir = ".",
     config_file = .run_relative_path(config_path, run_dir),
     config_md5 = .run_md5_file(config_path),
     analysis_signature = .run_md5_object(analysis_config[sort(names(analysis_config))]),
+    backend_revision = backend$revision,
+    backend_dirty = backend$dirty,
+    backend_signature = .run_backend_signature(backend_files, backend$revision),
     run_bytes = run_bytes,
     change_note = change_note,
     stringsAsFactors = FALSE
@@ -91,8 +126,8 @@ write_run_manifest <- function(run_dir = ".",
 }
 
 # Rebuild the project-level registry from per-run manifests. Exact duplicates
-# share both the input checksum and analysis signature. The first completed run
-# remains the owner; later rows point to it through `duplicate_of`.
+# share the input, analysis and backend-code signatures. A full canonical run
+# is preferred as owner; other family members point to it through `duplicate_of`.
 build_run_registry <- function(runs_dir,
                                path = file.path(runs_dir, "RUN_REGISTRY.csv")) {
   if (!dir.exists(runs_dir)) stop("Runs directory not found: ", runs_dir)
@@ -106,6 +141,13 @@ build_run_registry <- function(runs_dir,
     if (nrow(x) != 1L) stop("Run manifest must contain exactly one row: ", file)
     x
   })
+  # Manifest schemas evolve. Fill absent columns before binding so a project
+  # can retain old run bundles while adopting newer provenance fields.
+  all_columns <- unique(unlist(lapply(rows, colnames), use.names = FALSE))
+  rows <- lapply(rows, function(x) {
+    for (column in setdiff(all_columns, colnames(x))) x[[column]] <- NA
+    x[, all_columns, drop = FALSE]
+  })
   registry <- do.call(rbind, rows)
   required <- c("run_id", "completed_at", "input_md5", "analysis_signature")
   missing <- setdiff(required, colnames(registry))
@@ -114,7 +156,14 @@ build_run_registry <- function(runs_dir,
   rownames(registry) <- NULL
 
   valid_key <- nzchar(registry$input_md5) & nzchar(registry$analysis_signature)
-  keys <- paste(registry$input_md5, registry$analysis_signature, sep = "::")
+  backend_key <- if ("backend_signature" %in% colnames(registry)) {
+    value <- as.character(registry$backend_signature)
+    value[is.na(value) | !nzchar(value)] <- "legacy_unknown_backend"
+    value
+  } else {
+    rep("legacy_unknown_backend", nrow(registry))
+  }
+  keys <- paste(registry$input_md5, registry$analysis_signature, backend_key, sep = "::")
   registry$duplicate_of <- ""
   role_rank <- match(registry$role,
                      c("canonical", "candidate", "sensitivity", "repro_check", "superseded"))

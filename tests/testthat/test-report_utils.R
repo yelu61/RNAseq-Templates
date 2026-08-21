@@ -60,6 +60,23 @@ test_that("report coverage makes missing and covered domains explicit", {
   unlink(root, recursive = TRUE)
 })
 
+test_that("coverage overrides cannot replace refreshed evidence inventory", {
+  root <- tempfile()
+  dir.create(file.path(root, "2-GSEA"), recursive = TRUE)
+  writeLines("term", file.path(root, "2-GSEA", "GSEA_GO_case.csv"))
+  overrides <- data.frame(
+    domain = "gsea", status = "omitted_with_reason",
+    report_location = "appendix", omission_reason = "Not in headline report",
+    evidence_count = 0, evidence_files = "stale.csv", stringsAsFactors = FALSE
+  )
+  manifest <- build_report_coverage_manifest(root, overrides = overrides)
+  row <- manifest[manifest$domain == "gsea", ]
+  expect_equal(row$status, "omitted_with_reason")
+  expect_equal(row$evidence_count, 1)
+  expect_match(row$evidence_files, "GSEA_GO_case.csv", fixed = TRUE)
+  unlink(root, recursive = TRUE)
+})
+
 test_that("claim-evidence ledger requires calibrated levels and provenance", {
   ledger <- data.frame(
     claim_id = "C1", claim = "A differed from B", claim_level = "E1_association",
@@ -190,6 +207,16 @@ test_that("headline validation catches a stale text summary", {
   writeLines("   - A_vs_B: 4 DEGs (Up: 3, Down: 1)", file.path(root, "Analysis_summary.txt"))
   expect_error(validate_report_headline_values(root), "disagree")
   unlink(root, recursive = TRUE)
+})
+
+test_that("HTML asset validation catches failed previews", {
+  html <- tempfile(fileext = ".html")
+  writeLines("<html>PDF preview failed: x.pdf</html>", html)
+  expect_error(validate_report_html_assets(html), "failure markers")
+  writeLines('<html><img src="data:image/png;base64,AAAA"></html>', html)
+  out <- validate_report_html_assets(html, expect_figures = TRUE)
+  expect_equal(out$embedded_figures, 1L)
+  unlink(html)
 })
 
 test_that("rmarkdown twin of the .qmd report template exists and does not drift", {

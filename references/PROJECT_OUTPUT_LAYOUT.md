@@ -55,8 +55,10 @@ copied into a project should be source code; the run bundle should live under
 - Classify each run as `candidate`, `canonical`, `sensitivity`, `repro_check`
   or `superseded`; record its parent and concise change note. Rebuild
   `RUN_REGISTRY.csv` from per-run manifests after batch execution. Exact
-  duplicate means the input checksum and analysis signature both match. Within
-  one duplicate family, a full canonical run is preferred as the retained owner;
+  duplicate means the input checksum, analysis signature and backend-code
+  signature all match. The manifest also records backend revision and dirty
+  state. Within one duplicate family, a full canonical run is preferred as the
+  retained owner;
   other rows point to it through `duplicate_of`.
 - Retention is explicit and non-destructive: canonical runs stay `full`;
   sensitivity runs may become `slim`; superseded or exact reproducibility

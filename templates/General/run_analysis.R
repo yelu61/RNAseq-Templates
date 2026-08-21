@@ -973,7 +973,12 @@ write_run_manifest(
   run_dir = ".", config_path = config_path, input_file = INPUT_FILE,
   analysis_config = analysis_config,
   role = RUN_ROLE, parent_run_id = PARENT_RUN_ID,
-  retention = RUN_RETENTION, change_note = RUN_CHANGE_NOTE
+  retention = RUN_RETENTION, change_note = RUN_CHANGE_NOTE,
+  backend_root = dirname(normalizePath(lib_dir)),
+  backend_files = c(
+    if (length(file_arg)) normalizePath(file_arg[[1]], mustWork = TRUE) else character(0),
+    list.files(lib_dir, pattern = "[.]R$", full.names = TRUE)
+  )
 )
 
 cat("\n========================================\n")

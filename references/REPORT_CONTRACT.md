@@ -132,7 +132,9 @@ A shareable report must pass:
 The deterministic checks are recorded in `report_validation.csv`. In addition,
 headline DEG counts are independently reconciled between
 `Analysis_summary.txt` and `DEG_threshold_summary.csv`, and every project-relative
-file named by the claim ledger must exist.
+file named by the claim ledger must exist. Rendered HTML must contain no
+missing/failed PDF-preview marker and must embed figure previews whenever the
+run contains reportable PDFs.
 `report_review_checklist.csv` requires human sign-off for design and
 experimental unit, sample QC/exclusions, contrast direction, primary FDR and
 effect-size choices, ORA/GSEA/GSVA interpretation, claim calibration,

@@ -185,8 +185,9 @@ recompute. See [templates/General/README.md](templates/General/README.md) for
 batch execution and library-path resolution.
 
 Every completed General run writes `run_manifest.csv`, including input/config
-checksums, an analysis signature, lifecycle role, parent run and retention
-class. After running one or more bundles, rebuild the non-destructive registry:
+checksums, analysis and backend-code signatures, git revision/dirty state,
+lifecycle role, parent run and retention class. After running one or more
+bundles, rebuild the non-destructive registry:
 
 ```bash
 Rscript tools/build_run_registry.R /path/to/project/analysis/runs

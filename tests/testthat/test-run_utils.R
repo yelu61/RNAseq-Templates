@@ -17,6 +17,7 @@ test_that("write_run_manifest records checksums and lifecycle metadata", {
   expect_equal(x$role, "canonical")
   expect_match(x$input_md5, "^[0-9a-f]{32}$")
   expect_match(x$analysis_signature, "^[0-9a-f]{32}$")
+  expect_match(x$backend_signature, "^[0-9a-f]{32}$")
 })
 
 test_that("build_run_registry identifies exact duplicates but not changed configs", {
@@ -87,4 +88,38 @@ test_that("a canonical full run owns an exact-duplicate family", {
   registry <- build_run_registry(runs)
   expect_equal(registry$duplicate_of[registry$run_id == "run2"], "")
   expect_true(all(registry$duplicate_of[registry$run_id != "run2"] == "run2"))
+})
+
+test_that("backend signatures change when analysis code changes", {
+  code <- tempfile(fileext = ".R")
+  writeLines("x <- 1", code)
+  first <- .run_backend_signature(code, revision = "abc")
+  writeLines("x <- 2", code)
+  second <- .run_backend_signature(code, revision = "abc")
+  expect_false(identical(first, second))
+  unlink(code)
+})
+
+test_that("run registry accepts legacy and current manifest schemas", {
+  runs <- tempfile("runs-")
+  dir.create(runs)
+  input <- tempfile()
+  writeLines("counts", input)
+  for (id in c("legacy", "current")) {
+    run <- file.path(runs, id)
+    dir.create(run)
+    config <- file.path(run, "config.R")
+    writeLines("same", config)
+    write_run_manifest(run, config, input, list(a = 1))
+  }
+  legacy_file <- file.path(runs, "legacy", "run_manifest.csv")
+  legacy <- read.csv(legacy_file, stringsAsFactors = FALSE, check.names = FALSE)
+  legacy <- legacy[, !colnames(legacy) %in% c("backend_revision", "backend_dirty", "backend_signature"), drop = FALSE]
+  write.csv(legacy, legacy_file, row.names = FALSE)
+
+  registry <- build_run_registry(runs)
+  expect_equal(nrow(registry), 2)
+  expect_true("backend_signature" %in% colnames(registry))
+  expect_true(is.na(registry$backend_signature[registry$run_id == "legacy"]))
+  expect_true(all(registry$duplicate_of == ""))
 })

@@ -110,6 +110,16 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Fixed
 
+- **Code-aware duplicate detection and mixed manifest schemas**: General run
+  manifests now record the backend git revision, dirty state and a checksum of
+  the runner plus shared R modules. `RUN_REGISTRY.csv` includes that code
+  signature in the exact-duplicate key, so runs made by different template
+  code are not falsely collapsed. Registry rebuilding now fills missing
+  columns when old and current manifest schemas coexist.
+- **Report asset and coverage-refresh validation**: report QA now rejects HTML
+  containing missing/failed PDF-preview markers and requires embedded figure
+  previews when a run contains PDFs. Coverage decisions can no longer overwrite
+  refreshed evidence counts/files with stale values during re-rendering.
 - **Explicit sample IDs in General `colData.csv`**: the runner and complete
   notebook now persist row names as a `sample` column instead of relying on row
   order. The review notebook remains backward-compatible with older runs that
