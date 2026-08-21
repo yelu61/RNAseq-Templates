@@ -63,8 +63,16 @@ THRESHOLD_GRID <- data.frame(
   name     = c("strict", "standard", "loose"),
   p_cutoff = c(0.01, 0.05, 0.10),
   log2fc   = c(1.5, 1.0, 0.5),
+  p_column = c("padj", "padj", "padj"),
   stringsAsFactors = FALSE
 )
+# Optional per-row `p_column` overrides DEG_PVALUE_COLUMN for that tier only.
+# Low-DEG projects can append an EXPLORATORY nominal-p tier so ORA still has a
+# gene list to work with, e.g. add a row:
+#   name = "exploratory", p_cutoff = 0.05, log2fc = 0.5, p_column = "pvalue"
+# Nominal-p tiers are hypothesis-generation only: never set one as
+# DEFAULT_THRESHOLD, and treat any ORA result from it as exploratory until it
+# is confirmed at an adjusted-P tier or by rank-based (GSEA/GSVA) evidence.
 DEFAULT_THRESHOLD <- "standard"             # must be one of THRESHOLD_GRID$name
 
 MIN_COUNT      <- 10                        # keep genes with count >= this in enough samples
@@ -101,7 +109,9 @@ TME_GENE_START_COL     <- "gene_start"  # used when TME_GENE_LENGTH_COLUMN is NU
 TME_GENE_END_COL       <- "gene_end"
 RUN_TME_ESTIMATE <- TRUE          # native ESTIMATE immune/stromal scores
 RUN_TME_IOBR     <- TRUE          # IOBR multi-algorithm deconvolution
-TME_IOBR_METHODS <- c("estimate", "cibersort", "epic", "xcell")
+# Offline-stable defaults. xcell needs a live biomaRt lookup; opt in only when
+# that network dependency is acceptable and its reference retrieval is verified.
+TME_IOBR_METHODS <- c("estimate", "cibersort", "epic", "mcpcounter")
 TME_IOBR_PERM    <- 1000
 RUN_TME_SSGSEA   <- TRUE          # ssGSEA over 28 built-in immune signatures
 # Mouse->human ortholog mapping cache (.rds path). The first run queries biomaRt
@@ -115,6 +125,15 @@ EXPORT_EXCEL <- TRUE              # write multi-threshold DEG table to 1-DEG/DEG
 # ---- 1.11 HTML report ----------------------------------------------------------
 GENERATE_HTML_REPORT <- TRUE      # render RNAseq_report.html (needs quarto CLI or rmarkdown)
 REPORT_TITLE <- "RNA-seq Analysis Report"
+SCAFFOLD_REPORT_INTERPRETATION <- FALSE  # first run only: create editable per-section report notes
+
+# ---- 1.12 Run lifecycle ------------------------------------------------------
+# These fields describe this run; they do not change the statistical analysis.
+# Rebuild analysis/runs/RUN_REGISTRY.csv with tools/build_run_registry.R.
+RUN_ROLE        <- "candidate"    # candidate/canonical/sensitivity/repro_check/superseded
+PARENT_RUN_ID   <- NA_character_  # source run for a sensitivity or replacement run
+RUN_CHANGE_NOTE <- ""             # concise reason this run differs from its parent
+RUN_RETENTION   <- "full"         # full/slim/metadata_only; never pruned automatically
 
 # =============================================================================
 # Derived values & validation (normally no need to edit below this line)
@@ -126,12 +145,34 @@ if (!DEG_PVALUE_COLUMN %in% c("padj", "pvalue")) stop("DEG_PVALUE_COLUMN must be
 if (!is.character(DEG_LFC_COLUMN) || length(DEG_LFC_COLUMN) != 1) stop("DEG_LFC_COLUMN must be a single column name.")
 if (any(duplicated(THRESHOLD_GRID$name))) stop("THRESHOLD_GRID$name must be unique.")
 if (!DEFAULT_THRESHOLD %in% THRESHOLD_GRID$name) stop("DEFAULT_THRESHOLD must be one of THRESHOLD_GRID$name.")
+if ("p_column" %in% colnames(THRESHOLD_GRID)) {
+  bad_col <- !is.na(THRESHOLD_GRID$p_column) & !THRESHOLD_GRID$p_column %in% c("padj", "pvalue")
+  if (any(bad_col)) stop("THRESHOLD_GRID$p_column must be 'padj' or 'pvalue' (or NA to inherit DEG_PVALUE_COLUMN).")
+  default_row_p_col <- THRESHOLD_GRID$p_column[THRESHOLD_GRID$name == DEFAULT_THRESHOLD]
+  if (!is.na(default_row_p_col) && default_row_p_col == "pvalue") {
+    warning("DEFAULT_THRESHOLD uses nominal pvalue; nominal-p tiers are exploratory and should not headline the analysis.")
+  }
+}
+if (!RUN_ROLE %in% c("candidate", "canonical", "sensitivity", "repro_check", "superseded")) {
+  stop("RUN_ROLE must be candidate/canonical/sensitivity/repro_check/superseded.")
+}
+if (!RUN_RETENTION %in% c("full", "slim", "metadata_only")) {
+  stop("RUN_RETENTION must be full/slim/metadata_only.")
+}
 
 default_threshold_config <- THRESHOLD_GRID[THRESHOLD_GRID$name == DEFAULT_THRESHOLD, ]
 DEG_P_CUTOFF  <- default_threshold_config$p_cutoff
 DEG_LFC_CUTOFF <- default_threshold_config$log2fc
+DEFAULT_DEG_PVALUE_COLUMN <- if ("p_column" %in% colnames(default_threshold_config) &&
+                                 !is.na(default_threshold_config$p_column[[1]]) &&
+                                 nzchar(default_threshold_config$p_column[[1]])) {
+  default_threshold_config$p_column[[1]]
+} else {
+  DEG_PVALUE_COLUMN
+}
 PADJ_THRESH   <- DEG_P_CUTOFF     # backward-compatible aliases used by TF section
 LOG2FC_THRESH <- DEG_LFC_CUTOFF
 
 cat("Configuration loaded:", length(SAMPLE_NAMES), "samples,",
-    length(COMPARISONS), "comparisons, default threshold =", DEFAULT_THRESHOLD, "\n")
+    length(COMPARISONS), "comparisons, default threshold =", DEFAULT_THRESHOLD,
+    "(", DEFAULT_DEG_PVALUE_COLUMN, ")\n")

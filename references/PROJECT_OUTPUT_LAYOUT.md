@@ -17,7 +17,9 @@ analysis/
   notebooks/                      source notebooks only; no bulk output
   runs/<run_id>/                  complete backend-native run bundle
     0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ 4-TME/
-    Analysis_summary.txt sessionInfo.txt analysis_manifest.csv
+    Analysis_summary.txt sessionInfo.txt run_manifest.csv
+  runs/RUN_REGISTRY.csv           rebuilt index; duplicate/lifecycle overview
+  notebook_output/run_review/     derived review-notebook outputs only
 results/                          curated, canonical deliverables
   tables/ figures/ reports/
   report_assets/                  derived browser previews; rebuildable cache
@@ -50,6 +52,16 @@ copied into a project should be source code; the run bundle should live under
 - Never overwrite a completed run. Use a new `run_id` and record backend
   revision, configuration hash, input checksums, session information, and
   worktree state.
+- Classify each run as `candidate`, `canonical`, `sensitivity`, `repro_check`
+  or `superseded`; record its parent and concise change note. Rebuild
+  `RUN_REGISTRY.csv` from per-run manifests after batch execution. Exact
+  duplicate means the input checksum and analysis signature both match. Within
+  one duplicate family, a full canonical run is preferred as the retained owner;
+  other rows point to it through `duplicate_of`.
+- Retention is explicit and non-destructive: canonical runs stay `full`;
+  sensitivity runs may become `slim`; superseded or exact reproducibility
+  copies may become `metadata_only` only after curated provenance points to a
+  retained owner. The template never prunes automatically.
 - Separate exhaustive diagnostic plots from manuscript-facing primary figures.
   A figure manifest should record role, source table, dimensions, format, and
   QA status.

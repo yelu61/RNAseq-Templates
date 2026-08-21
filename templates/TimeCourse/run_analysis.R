@@ -21,6 +21,7 @@ options(stringsAsFactors = FALSE)
 invocation_dir <- normalizePath(getwd(), mustWork = TRUE)
 cmd_args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", grep("^--file=", cmd_args, value = TRUE))
+file_arg <- gsub("~\\+~", " ", file_arg)
 script_dir <- if (length(file_arg) > 0 && nzchar(file_arg)) dirname(normalizePath(file_arg[1])) else invocation_dir
 
 user_args <- commandArgs(trailingOnly = TRUE)

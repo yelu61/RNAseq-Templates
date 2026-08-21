@@ -15,9 +15,10 @@ params:
   title: "RNA-seq Analysis Report"
   author: ""
   outdir: "."
+  primary_threshold: "standard"
 ---
 
-```{r setup}
+```{r setup, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 outdir <- params$outdir
 deg_dir <- file.path(outdir, "1-DEG")
@@ -76,15 +77,129 @@ show_pdf <- function(rel_path, width = "100%") {
 
 coverage <- read_csv_safe(file.path(outdir, "report_coverage_manifest.csv"))
 claim_ledger <- read_csv_safe(file.path(outdir, "claim_evidence_ledger.csv"), check.names = FALSE)
+review_checklist <- read_csv_safe(file.path(outdir, "report_review_checklist.csv"), check.names = FALSE)
 inventory <- if (dir.exists(outdir)) {
   paths <- list.files(outdir, recursive = TRUE, full.names = FALSE)
   data.frame(path = paths, extension = tolower(tools::file_ext(paths)), stringsAsFactors = FALSE)
 } else NULL
+
+# Render a per-section project annotation from report_interpretation/<key>.md.
+# Whole-line HTML comments count as scaffold guidance and are stripped; a file
+# with no remaining content renders nothing, so untouched scaffold files stay
+# hidden. Annotations knit with the project environment so inline `r ` code
+# works, and they persist across re-renders without editing this template.
+show_interpretation <- function(key) {
+  path <- file.path(outdir, "report_interpretation", paste0(key, ".md"))
+  if (!file.exists(path)) return(invisible(NULL))
+  txt <- readLines(path, warn = FALSE)
+  txt <- txt[!grepl("^\\s*<!--.*-->\\s*$", txt)]
+  if (!any(nzchar(trimws(txt)))) return(invisible(NULL))
+  cat("\n::: {.interpretation-box}\n\n")
+  cat("*Project annotation — edit `report_interpretation/", key, ".md`*\n\n", sep = "")
+  cat(knitr::knit(text = txt, quiet = TRUE))
+  cat("\n:::\n\n")
+}
+
+# --- Data-driven result-detail helpers ---------------------------------------
+# These surface the actual genes and enriched terms behind each result block so
+# the report answers "which genes / which pathways" directly, for any project.
+# Every helper degrades to NULL when the underlying file is absent, so the
+# report still renders for partial runs.
+
+# Primary DEG threshold: honor the run's declared default when that threshold
+# has result tables; retain the standard/first-folder fallback for old bundles.
+primary_threshold <- function() {
+  th <- list.dirs(deg_dir, recursive = FALSE, full.names = FALSE)
+  th <- th[vapply(th, function(x) {
+    length(list.files(file.path(deg_dir, x), pattern = "^DEG_results_.*\\.csv$")) > 0
+  }, logical(1))]
+  declared <- params$primary_threshold
+  if (is.character(declared) && length(declared) == 1 && declared %in% th) return(declared)
+  if ("standard" %in% th) "standard" else if (length(th)) th[[1]] else NULL
+}
+
+# Contrast names discovered from the primary-threshold DEG result files.
+list_contrasts <- function(threshold = primary_threshold()) {
+  if (is.null(threshold)) return(character(0))
+  files <- list.files(file.path(deg_dir, threshold), pattern = "^DEG_results_.*\\.csv$")
+  sub("^DEG_results_(.*)\\.csv$", "\\1", files)
+}
+
+# Top `n` up- and down-regulated genes per contrast by |shrunken log2FC|.
+top_deg_table <- function(contrast, threshold = primary_threshold(), n = 8) {
+  df <- read_csv_safe(file.path(deg_dir, threshold, paste0("DEG_results_", contrast, ".csv")))
+  if (is.null(df) || !nrow(df) || !"gene_name" %in% colnames(df)) return(NULL)
+  lfc_col <- intersect(c("log2FoldChange_shrunken", "log2FoldChange", "log2FoldChange_raw"), colnames(df))[1]
+  if (is.na(lfc_col)) return(NULL)
+  df <- df[!is.na(df[[lfc_col]]), , drop = FALSE]
+  pick <- function(x, dirn) {
+    if (is.null(x) || !nrow(x)) return(NULL)
+    x <- utils::head(x[order(-abs(x[[lfc_col]])), , drop = FALSE], n)
+    data.frame(
+      Direction = dirn, Gene = x$gene_name,
+      log2FC = round(x[[lfc_col]], 2),
+      padj = if ("padj" %in% colnames(x)) signif(x$padj, 3) else NA_real_,
+      stringsAsFactors = FALSE
+    )
+  }
+  if ("significance" %in% colnames(df)) {
+    out <- rbind(pick(df[grepl("^up", df$significance, ignore.case = TRUE), , drop = FALSE], "Up"),
+                 pick(df[grepl("^down", df$significance, ignore.case = TRUE), , drop = FALSE], "Down"))
+  } else {
+    out <- rbind(pick(df[df[[lfc_col]] > 0, , drop = FALSE], "Up"),
+                 pick(df[df[[lfc_col]] < 0, , drop = FALSE], "Down"))
+  }
+  if (is.null(out) || !nrow(out)) NULL else out
+}
+
+# Top enriched ORA terms for one contrast, merging the available
+# direction/ontology source tables saved under the primary threshold.
+ora_top_terms <- function(contrast, threshold = primary_threshold(), n = 6) {
+  dir_path <- file.path(gsea_dir, threshold)
+  if (!dir.exists(dir_path)) return(NULL)
+  files <- list.files(dir_path, pattern = paste0("ORA.*", contrast, "\\.csv$"), full.names = TRUE)
+  if (!length(files)) return(NULL)
+  rows <- lapply(files, function(f) {
+    df <- read_csv_safe(f)
+    if (is.null(df) || !nrow(df) || !"Description" %in% colnames(df)) return(NULL)
+    db <- if (grepl("KEGG", basename(f))) "KEGG" else "GO"
+    dirn <- if (grepl("_UP_", basename(f))) "Up" else if (grepl("_DOWN_", basename(f))) "Down" else "Both"
+    df <- utils::head(df[order(df$p.adjust), , drop = FALSE], n)
+    data.frame(Ontology = db, Direction = dirn, Term = df$Description,
+               Count = if ("Count" %in% colnames(df)) df$Count else NA_integer_,
+               padj = signif(df$p.adjust, 3), stringsAsFactors = FALSE)
+  })
+  out <- do.call(rbind, rows)
+  if (is.null(out) || !nrow(out)) NULL else out[order(out$padj), , drop = FALSE]
+}
+
+# Top GSEA gene sets for one contrast, split by enrichment direction (NES sign).
+gsea_top_terms <- function(contrast, n = 5) {
+  files <- c(GO = file.path(gsea_dir, paste0("GSEA_GO_", contrast, ".csv")),
+             KEGG = file.path(gsea_dir, paste0("GSEA_KEGG_", contrast, ".csv")))
+  rows <- lapply(names(files), function(db) {
+    df <- read_csv_safe(files[[db]])
+    if (is.null(df) || !nrow(df) || !all(c("Description", "NES") %in% colnames(df))) return(NULL)
+    df <- df[!is.na(df$NES) & !is.na(df$p.adjust), , drop = FALSE]
+    if (!nrow(df)) return(NULL)
+    pick <- function(x, dirn) {
+      if (!nrow(x)) return(NULL)
+      x <- utils::head(x[order(x$p.adjust), , drop = FALSE], n)
+      data.frame(Ontology = db, Direction = dirn, Term = x$Description,
+                 NES = round(x$NES, 2), padj = signif(x$p.adjust, 3), stringsAsFactors = FALSE)
+    }
+    rbind(pick(df[df$NES > 0, , drop = FALSE], "Up"), pick(df[df$NES < 0, , drop = FALSE], "Down"))
+  })
+  out <- do.call(rbind, rows)
+  if (is.null(out) || !nrow(out)) NULL else out[order(out$padj), , drop = FALSE]
+}
 ```
 
 <style>
 .summary-box {background:#f3f7fb;border-left:5px solid #3778a8;padding:0.9rem 1.1rem;margin:1rem 0;}
 .caution-box {background:#fff8e8;border-left:5px solid #d99a2b;padding:0.9rem 1.1rem;margin:1rem 0;}
+.interpretation-box {background:#f6f3fb;border-left:5px solid #7a5fa8;padding:0.7rem 1.1rem;margin:1rem 0;}
+.interpretation-box > p:first-of-type em {color:#7a5fa8;font-size:0.85rem;}
 figure {margin:1.2rem 0 1.6rem 0;}
 figure img {border:1px solid #e5e7eb;}
 figcaption {color:#5f6368;font-size:0.9rem;margin-top:0.45rem;}
@@ -117,6 +232,23 @@ if (file.exists(summary_txt)) {
 }
 ```
 
+```{r interpretation, results='asis'}
+# Optional project-supplied biological interpretation. A project can drop a
+# `report_interpretation.md` into the output directory to add a reviewed,
+# project-specific narrative (top-DEG functional reading, pathway meaning,
+# gene-set rationale, links to the study question) that persists across
+# re-renders without editing this shared template. Finer-grained annotations
+# belong in `report_interpretation/<section>.md`, rendered in place at the end
+# of each matching section (see `show_interpretation()` calls below).
+interp_md <- file.path(outdir, "report_interpretation.md")
+if (file.exists(interp_md)) {
+  cat("\n# Biological interpretation\n\n")
+  cat('<div class="summary-box">Project-supplied, reviewed interpretation. It is subordinate to the statistical evidence in the sections that follow and does not replace the claim-evidence ledger.</div>\n\n')
+  cat(knitr::knit(text = readLines(interp_md, warn = FALSE), quiet = TRUE))
+  cat("\n")
+}
+```
+
 # Scope, samples, and inferential definitions
 
 The experimental unit, inclusion decisions, group sizes, design formula,
@@ -127,6 +259,10 @@ below is the report's source of truth for sample inclusion.
 ```{r sample-design}
 coldata <- read_csv_safe(file.path(deg_dir, "colData.csv"), check.names = FALSE)
 show_table(coldata, caption = "Samples included in the analysis and their modeled groups.", max_rows = 100)
+```
+
+```{r interpretation-scope, results='asis'}
+show_interpretation("scope")
 ```
 
 # Sample quality supports—or limits—the modeled comparisons
@@ -146,6 +282,10 @@ for (f in utils::head(qc_pdfs, 8)) {
 if (length(qc_pdfs) == 0) cat("_No QC figures found._\n")
 ```
 
+```{r interpretation-qc, results='asis'}
+show_interpretation("qc")
+```
+
 # Differential expression is reported at one primary threshold
 
 ## DEG counts by threshold
@@ -153,6 +293,26 @@ if (length(qc_pdfs) == 0) cat("_No QC figures found._\n")
 ```{r deg-summary}
 deg_summary <- read_csv_safe(file.path(deg_dir, "DEG_threshold_summary.csv"))
 show_table(deg_summary, caption = "Number of differentially expressed genes per comparison and threshold.")
+```
+
+```{r declared-primary-threshold, results='asis'}
+primary_th <- primary_threshold()
+if (!is.null(primary_th)) {
+  cat("The declared primary threshold for the detailed tables below is <code>", primary_th, "</code>.\n\n", sep = "")
+}
+```
+
+```{r exploratory-tier-note, results='asis'}
+# Nominal-p tiers are hypothesis-generation only; flag them explicitly wherever
+# the threshold summary is shown so they are never read as inferential results.
+if (!is.null(deg_summary) && "pvalue_column" %in% colnames(deg_summary) &&
+    any(deg_summary$pvalue_column == "pvalue", na.rm = TRUE)) {
+  cat('\n<div class="caution-box"><strong>Exploratory nominal-P tier present.</strong> ',
+      'Rows with <code>pvalue_column = pvalue</code> use unadjusted P values to keep ',
+      'pathway analysis alive in low-DEG projects. They are hypothesis-generation inputs: ',
+      'ORA or gene lists derived from them require confirmation at an adjusted-P tier or by ',
+      'rank-based (GSEA/GSVA) evidence before supporting any claim beyond E0/E1.</div>\n')
+}
 ```
 
 The declared primary threshold should drive headline counts. Other rows are
@@ -165,6 +325,27 @@ sample size; they are not a standalone measure of treatment strength.
 ```{r lfc-strategy}
 lfc_strategy <- read_csv_safe(file.path(deg_dir, "DEG_lfc_strategy_summary.csv"))
 show_table(lfc_strategy, caption = "DEG counts using raw vs shrunken log2 fold-change.")
+```
+
+## Top differentially expressed genes
+
+The genes driving each headline comparison, ranked by shrunken effect size at
+the primary threshold. These identify *which* genes change before any
+functional interpretation is layered on.
+
+```{r top-degs, results='asis'}
+contrasts_deg <- list_contrasts()
+if (!length(contrasts_deg)) {
+  cat("_No per-contrast DEG tables found at the primary threshold._\n")
+} else {
+  for (cc in contrasts_deg) {
+    tt <- top_deg_table(cc)
+    if (is.null(tt)) next
+    cat("\n### ", cc, "\n\n")
+    print(knitr::kable(tt, caption = paste("Top up- and down-regulated genes by |shrunken log2FC|:", cc), row.names = FALSE))
+    cat("\n")
+  }
+}
 ```
 
 ## Volcano plots
@@ -190,6 +371,10 @@ for (f in utils::head(hm_pdfs, 12)) {
 }
 ```
 
+```{r interpretation-deg, results='asis'}
+show_interpretation("deg")
+```
+
 # ORA findings depend on the DEG threshold and tested background
 
 ```{r ora-summary}
@@ -200,6 +385,28 @@ show_table(ora_summary, caption = "Over-representation analysis summary across t
 ORA asks whether a thresholded DEG list contains more genes from a term than
 expected against the declared expressed-gene background. Direction, threshold,
 ontology and correction family must be retained when interpreting a term.
+
+## Top enriched ORA terms
+
+The strongest enriched GO/KEGG terms per comparison at the primary threshold,
+merged across the direction-specific source tables. Disease-labelled KEGG terms
+(e.g. viral infections) usually reflect shared interferon / antigen / cytotoxic
+gene content rather than literal infection.
+
+```{r ora-top-terms, results='asis'}
+contrasts_ora <- list_contrasts()
+if (!length(contrasts_ora)) {
+  cat("_No per-contrast ORA tables found at the primary threshold._\n")
+} else {
+  for (cc in contrasts_ora) {
+    tt <- ora_top_terms(cc)
+    if (is.null(tt)) next
+    cat("\n### ", cc, "\n\n")
+    print(knitr::kable(tt, caption = paste("Top enriched ORA terms (GO/KEGG, by adjusted P):", cc), row.names = FALSE))
+    cat("\n")
+  }
+}
+```
 
 ```{r ora-figures, results='asis'}
 ora_pdfs <- list_pdfs(viz_dir, pattern = "(ORA|GO_|KEGG_).*\\.pdf$")
@@ -217,12 +424,37 @@ if (length(ora_pdfs) > 0) {
 }
 ```
 
+```{r interpretation-ora, results='asis'}
+show_interpretation("ora")
+```
+
 # GSEA provides rank-based program evidence, not literal pathway function
 
 GSEA uses a full ranked gene list and therefore reduces dependence on a single
 DEG cutoff. GO terms can be redundant and disease-labelled KEGG terms often
 reflect shared ribosomal, mitochondrial or inflammatory genes. Leading-edge
 genes—not the pathway title alone—should anchor biological interpretation.
+
+## Top enriched gene sets by NES
+
+The strongest positively and negatively enriched gene sets per comparison,
+ranked by adjusted P value. Positive NES = enriched among up-regulated genes;
+negative NES = enriched among down-regulated genes.
+
+```{r gsea-top-terms, results='asis'}
+contrasts_gsea <- list_contrasts()
+if (!length(contrasts_gsea)) {
+  cat("_No per-contrast GSEA tables found._\n")
+} else {
+  for (cc in contrasts_gsea) {
+    tt <- gsea_top_terms(cc)
+    if (is.null(tt)) next
+    cat("\n### ", cc, "\n\n")
+    print(knitr::kable(tt, caption = paste("Top GSEA gene sets by direction (GO/KEGG):", cc), row.names = FALSE))
+    cat("\n")
+  }
+}
+```
 
 ```{r gsea-figures, results='asis'}
 gsea_pdfs <- list_pdfs(viz_dir, pattern = "GSEA.*\\.pdf$")
@@ -251,6 +483,10 @@ if (length(running)) {
 }
 ```
 
+```{r interpretation-gsea, results='asis'}
+show_interpretation("gsea")
+```
+
 # Custom gene sets are a separate exploratory evidence layer
 
 Custom GSVA/ssGSEA scores should be versioned, sourced and separated from
@@ -268,6 +504,10 @@ for (f in utils::head(gsva_pdfs, 12)) {
 }
 ```
 
+```{r interpretation-custom-genesets, results='asis'}
+show_interpretation("custom_genesets")
+```
+
 # Cross-contrast structure helps separate shared and treatment-specific signals
 
 ```{r cross-contrast, results='asis'}
@@ -278,6 +518,10 @@ for (f in utils::head(cross_pdfs, 8)) {
   show_pdf(f)
   cat("\nOverlap is descriptive unless a formal equivalence, interaction or differential-effect test was prespecified.\n")
 }
+```
+
+```{r interpretation-cross-contrast, results='asis'}
+show_interpretation("cross_contrast")
 ```
 
 # Evidence-linked synthesis and hypotheses
@@ -292,6 +536,10 @@ if (!is.null(claim_ledger) && nrow(claim_ledger)) {
 }
 ```
 
+```{r interpretation-synthesis, results='asis'}
+show_interpretation("synthesis")
+```
+
 # Limitations, uncertainty, and robustness
 
 - Small groups limit precision and outlier robustness; show individual samples and effect sizes.
@@ -299,6 +547,10 @@ if (!is.null(claim_ledger) && nrow(claim_ledger)) {
 - “Not significant” does not establish equivalence or absence of a biologically meaningful effect.
 - Transcript-level pathway scores do not establish protein activity, localization, secretion or functional flux.
 - ORA and GSEA term names require leading-edge or contributing-gene review before biological extrapolation.
+
+```{r interpretation-limitations, results='asis'}
+show_interpretation("limitations")
+```
 
 # Report coverage and unresolved questions
 
@@ -308,6 +560,16 @@ decision or a documented omission. A missing optional analysis remains visible.
 
 ```{r coverage}
 show_table(coverage, caption = "Analysis-domain coverage contract.", max_rows = 100)
+```
+
+## Scientific review status
+
+Draft rendering and scientific approval are separate. A report is publishable
+only after all checklist rows are approved or explicitly marked not applicable
+with a reason.
+
+```{r review-checklist}
+show_table(review_checklist, caption = "Human scientific-review checklist.", max_rows = 100)
 ```
 
 # Reproducibility and methods handoff

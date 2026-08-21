@@ -80,7 +80,7 @@ not copy or merge either analysis implementation.
 
 | I want to... | Use this template | Input | Key outputs |
 | --- | --- | --- | --- |
-| Standard DE across 2+ groups | `RNAseq_General.ipynb` | raw counts | multi-threshold DEG, ORA/GSEA/GSVA, QC, HTML report |
+| Standard DE across 2+ groups | General CLI runner; `RNAseq_General.ipynb` for a complete interactive rerun; `RNAseq_General_RunReview.ipynb` for read-only follow-up | raw counts or a completed run | multi-threshold DEG, ORA/GSEA/GSVA, QC, HTML report |
 | Prefer limma-voom / batch covariate | `RNAseq_limma_voom_Template.ipynb` | raw counts | voom DEG, volcano, GO ORA |
 | Analyze a time series / repeated measures | `RNAseq_TimeCourse_Template.ipynb` | VST matrix (from General) | Mfuzz clusters, time-point DEG |
 | Quantify immune / stromal infiltration | `RNAseq_TME_Deconvolution_Template.ipynb` | counts + gene lengths (TPM internal) | IOBR/ESTIMATE/ssGSEA scores, heatmaps |
@@ -118,6 +118,7 @@ For a step-by-step guide, see [GETTING_STARTED.md](GETTING_STARTED.md).
 ```text
 notebooks/
   RNAseq_General.ipynb                  # standard DESeq2 DE (start here)
+  RNAseq_General_RunReview.R/.ipynb     # read one CLI run; no core re-analysis
   RNAseq_limma_voom_Template.ipynb      # limma-voom alternative
   RNAseq_TimeCourse_Template.ipynb      # Mfuzz time-series clustering
   RNAseq_TME_Deconvolution_Template.ipynb  # immune/stromal deconvolution
@@ -127,13 +128,15 @@ RNAseq_lib/                # shared R helpers (15 modules)
   io_utils.R  deg_utils.R  enrichment_utils.R  plot_utils.R
   tme_utils.R  tcga_utils.R  limma_voom_utils.R  timecourse_utils.R
   survival_utils.R  batch_utils.R  design_utils.R  geo_utils.R
-  data_utils.R  report_utils.R
+  data_utils.R  report_utils.R  narrative_utils.R  run_utils.R
 templates/                 # one CLI runner trio per template
   General/  Limma_Voom/  WGCNA/  TME/  TimeCourse/  TCGA_GEO/
     config.R                 #   edit per-project parameters
     run_analysis.R           #   Rscript entry point (same as notebook)
     visualize_results.R      #   re-plot from saved results (no recompute)
 tools/notebook_to_runner.R   # notebook param cell -> config.R + runner draft
+tools/build_run_registry.R   # per-run manifests -> project RUN_REGISTRY.csv
+tools/render_report.R        # re-render + validate a completed run report
 reports/analysis_report.qmd  # unified HTML report template
 examples/
   run_demo_smoke_test.R    # runs every demo and validates outputs
@@ -181,6 +184,17 @@ single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without
 recompute. See [templates/General/README.md](templates/General/README.md) for
 batch execution and library-path resolution.
 
+Every completed General run writes `run_manifest.csv`, including input/config
+checksums, an analysis signature, lifecycle role, parent run and retention
+class. After running one or more bundles, rebuild the non-destructive registry:
+
+```bash
+Rscript tools/build_run_registry.R /path/to/project/analysis/runs
+```
+
+`RUN_REGISTRY.csv` marks exact duplicates through `duplicate_of`; it recommends
+review but never deletes an output automatically.
+
 To convert a notebook's parameter cell into a `config.R` + `run_analysis.R`
 draft for a new pipeline, use the converter:
 
@@ -197,9 +211,18 @@ For a real project, run inside a versioned native output root such as
 `results/tables`, `results/figures`, and `results/reports`. See
 [Real-project Output Layout](references/PROJECT_OUTPUT_LAYOUT.md).
 
-### Option B — notebook (interactive exploration)
+### Option B — two notebook roles
 
-1. Copy a notebook from `notebooks/` into a concrete project folder only when
+The two notebooks are intentionally maintained because they answer different
+questions:
+
+- `RNAseq_General.ipynb` is the complete, independently executable pipeline for
+  teaching, method development and an auditable interactive rerun.
+- `RNAseq_General_RunReview.ipynb` takes `RUN_DIR` as its immutable source,
+  never refits the core model, and writes selected-gene plots or optional custom
+  GSVA derivatives to a separate `REVIEW_OUTDIR`.
+
+1. Copy the appropriate notebook from `notebooks/` into a concrete project folder only when
    interactive exploration is needed.
 2. Keep access to `RNAseq_lib/` by either:
    - copying the `RNAseq_lib/` directory next to the project notebook, or
@@ -275,7 +298,21 @@ WGCNA and time-course clustering can use the exported VST matrix. TME deconvolut
 
 Set `GENERATE_HTML_REPORT <- TRUE` in the General notebook (default) to render a single self-contained `RNAseq_report.html` from the saved CSV and PDF outputs — easier to share with collaborators than a folder of PDFs. The report is assembled by `reports/analysis_report.qmd` via `render_analysis_report()` and does not re-run any analysis. The default `.qmd` uses the [Quarto](https://quarto.org) CLI when available; without Quarto it automatically falls back to `rmarkdown` rendering the bundled `.Rmd` twin (`reports/analysis_report.Rmd`), so the report works out of the box. The report cell skips gracefully with an actionable message only when neither renderer is installed.
 
-The report follows a machine-checkable [RNA-seq HTML Report Contract](references/REPORT_CONTRACT.md): every analysis domain is marked as covered, not applicable, intentionally omitted, or unresolved in `report_coverage_manifest.csv`. Project-specific biological conclusions can be supplied through a validated `claim_evidence_ledger.csv`; without that ledger the generic report remains descriptive and does not invent mechanism claims. PDF figures are rendered to embedded PNG previews for browser reliability while the editable PDF masters remain unchanged.
+The report follows a machine-checkable [RNA-seq HTML Report Contract](references/REPORT_CONTRACT.md): every analysis domain is marked as covered, not applicable, intentionally omitted, or unresolved in `report_coverage_manifest.csv`. Project-specific biological conclusions can be supplied through a validated `claim_evidence_ledger.csv`; without that ledger the generic report remains descriptive and does not invent mechanism claims. Set `SCAFFOLD_REPORT_INTERPRETATION <- TRUE` once to create durable, per-section reviewed annotations under `report_interpretation/`; never edit the generated HTML or shared report template. PDF figures are rendered to embedded PNG previews for browser reliability while the editable PDF masters remain unchanged.
+
+Edit the project-owned Markdown files and re-render without rerunning RNA-seq:
+
+```bash
+Rscript tools/render_report.R analysis/runs/<run_id> --scaffold
+# after completing report_review_checklist.csv:
+Rscript tools/render_report.R analysis/runs/<run_id> --publish
+```
+
+Draft rendering permits pending review items. `--publish` requires resolved
+coverage plus signed scientific review of design, QC, contrast direction,
+FDR/effect-size choices, enrichment interpretation, evidence calibration,
+limitations and figure integrity. Validation is written to
+`report_validation.csv`.
 
 ## Multi-threshold DEG + ORA
 
@@ -290,6 +327,7 @@ THRESHOLD_GRID <- data.frame(
   name     = c("strict", "standard", "loose"),
   p_cutoff = c(0.01, 0.05, 0.10),
   log2fc   = c(1.5, 1.0, 0.5),
+  p_column = c("padj", "padj", "padj"),
   stringsAsFactors = FALSE
 )
 DEFAULT_THRESHOLD <- "standard"
@@ -307,6 +345,8 @@ Multi-threshold output applies to:
 - threshold-specific ORA PDFs under `3-Visualization/<threshold>/`
 
 GSEA is intentionally not repeated by DEG threshold because it uses the full ranked gene list. The default rank is the DESeq2 Wald statistic (`stat`), while DEG calls, volcano plots, DEG heatmaps, ORA, and compareCluster follow the selected `DEG_LFC_COLUMN`. The default `DEG_LFC_COLUMN` is raw DESeq2 LFC to avoid under-calling DEG sets; shrunken LFC is still saved for every gene and can be selected for more conservative reporting or visualization.
+
+For low-DEG projects, append a clearly labelled exploratory row such as `name = "exploratory", p_cutoff = 0.05, log2fc = 0.5, p_column = "pvalue"`. This preserves the adjusted-P tiers while enabling hypothesis-generating ORA; it must not be used as the headline threshold or support a claim beyond E0/E1 without confirmation from adjusted-P or rank-based evidence.
 
 ## Topic Templates
 

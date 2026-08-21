@@ -47,7 +47,7 @@ undo_log_expr <- function(expr, is_log = TRUE, log_base = 2) {
 
 # Validate that an expression matrix is suitable for TME deconvolution.
 # Checks: numeric, non-negative, rownames present.
-# Warns if rownames look like Ensembl IDs rather than gene symbols.
+# Warns when most rownames look like Ensembl IDs rather than gene symbols.
 validate_tme_input <- function(expr) {
   if (is.null(expr)) stop("Expression matrix is NULL.")
   if (!is.matrix(expr) && !is.data.frame(expr)) {
@@ -66,8 +66,8 @@ validate_tme_input <- function(expr) {
   if (anyNA(expr)) stop("Expression matrix contains missing values.")
   if (any(expr < 0, na.rm = TRUE)) stop("Expression matrix contains negative values.")
 
-  looks_ensembl <- any(grepl("^(ENS|ENSMUS|ENSMUST|ENSG)", rnames, ignore.case = TRUE))
-  if (looks_ensembl) {
+  ensembl_fraction <- mean(grepl("^(ENS|ENSMUS|ENSMUST|ENSG)", rnames, ignore.case = TRUE))
+  if (ensembl_fraction > 0.5) {
     warning("Rownames look like Ensembl IDs. TME deconvolution methods expect gene symbols (e.g. HGNC or MGI symbols).")
   }
 
@@ -176,9 +176,34 @@ convert_mouse_symbols_to_human <- function(expr,
 
   # Only genes not already in the cache need the network.
   need <- setdiff(toupper(mouse_symbols), queried)
+  # Symbols that look like Ensembl IDs (a common placeholder when a feature has
+  # no MGI symbol) can never match the mgi_symbol filter; don't waste a query.
+  is_ens <- grepl("^ENSMUSG", need, ignore.case = TRUE)
+  if (any(is_ens)) {
+    if (verbose) message("Skipping ", sum(is_ens), " Ensembl-ID placeholders (not MGI symbols); they stay unmapped.")
+    queried <- union(queried, need[is_ens])
+    need <- need[!is_ens]
+  }
   if (length(need) > 0) {
-    lds <- .tme_fetch_orthologs_online(need, mouse_attr, human_attr, host, fallback_hosts)
-    if (nrow(lds) > 0) {
+    lds <- tryCatch(
+      .tme_fetch_orthologs_online(need, mouse_attr, human_attr, host, fallback_hosts),
+      error = function(e) e
+    )
+    online_ok <- !inherits(lds, "error")
+    if (!online_ok) {
+      # Offline-robust degradation: if a cached mapping already covers some
+      # genes, proceed cache-only instead of dying; the un-queried `need`
+      # genes are simply left unmapped downstream.
+      if (nrow(mapping) > 0) {
+        warning("Online ortholog lookup failed (", conditionMessage(lds),
+                "). Proceeding with the cached mapping only; ", length(need),
+                " un-cached symbol(s) left unmapped.", call. = FALSE)
+        lds <- NULL
+      } else {
+        stop(lds)
+      }
+    }
+    if (!is.null(lds) && nrow(lds) > 0) {
       mgi_col <- grep("^MGI\\.symbol$|^mgi_symbol$", colnames(lds), value = TRUE)[1]
       hgnc_col <- grep("^HGNC\\.symbol$|^hgnc_symbol$", colnames(lds), value = TRUE)[1]
       if (is.na(mgi_col) || is.na(hgnc_col)) {
@@ -192,11 +217,15 @@ convert_mouse_symbols_to_human <- function(expr,
       fresh <- fresh[fresh$hgnc_symbol != "" & !is.na(fresh$hgnc_symbol), ]
       mapping <- unique(rbind(mapping, fresh))
     }
-    queried <- union(queried, need)
-    if (!is.null(ortholog_cache)) {
-      dir.create(dirname(ortholog_cache), showWarnings = FALSE, recursive = TRUE)
-      saveRDS(list(mapping = mapping, queried = queried), ortholog_cache)
-      if (verbose) message("Cached mouse-human orthologs -> ", ortholog_cache)
+    # Only mark `need` as queried (and persist the cache) when the online lookup
+    # actually succeeded — a failed lookup must not poison the cache.
+    if (online_ok) {
+      queried <- union(queried, need)
+      if (!is.null(ortholog_cache)) {
+        dir.create(dirname(ortholog_cache), showWarnings = FALSE, recursive = TRUE)
+        saveRDS(list(mapping = mapping, queried = queried), ortholog_cache)
+        if (verbose) message("Cached mouse-human orthologs -> ", ortholog_cache)
+      }
     }
   }
 

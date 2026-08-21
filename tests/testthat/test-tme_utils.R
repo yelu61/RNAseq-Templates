@@ -117,8 +117,59 @@ test_that("convert_mouse_symbols_to_human cache ignores unmapped-but-queried gen
     nrow = 2,
     dimnames = list(c("Actb", "Noortholog"), c("S1", "S2"))
   )
+  expect_silent(out <- convert_mouse_symbols_to_human(mat, ortholog_cache = cache, verbose = FALSE))
+  expect_equal(rownames(out), "ACTB")
+})
+
+test_that("convert_mouse_symbols_to_human skips Ensembl-ID placeholders offline", {
+  # gene_name columns sometimes carry Ensembl IDs for features with no MGI
+  # symbol. These must not trigger a network query (they can never match the
+  # mgi_symbol filter); they are simply left unmapped.
+  cache <- file.path(tempdir(), "orthologs_ens.rds")
+  on.exit(unlink(cache), add = TRUE)
+  saveRDS(list(
+    mapping = data.frame(mgi_symbol = "ACTB", hgnc_symbol = "ACTB", stringsAsFactors = FALSE),
+    queried = "ACTB"
+  ), cache)
+
+  mat <- matrix(
+    c(10, 5, 8, 4),
+    nrow = 2,
+    dimnames = list(c("Actb", "ENSMUSG00000000001"), c("S1", "S2"))
+  )
   out <- convert_mouse_symbols_to_human(mat, ortholog_cache = cache, verbose = FALSE)
   expect_equal(rownames(out), "ACTB")
+})
+
+test_that("convert_mouse_symbols_to_human degrades to cache when network fails", {
+  skip_if_not_installed("biomaRt")
+  # Cache covers ACTB; Cd274 is un-cached and would need the network. Point the
+  # lookup at a dead host with no fallbacks so the fetch fails fast, and confirm
+  # the function warns and returns the cache-only mapping instead of dying.
+  cache <- file.path(tempdir(), "orthologs_degrade.rds")
+  on.exit(unlink(cache), add = TRUE)
+  saveRDS(list(
+    mapping = data.frame(mgi_symbol = "ACTB", hgnc_symbol = "ACTB", stringsAsFactors = FALSE),
+    queried = "ACTB"
+  ), cache)
+
+  mat <- matrix(
+    c(10, 5, 8, 4),
+    nrow = 2,
+    dimnames = list(c("Actb", "Cd274"), c("S1", "S2"))
+  )
+  expect_warning(
+    out <- convert_mouse_symbols_to_human(
+      mat,
+      host = "http://127.0.0.1:9/", fallback_hosts = character(0),
+      ortholog_cache = cache, verbose = FALSE
+    ),
+    "cached mapping only"
+  )
+  expect_equal(rownames(out), "ACTB")
+  # Failed lookup must not poison the cache: Cd274 stays un-queried.
+  oc <- readRDS(cache)
+  expect_false("CD274" %in% oc$queried)
 })
 
 test_that("prepare_tme_expression rejects invalid species", {

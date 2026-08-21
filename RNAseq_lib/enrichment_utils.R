@@ -122,7 +122,7 @@ run_threshold_ora <- function(res_list, threshold_grid, org_db, universe, organi
     ora_results[[th$name]] <- list()
 
     for (comp_name in names(res_list)) {
-      genes <- genes_for_enrichment(res_list[[comp_name]], th$p_cutoff, th$log2fc, pvalue_column = pvalue_column, lfc_column = lfc_column)
+      genes <- genes_for_enrichment(res_list[[comp_name]], th$p_cutoff, th$log2fc, pvalue_column = threshold_p_column(th, pvalue_column), lfc_column = lfc_column)
       ora_results[[th$name]][[comp_name]] <- list()
 
       ego <- run_go_ora(genes$sig, org_db = org_db, universe = universe)

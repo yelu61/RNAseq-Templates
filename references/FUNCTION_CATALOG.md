@@ -410,6 +410,28 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
   Persist the coverage contract and reject unresolved required domains or undocumented omissions.
 - `validate_claim_evidence_ledger(...)`
   Validate project-specific conclusions, evidence levels, alternatives, falsifiers, next evidence, and source-file provenance before report rendering.
+- `report_review_items()` / `scaffold_report_review(...)` / `validate_report_review(...)`
+  Create and validate the human scientific-review checklist. Drafts may retain pending rows; publication requires signed approval or a reasoned not-applicable decision.
+- `validate_analysis_report(outdir, report_file, publish)`
+  Write `report_validation.csv` after checking HTML, coverage, claim ledger, reproducibility metadata, PDF integrity and scientific-review status.
+- `validate_report_headline_values(outdir)`
+  Reconcile primary-tier DEG headline counts in `Analysis_summary.txt` against `DEG_threshold_summary.csv` to detect stale report prose.
+
+## `narrative_utils.R` — project-specific narrative reports
+
+- `make_report_citers(run_dir)`
+  Build inline helpers that read DEG counts, gene statistics, GSEA NES and ORA terms directly from a saved run.
+- `show_pdf(rel, caption, base_dir, width)`
+  Embed the first page of a run-bundle PDF in a narrative HTML report.
+- `validate_narrative_report(...)` / `scaffold_narrative_report(...)`
+  Scaffold a project-owned narrative Rmd and gate the rendered HTML for missing figures, sections and suspicious failed value lookups.
+
+## `run_utils.R` — run provenance and duplicate governance
+
+- `write_run_manifest(...)`
+  Write one run-local manifest with input/config checksums, an analysis signature, lifecycle role, parent, retention class and size.
+- `build_run_registry(runs_dir, path)`
+  Rebuild `RUN_REGISTRY.csv` from run-local manifests and mark exact duplicate runs without deleting them.
 
 ## TME constants
 

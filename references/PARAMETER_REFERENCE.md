@@ -19,9 +19,10 @@
 | `PAIR_ID` | character vector/NULL | `NULL` | 配对 ID，设置后自动改为配对设计公式 |
 | `SAMPLE_EXCLUDE` | character vector | `character(0)` | 要排除的样本名 |
 | `COMPARISONS` | list of 3-element vectors | — | 每个比较：`c(name, treatment, control)` |
-| `THRESHOLD_GRID` | data.frame | strict/standard/loose | 多阈值 DEG 网格，必须含 `name/p_cutoff/log2fc` |
+| `THRESHOLD_GRID` | data.frame | strict/standard/loose | 多阈值 DEG 网格，必须含 `name/p_cutoff/log2fc`；可选 `p_column` 按层指定 `padj` 或仅探索用的 `pvalue` |
 | `DEFAULT_THRESHOLD` | character | `"standard"` | 默认阈值名，必须是 THRESHOLD_GRID$name 之一 |
 | `DEG_PVALUE_COLUMN` | character | `"padj"` | 用于 DEG 判断的 P 值列 |
+| `DEFAULT_DEG_PVALUE_COLUMN` | character | 由默认阈值解析 | 默认层实际使用的 P 值列；由该行 `p_column` 覆盖，否则继承 `DEG_PVALUE_COLUMN` |
 | `DEG_LFC_COLUMN` | character | `"log2FoldChange_raw"` | 用于 DEG 判断的 LFC 列；可改为 shrunken 做更保守展示 |
 | `GSEA_RANK_COLUMN` | character | `"stat"` | GSEA 排序列 |
 | `PAIRWISE_P_ADJUST_METHOD` | character | `"BH"` | GSVA/单基因两两比较图的 P 值校正方法 |
@@ -32,6 +33,9 @@
 | `EXPORT_EXCEL` | logical | `TRUE` | 是否输出 `1-DEG/DEG_results.xlsx` |
 | `GENERATE_HTML_REPORT` | logical | `TRUE` | 是否渲染统一 HTML 报告 `RNAseq_report.html`（无 quarto CLI 时自动回退 rmarkdown 渲染 `.Rmd` 双胞胎模板） |
 | `REPORT_TITLE` | character | `"RNA-seq Analysis Report"` | HTML 报告标题 |
+| `SCAFFOLD_REPORT_INTERPRETATION` | logical | `FALSE` | 首次需要项目说明时设为 TRUE，创建不覆盖的 `report_interpretation/<section>.md` 注释骨架 |
+
+`p_column = "pvalue"` 的层只用于假设生成，不能作为项目主结论阈值；相应 ORA 必须由 adjusted-P 层或 GSEA/GSVA 等等级证据确认。
 
 ## `RNAseq_limma_voom_Template.ipynb`
 
@@ -142,3 +146,15 @@
 2. **GROUP_LEVELS 顺序**：第一个水平通常作为对照组/参考组，影响 DESeq2 / limma 的结果方向。
 3. **比较方向**：每个 `COMPARISONS` 条目格式为 `c("name", "treatment", "control")`，结果表示 treatment vs control。
 4. **Excel 导出**：依赖 `openxlsx`，已通过 `install_dependencies.R` 安装。
+
+## General runner 生命周期参数
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `RUN_ROLE` | `"candidate"` | `candidate`、`canonical`、`sensitivity`、`repro_check` 或 `superseded`；不改变统计模型 |
+| `PARENT_RUN_ID` | `NA_character_` | sensitivity/replacement run 的来源 run_id |
+| `RUN_CHANGE_NOTE` | `""` | 与 parent 相比的唯一、简短变更原因 |
+| `RUN_RETENTION` | `"full"` | `full`、`slim` 或 `metadata_only`；模板仅记录，不自动清理 |
+
+General runner 在完成时写 `run_manifest.csv`。使用
+`Rscript tools/build_run_registry.R analysis/runs` 汇总并识别完全重复 run。

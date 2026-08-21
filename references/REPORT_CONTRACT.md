@@ -59,12 +59,45 @@ An LLM may help draft or reorganize this ledger, but it must not invent source
 files, numerical results, literature support, or evidence levels. A deterministic
 validator checks the ledger before rendering.
 
+## Annotation rule
+
+Reviewed, project-specific prose lives in durable inputs that survive
+re-rendering, never in the shared template and never by editing the rendered
+HTML:
+
+- `report_interpretation.md` — one whole-report narrative, rendered near the
+  top;
+- `report_interpretation/<section>.md` — per-section annotations rendered in
+  place at the end of the matching section. Canonical section keys come from
+  `report_interpretation_sections()`; `scaffold_report_interpretation()`
+  creates starter files. Whole-line HTML comments are treated as guidance and
+  never render, and a file containing only comments is skipped, so untouched
+  starters stay invisible.
+
+Annotations are subordinate to the statistical evidence and to the
+claim-evidence ledger: they may interpret, contextualize, and flag caveats,
+but must not introduce numerical claims that are not read from saved outputs,
+and must not raise a conclusion above its ledger evidence level. Editing an
+annotation plus re-rendering is the supported modification loop; the rendered
+HTML remains a regenerable artifact.
+
+Use `Rscript tools/render_report.R <run_dir> --scaffold` to create durable
+annotation files and a review checklist, then re-render after each Markdown
+edit without rerunning the statistical pipeline. Do not edit the shared
+`reports/analysis_report.Rmd`/`.qmd` or the generated HTML inside a project.
+
 ## Statistical rule
 
 - Define the experimental unit, model, contrast, primary threshold and
   multiplicity family before results.
 - Report effect estimates and uncertainty alongside P/FDR values.
 - Treat additional DEG thresholds as sensitivity analyses.
+- A threshold tier using unadjusted (nominal) P values is exploratory
+  hypothesis-generation only: it exists to keep ORA/gene-list analyses alive
+  in low-DEG projects, must be labelled as nominal, must never serve as the
+  primary threshold, and anything derived from it requires confirmation at an
+  adjusted-P tier or by rank-based (GSEA/GSVA) evidence before supporting a
+  claim above E0/E1.
 - Separate database enrichment from custom or model-defined gene sets.
 - With very small groups, supplement parametric gene-set comparisons with
   individual samples, standardized effect size, and exact label-permutation
@@ -96,3 +129,12 @@ A shareable report must pass:
    browser errors;
 6. a complete result inventory and reproducibility metadata.
 
+The deterministic checks are recorded in `report_validation.csv`. In addition,
+headline DEG counts are independently reconciled between
+`Analysis_summary.txt` and `DEG_threshold_summary.csv`, and every project-relative
+file named by the claim ledger must exist.
+`report_review_checklist.csv` requires human sign-off for design and
+experimental unit, sample QC/exclusions, contrast direction, primary FDR and
+effect-size choices, ORA/GSEA/GSVA interpretation, claim calibration,
+alternative explanations, limitations and figure integrity. Draft rendering
+allows pending rows; `tools/render_report.R <run_dir> --publish` does not.

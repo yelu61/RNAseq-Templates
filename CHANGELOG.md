@@ -6,6 +6,78 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ### Added
 
+- **Two-notebook General workflow**: `RNAseq_General.ipynb` remains the complete,
+  independently executable pipeline, while the new Jupytext-paired
+  `RNAseq_General_RunReview.R/.ipynb` reads an immutable CLI `RUN_DIR`, never
+  refits the core differential/enrichment model, and writes selected-gene plots
+  or optional custom-GSVA derivatives to a separate `REVIEW_OUTDIR`. A static
+  regression test rejects core-analysis calls in the review notebook, and the
+  notebook was executed against the bundled General demo.
+- **Run manifest and registry (`run_utils.R`, `tools/build_run_registry.R`)**:
+  General runs now record input/config checksums, a statistical analysis
+  signature, lifecycle role, parent, change note, retention class and size in
+  `run_manifest.csv`. The project registry is rebuilt after runs finish, safely
+  marks exact duplicates through `duplicate_of`, prefers a full canonical run
+  as the family owner, and never prunes automatically.
+- **Independent report rendering and scientific publish gate**:
+  `tools/render_report.R` re-renders a completed run after project-owned
+  Markdown edits without re-analysis. `report_review_checklist.csv` separates
+  draft generation from human approval, while `validate_analysis_report()`
+  writes `report_validation.csv` and checks HTML, coverage, claims,
+  reproducibility, PDF integrity, headline DEG-count reconciliation and review
+  status; claim-ledger source paths must resolve. `--publish` requires all coverage
+  decisions and checklist items to be resolved and signed.
+
+- **Narrative-report layer machinery (`narrative_utils.R`,
+  `reports/narrative_report_scaffold.Rmd`, `references/NARRATIVE_REPORT.md`)**:
+  the bespoke, conclusion-led narrative report (the RPE/CF-style Chinese
+  document layered above the generic technical `RNAseq_report.html`) was
+  previously re-authored from scratch per project with no shared plumbing and
+  no quality gate. The repo now ships the machinery that guarantees its
+  quality: `make_report_citers(run_dir)` builds inline-citation closures
+  (`sv`/`gl`/`gp`/`gnes`/`ora_terms`) that read every headline number from
+  saved run outputs at render time (hand-typed values remain contract-banned);
+  `show_pdf()` embeds run-bundle PDF figures as the single source of truth;
+  `validate_narrative_report()` is an automated QA gate that hard-fails on
+  missing figures/sections and warns on failed lookups before a report may be
+  curated; `scaffold_narrative_report()` copies the generic skeleton
+  (conclusion-led headings, per-section bio-boxes, contract reminders in
+  non-rendering comments) into a project. `NARRATIVE_REPORT.md` documents the
+  two-layer model, the quality mechanisms, and the standard workflow.
+  Backfilled from the reference implementations in 202607XXR_RPE and 202605CF.
+- **Per-section project annotations for the HTML report
+  (`report_utils.R`, `reports/analysis_report.qmd` + `.Rmd` twin)**:
+  projects can now annotate individual report sections via
+  `report_interpretation/<section>.md` files (canonical keys:
+  `scope`, `qc`, `deg`, `ora`, `gsea`, `custom_genesets`,
+  `cross_contrast`, `synthesis`, `limitations`). Annotations render in place
+  at the end of the matching section in a distinct callout box, support full
+  markdown and inline R, and persist across re-renders — so reviewed
+  interpretation is edited as a durable input instead of being re-typed after
+  every regeneration. New `report_interpretation_sections()` and
+  `scaffold_report_interpretation()` helpers create starter files (never
+  overwriting written prose); starter guidance lives in whole-line HTML
+  comments that never render, and comment-only files are skipped so untouched
+  scaffolds stay invisible. `REPORT_CONTRACT.md` gains an "Annotation rule"
+  section keeping annotations subordinate to saved evidence and the
+  claim-evidence ledger.
+- **Exploratory nominal-P DEG tiers via per-row `p_column` in `THRESHOLD_GRID`
+  (`deg_utils.R`, `enrichment_utils.R`, `templates/General/config.R`,
+  report template)**: the threshold grid was previously interpreted through a
+  single run-wide `DEG_PVALUE_COLUMN`, so a project either called all DEGs on
+  adjusted P or all on nominal P. Each grid row can now carry its own
+  `p_column` ("padj"/"pvalue", NA/absent = inherit the run-wide default), so a
+  run can keep inferential padj tiers *and* append an exploratory nominal-p
+  tier (e.g. `exploratory: 0.05, p_column = "pvalue"`) that keeps ORA alive in
+  low-DEG projects. DEG marking, the threshold summary (`pvalue_column` +
+  `definition` columns), the raw-vs-shrunken strategy summary and
+  `run_threshold_ora()` all resolve the column per row via the new
+  `threshold_p_column()` helper. Guardrails: config rejects invalid values and
+  warns if the default threshold is nominal; the report renders a caution box
+  next to the DEG-count table whenever a nominal-p tier is present; the
+  report's primary-threshold picker and `REPORT_CONTRACT.md` keep nominal
+  tiers out of the headline reading path (confirmation at an adjusted-P tier
+  or by rank-based evidence required for claims above E0/E1).
 - **`TME_ORTHOLOG_CACHE` runner option (`templates/General/`)**: the General
   runner's TME block now passes `ortholog_cache = TME_ORTHOLOG_CACHE` through to
   `prepare_tme_expression()`, exposing the offline-deterministic ortholog cache
@@ -24,14 +96,61 @@ All notable changes to RNAseq-Templates are documented in this file.
   is unavailable but `rmarkdown` is, the helper automatically renders the twin
   instead of stopping. Regression tests pin the twin body to the `.qmd` (drift
   guard) and exercise the fallback render end-to-end when Quarto is absent.
+- **GSVA per-set group-comparison statistics in the runner
+  (`templates/General/run_analysis.R`)**: the runner previously wrote
+  `GSVA_scores.csv` and boxplots but never *tested* the scores, so "does this
+  gene set differ by group?" had no statistical answer — surfaced by the
+  202504CF_EV Pyro-EV macrophage runs, where the M1/M2/cGAS-STING sets looked
+  different on the boxplot but the group-mean impression did not survive a
+  proper test. After writing `GSVA_scores.csv` the runner now calls
+  `pathway_group_comparison()` (existing library helper: per-set t-test/wilcoxon
+  + BH across `COMPARISONS`) and writes `2-GSEA/GSVA_group_comparison.csv`
+  (pathway × comparison, p, BH p.adj, direction). Guarded with `tryCatch` so a
+  stats failure never aborts the run.
 
 ### Fixed
 
+- **Explicit sample IDs in General `colData.csv`**: the runner and complete
+  notebook now persist row names as a `sample` column instead of relying on row
+  order. The review notebook remains backward-compatible with older runs that
+  lack the column.
+- **CLI self-location under iCloud paths containing spaces**: on affected macOS
+  Rscript installations, `--file=` encodes spaces as `~+~`. All runner,
+  re-visualization and report/registry entry points now restore the path before
+  normalization; converter-generated runners inherit the same fix.
+
+- **Setup-chunk source leaked into rmarkdown-rendered reports
+  (`reports/analysis_report.qmd` + `.Rmd` twin)**: the setup chunk relied on
+  `knitr::opts_chunk$set(echo = FALSE)`, which only takes effect for
+  *subsequent* chunks, and the `.Rmd` twin's YAML has no global echo setting —
+  so under the rmarkdown fallback (the path used on machines without the
+  Quarto CLI) the entire helper-code block was dumped at the top of the
+  report. The setup chunk now carries an explicit `echo=FALSE` chunk option,
+  which both Quarto and rmarkdown honor.
 - **`4-TME/` missing from run summaries (`templates/General/run_analysis.R`)**:
   with `RUN_TME <- TRUE` the runner wrote a full `4-TME/` deconvolution bundle
   but neither `Analysis_summary.txt` ("3. Output Files") nor the final
   `Outputs:` log line listed it — surfaced by the 202603AK112 three-model runs.
   Both now include `4-TME/` when `RUN_TME` is on.
+- **Mouse TME aborted when any symbol was un-cached and the network was down
+  (`tme_utils.R`)**: `convert_mouse_symbols_to_human()` queried the network
+  whenever *any* input symbol was absent from `ortholog_cache`, and a failed
+  lookup (e.g. Ensembl endpoint HTTP 404) aborted the whole run even when the
+  cache already covered the mappable majority. Two hardenings, backfilled from
+  the 202605CF Ta1 run (whose `gene_name` column carries Ensembl-ID placeholders
+  for ~1,600 features with no MGI symbol): (1) rownames matching `^ENSMUSG` are
+  recognised as non-symbol placeholders and skipped rather than sent to the
+  `mgi_symbol` filter; (2) a failed online lookup now degrades to the cached
+  mapping (with a warning) instead of stopping, and — critically — does *not*
+  mark the un-fetched symbols as queried or write them to the cache, so a later
+  online run still retries them. Regression tests cover the Ensembl-skip path,
+  the cache-only degradation, and cache non-poisoning.
+- **Misleading Ensembl-ID warning for mixed mouse symbols (`tme_utils.R`)**:
+  a small number of Ensembl placeholders is now handled quietly by the
+  mouse-to-human converter; the input warning is reserved for matrices whose
+  rownames are predominantly Ensembl IDs. The General runner's default IOBR
+  panel now avoids online-only xCell (`estimate/cibersort/epic/mcpcounter`);
+  xCell remains an explicit opt-in when its network dependency is verified.
 
 ### Added (continued)
 
@@ -86,60 +205,7 @@ All notable changes to RNAseq-Templates are documented in this file.
   `seed = NULL` to restore stochastic behaviour. New regression test asserts
   two calls with the default seed return identical result frames.
 
-## [0.9.0] - 2026-07-27
-
-Reliability and CI hardening release. The headline: the GitHub Actions smoke
-test went from never passing to fully green across all six templates, with the
-unit-test suite expanded to every helper module and two real integration bugs
-fixed in the General template.
-
-### Fixed
-
-- **Paired-design integration bug (General template)**: the paired branch in
-  `templates/General/run_analysis.R` and `RNAseq_General.ipynb` built `colData`
-  but never created `group`, so `filter_low_count_genes()` and the
-  `save(..., group, ...)` call failed with `object 'group' not found` on any
-  paired run. `group <- colData$condition` is now set in the paired branch.
-- **Batch-correction loop not closed (General template)**: `BATCH_VECTOR` fed
-  PCA/PVE diagnostics but was never written into `colData`, so a batch-aware
-  `DESIGN_FORMULA` (e.g. `~ batch + condition`) could not resolve. New
-  `add_batch_col()` in `design_utils.R` (paired with the existing
-  `validate_batch_design()`) writes the batch covariate into `colData`; both the
-  runner and the notebook call it.
-- **CI dependency install (the reason CI never passed)**:
-  - The hand-written package list in `smoke-test.yml` had drifted from
-    `install_dependencies.R` and used wrong namespaces (`bioc::survival` is a
-    CRAN package; `any::estimate` is R-Forge-only). The workflow now reuses
-    `install_dependencies.R` as the single source of truth.
-  - `install_dependencies.R` warned instead of failing on missing packages, so
-    the install step reported success and the smoke test was the first thing to
-    actually stop. It now `stop()`s with a clear, attributable message.
-  - `install_dependencies.R` hard-coded the P3M *jammy* repo while
-    `ubuntu-latest` is now *noble* (24.04), pulling a `libMagick++` soname
-    (`.so.8`) that noble's apt packages do not provide — this broke
-    `SpatialExperiment` → `GSVA` → `IOBR` at load time. The distro codename is
-    now detected from `/etc/os-release`, and `libmagick++-dev` (plus other Bioc
-    system libraries) is installed explicitly.
-
-### Added
-
-- **Unit tests for the 6 previously-untested modules** (`batch_utils`,
-  `geo_utils`, `report_utils`, `survival_utils`, `tcga_utils`,
-  `timecourse_utils`), giving all 14 `RNAseq_lib` modules direct coverage.
-  Suite: 293 assertions, 0 fail/warn/skip.
-- **Integration tests** (`tests/testthat/test-design-integration.R`)
-  reproducing the paired-`group` and batch-`colData` failure modes above.
-- **limma-voom and WGCNA demos added to the smoke test**; the smoke test now
-  exercises all six templates. Their demo input data is committed (with targeted
-  `.gitignore` exemptions), matching how `examples/demo_data` is handled.
-- **CI diagnosability**: per-demo logs (`examples/demo_logs/`) echoed into the
-  main log, and a `failure()` artifact upload of demo outputs, so future CI
-  failures are self-describing.
-- The bundled CIBERSORT mouse signature
-  (`references/CIBERSORT/cibersort_mouse_22.csv`) is now tracked, so the native
-  CIBERSORT test runs on CI instead of skipping.
-
-## [Unreleased]
+## [0.10.0] - 2026-08-13
 
 ### Added
 
@@ -447,6 +513,59 @@ fixed in the General template.
 
 - `extract_deseq2_results()` no longer fails with "object 'raw_df' not found".
 - limma-voom batch correction no longer checks nonsensical `names(GROUPS)` / `Sys.getenv()` conditions.
+
+## [0.9.0] - 2026-07-27
+
+Reliability and CI hardening release. The headline: the GitHub Actions smoke
+test went from never passing to fully green across all six templates, with the
+unit-test suite expanded to every helper module and two real integration bugs
+fixed in the General template.
+
+### Fixed
+
+- **Paired-design integration bug (General template)**: the paired branch in
+  `templates/General/run_analysis.R` and `RNAseq_General.ipynb` built `colData`
+  but never created `group`, so `filter_low_count_genes()` and the
+  `save(..., group, ...)` call failed with `object 'group' not found` on any
+  paired run. `group <- colData$condition` is now set in the paired branch.
+- **Batch-correction loop not closed (General template)**: `BATCH_VECTOR` fed
+  PCA/PVE diagnostics but was never written into `colData`, so a batch-aware
+  `DESIGN_FORMULA` (e.g. `~ batch + condition`) could not resolve. New
+  `add_batch_col()` in `design_utils.R` (paired with the existing
+  `validate_batch_design()`) writes the batch covariate into `colData`; both the
+  runner and the notebook call it.
+- **CI dependency install (the reason CI never passed)**:
+  - The hand-written package list in `smoke-test.yml` had drifted from
+    `install_dependencies.R` and used wrong namespaces (`bioc::survival` is a
+    CRAN package; `any::estimate` is R-Forge-only). The workflow now reuses
+    `install_dependencies.R` as the single source of truth.
+  - `install_dependencies.R` warned instead of failing on missing packages, so
+    the install step reported success and the smoke test was the first thing to
+    actually stop. It now `stop()`s with a clear, attributable message.
+  - `install_dependencies.R` hard-coded the P3M *jammy* repo while
+    `ubuntu-latest` is now *noble* (24.04), pulling a `libMagick++` soname
+    (`.so.8`) that noble's apt packages do not provide — this broke
+    `SpatialExperiment` → `GSVA` → `IOBR` at load time. The distro codename is
+    now detected from `/etc/os-release`, and `libmagick++-dev` (plus other Bioc
+    system libraries) is installed explicitly.
+
+### Added
+
+- **Unit tests for the 6 previously-untested modules** (`batch_utils`,
+  `geo_utils`, `report_utils`, `survival_utils`, `tcga_utils`,
+  `timecourse_utils`), giving all 14 `RNAseq_lib` modules direct coverage.
+  Suite: 293 assertions, 0 fail/warn/skip.
+- **Integration tests** (`tests/testthat/test-design-integration.R`)
+  reproducing the paired-`group` and batch-`colData` failure modes above.
+- **limma-voom and WGCNA demos added to the smoke test**; the smoke test now
+  exercises all six templates. Their demo input data is committed (with targeted
+  `.gitignore` exemptions), matching how `examples/demo_data` is handled.
+- **CI diagnosability**: per-demo logs (`examples/demo_logs/`) echoed into the
+  main log, and a `failure()` artifact upload of demo outputs, so future CI
+  failures are self-describing.
+- The bundled CIBERSORT mouse signature
+  (`references/CIBERSORT/cibersort_mouse_22.csv`) is now tracked, so the native
+  CIBERSORT test runs on CI instead of skipping.
 
 ## Earlier releases
 

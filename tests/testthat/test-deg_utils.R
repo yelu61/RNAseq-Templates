@@ -94,3 +94,67 @@ test_that("plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closu
   expect_true(file.exists(outfile))
   expect_gt(file.info(outfile)$size, 1500)
 })
+
+test_that("validate_threshold_grid validates per-row p_column", {
+  tg <- data.frame(
+    name = c("standard", "exploratory"),
+    p_cutoff = c(0.05, 0.05),
+    log2fc = c(1.0, 0.5),
+    p_column = c("padj", "pvalue"),
+    stringsAsFactors = FALSE
+  )
+  expect_silent(validate_threshold_grid(tg, "standard"))
+  tg$p_column[2] <- "fdr"
+  expect_error(validate_threshold_grid(tg), "p_column")
+})
+
+test_that("threshold_p_column resolves per-row override with default fallback", {
+  th <- data.frame(name = "exploratory", p_cutoff = 0.05, log2fc = 0.5,
+                   p_column = "pvalue", stringsAsFactors = FALSE)
+  expect_equal(threshold_p_column(th, "padj"), "pvalue")
+  th$p_column <- NA
+  expect_equal(threshold_p_column(th, "padj"), "padj")
+  th$p_column <- NULL
+  expect_equal(threshold_p_column(th, "padj"), "padj")
+  expect_equal(threshold_p_column(th, NULL), "padj")
+})
+
+test_that("build_deg_threshold_sets honors a mixed padj/pvalue grid", {
+  res <- data.frame(
+    gene_name = c("A", "B", "C", "D"),
+    pvalue = c(0.001, 0.01, 0.03, 0.20),
+    padj   = c(0.04, 0.30, 0.60, 0.90),
+    log2FoldChange = c(2, 1.5, -1.2, 0.8),
+    stringsAsFactors = FALSE
+  )
+  grid <- data.frame(
+    name = c("standard", "exploratory"),
+    p_cutoff = c(0.05, 0.05),
+    log2fc = c(1, 1),
+    p_column = c("padj", "pvalue"),
+    stringsAsFactors = FALSE
+  )
+  sets <- build_deg_threshold_sets(list(T_vs_C = res), grid, pvalue_column = "padj")
+  # padj tier: only gene A passes; nominal-p tier: A, B, C pass.
+  expect_equal(sum(sets$standard$T_vs_C$significance != "Not_Sig"), 1)
+  expect_equal(sum(sets$exploratory$T_vs_C$significance != "Not_Sig"), 3)
+  # Summary records the per-row column and definition.
+  s <- summarize_deg_thresholds(sets, grid, pvalue_column = "padj", lfc_column = "log2FoldChange")
+  expect_equal(s$pvalue_column[s$Threshold == "standard"], "padj")
+  expect_equal(s$pvalue_column[s$Threshold == "exploratory"], "pvalue")
+  expect_match(s$definition[s$Threshold == "exploratory"], "^pvalue < 0.05")
+})
+
+test_that("run-wide pvalue_column default applies when grid has no p_column", {
+  res <- data.frame(
+    gene_name = c("A", "B"),
+    pvalue = c(0.01, 0.20),
+    padj   = c(0.30, 0.90),
+    log2FoldChange = c(2, 2),
+    stringsAsFactors = FALSE
+  )
+  grid <- data.frame(name = "standard", p_cutoff = 0.05, log2fc = 1,
+                     stringsAsFactors = FALSE)
+  sets <- build_deg_threshold_sets(list(T_vs_C = res), grid, pvalue_column = "pvalue")
+  expect_equal(sum(sets$standard$T_vs_C$significance != "Not_Sig"), 1)
+})

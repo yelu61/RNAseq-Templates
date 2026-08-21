@@ -44,6 +44,9 @@ notebook's parameter cell into a `config.R` + runner draft.
       visual QA rules across shared plotting helpers
 - [x] Added a two-layer real-project output contract based on the
       `202607XXR_RPE` implementation audit
+- [x] Added separate complete-execution and read-only run-review General notebooks
+- [x] Added run manifests, duplicate registry and explicit retention lifecycle
+- [x] Added independent report re-rendering plus scientific-review publish gate
 
 ## Planned / Future
 

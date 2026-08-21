@@ -15,7 +15,27 @@ validate_threshold_grid <- function(threshold_grid, default_threshold = NULL) {
   if (!is.null(default_threshold) && !default_threshold %in% threshold_grid$name) {
     stop("DEFAULT_THRESHOLD must be one of THRESHOLD_GRID$name.")
   }
+  if ("p_column" %in% colnames(threshold_grid)) {
+    bad <- !is.na(threshold_grid$p_column) & !threshold_grid$p_column %in% c("padj", "pvalue")
+    if (any(bad)) {
+      stop("THRESHOLD_GRID$p_column must be 'padj' or 'pvalue' (or NA to inherit the run-wide default).")
+    }
+  }
   threshold_grid
+}
+
+# Resolve the p-value column for one threshold-grid row: a per-row `p_column`
+# ("padj" or "pvalue") overrides the run-wide default; an absent/NA entry
+# falls back to `default_column`. This lets one grid mix inferential padj
+# tiers with an exploratory nominal-p tier for low-DEG projects (e.g. keeping
+# ORA alive when adjusted-P tiers yield too few genes). Nominal-p tiers are
+# exploratory by definition and must stay out of headline claims.
+threshold_p_column <- function(th, default_column = "padj") {
+  if (is.null(default_column)) default_column <- "padj"
+  if ("p_column" %in% colnames(th) && !is.na(th$p_column[[1]]) && nzchar(th$p_column[[1]])) {
+    return(th$p_column[[1]])
+  }
+  default_column
 }
 
 run_deseq2_model <- function(count_data, col_data, design_formula) {
@@ -128,7 +148,7 @@ build_deg_threshold_sets <- function(res_list, threshold_grid, pvalue_column = "
       mark_deg_by_threshold,
       pvalue_thresh = th$p_cutoff,
       log2fc_thresh = th$log2fc,
-      pvalue_column = pvalue_column,
+      pvalue_column = threshold_p_column(th, pvalue_column),
       lfc_column = lfc_column
     )
   }
@@ -153,11 +173,12 @@ summarize_deg_thresholds <- function(deg_by_threshold, threshold_grid = NULL, pv
         stringsAsFactors = FALSE
       )
       if (!is.null(th)) {
-        row$pvalue_column <- pvalue_column
+        th_p_col <- threshold_p_column(th, pvalue_column)
+        row$pvalue_column <- th_p_col
         row$p_cutoff <- th$p_cutoff
         row$lfc_column <- lfc_column
         row$log2fc_cutoff <- th$log2fc
-        row$definition <- paste0(pvalue_column, " < ", th$p_cutoff, " & abs(", lfc_column, ") > ", th$log2fc)
+        row$definition <- paste0(th_p_col, " < ", th$p_cutoff, " & abs(", lfc_column, ") > ", th$log2fc)
       }
       row
     }))
@@ -221,17 +242,18 @@ summarize_lfc_strategies <- function(res_list, threshold_grid, pvalue_column = "
       validate_lfc_column(res, lfc_column)
       for (i in seq_len(nrow(threshold_grid))) {
         th <- threshold_grid[i, ]
+        th_p_col <- threshold_p_column(th, pvalue_column)
         marked <- mark_deg_by_threshold(
           res,
           pvalue_thresh = th$p_cutoff,
           log2fc_thresh = th$log2fc,
-          pvalue_column = pvalue_column,
+          pvalue_column = th_p_col,
           lfc_column = lfc_column
         )
         rows[[length(rows) + 1]] <- data.frame(
           Threshold = th$name,
           Comparison = comp_name,
-          pvalue_column = pvalue_column,
+          pvalue_column = th_p_col,
           p_cutoff = th$p_cutoff,
           lfc_column = lfc_column,
           lfc_strategy = sub("^log2FoldChange_", "", lfc_column),

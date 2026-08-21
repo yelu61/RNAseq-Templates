@@ -2,6 +2,8 @@
 # Renders a self-contained HTML report from the CSV/PDF outputs that the
 # notebooks already produce, without re-running any analysis.
 
+.report_or <- function(x, fallback) if (is.null(x)) fallback else x
+
 # Render the shared Quarto/R Markdown analysis report.
 #
 # @param outdir Project output directory (contains 1-DEG/, 2-GSEA/, 3-Visualization/).
@@ -38,9 +40,20 @@ render_analysis_report <- function(outdir = ".",
   # them. Project-specific workflows may replace rows with explicit
   # not_applicable / omitted_with_reason decisions before calling this helper.
   coverage_file <- file.path(outdir, "report_coverage_manifest.csv")
-  if (!file.exists(coverage_file)) {
-    write_report_coverage_manifest(outdir, coverage_file)
+  overrides <- NULL
+  if (file.exists(coverage_file)) {
+    previous <- tryCatch(utils::read.csv(coverage_file, stringsAsFactors = FALSE,
+                                         check.names = FALSE), error = function(e) NULL)
+    if (!is.null(previous) && all(c("domain", "status") %in% colnames(previous))) {
+      overrides <- previous[previous$status %in% c("not_applicable", "omitted_with_reason"), , drop = FALSE]
+    }
   }
+  write_report_coverage_manifest(outdir, coverage_file, overrides = overrides)
+  if (!file.exists(file.path(outdir, "report_review_checklist.csv"))) {
+    scaffold_report_review(outdir)
+  }
+  ledger_file <- file.path(outdir, "claim_evidence_ledger.csv")
+  if (file.exists(ledger_file)) validate_claim_evidence_ledger(ledger_file, base_dir = outdir)
 
   template_ext <- tolower(tools::file_ext(template))
   quarto_available <- requireNamespace("quarto", quietly = TRUE) && nzchar(Sys.which("quarto"))
@@ -124,7 +137,7 @@ default_report_coverage_rules <- function() {
       "(GSVA|CustomGeneSets|pathway_gsva|gene_set)",
       "(CompareCluster|overlap|Jaccard|treatment_effect)",
       "(claim_evidence_ledger|ReasoningBrief|report_narrative)",
-      "(sessionInfo|analysis_manifest|config[.]R)",
+      "(sessionInfo|analysis_manifest|run_manifest|config[.]R)",
       "(report_validation|figure_manifest|validation_checks)"
     ),
     stringsAsFactors = FALSE
@@ -223,7 +236,7 @@ validate_report_coverage <- function(manifest, require_resolved_optional = FALSE
 
 # Validate the narrative handoff used for model-assisted scientific synthesis.
 # The ledger keeps generated interpretation subordinate to saved evidence.
-validate_claim_evidence_ledger <- function(ledger) {
+validate_claim_evidence_ledger <- function(ledger, base_dir = NULL) {
   if (is.character(ledger) && length(ledger) == 1) {
     if (!file.exists(ledger)) stop("Claim-evidence ledger not found: ", ledger)
     ledger <- utils::read.csv(ledger, stringsAsFactors = FALSE, check.names = FALSE)
@@ -242,7 +255,246 @@ validate_claim_evidence_ledger <- function(ledger) {
     stop("Claim ledger contains unsupported evidence levels.")
   }
   if (any(!nzchar(trimws(ledger$source_files)))) stop("Every claim requires one or more source files.")
+  if (!is.null(base_dir)) {
+    missing_sources <- unique(unlist(lapply(ledger$source_files, function(value) {
+      files <- trimws(strsplit(value, ";", fixed = TRUE)[[1]])
+      files <- files[nzchar(files)]
+      files[!file.exists(file.path(base_dir, files))]
+    })))
+    if (length(missing_sources)) {
+      stop("Claim ledger references missing source files: ", paste(missing_sources, collapse = ", "))
+    }
+  }
   invisible(TRUE)
+}
+
+# Independently reconcile the text-summary headline DEG counts against the
+# machine-readable threshold summary. This catches stale prose after a rerun.
+validate_report_headline_values <- function(outdir = ".") {
+  summary_file <- file.path(outdir, "Analysis_summary.txt")
+  deg_file <- file.path(outdir, "1-DEG", "DEG_threshold_summary.csv")
+  config_file <- file.path(outdir, "0-Config", "analysis_config_used.R")
+  if (!file.exists(summary_file) || !file.exists(deg_file)) {
+    stop("Headline validation requires Analysis_summary.txt and DEG_threshold_summary.csv.")
+  }
+  primary <- "standard"
+  if (file.exists(config_file)) {
+    config_env <- new.env(parent = baseenv())
+    tryCatch(sys.source(config_file, envir = config_env), error = function(e) NULL)
+    if (exists("DEFAULT_THRESHOLD", envir = config_env, inherits = FALSE)) {
+      primary <- get("DEFAULT_THRESHOLD", envir = config_env, inherits = FALSE)
+    }
+  }
+  deg <- utils::read.csv(deg_file, stringsAsFactors = FALSE, check.names = FALSE)
+  required <- c("Threshold", "Comparison", "UP", "DOWN", "Total")
+  missing <- setdiff(required, colnames(deg))
+  if (length(missing)) stop("DEG threshold summary is missing columns: ", paste(missing, collapse = ", "))
+  expected <- deg[deg$Threshold == primary, required[-1], drop = FALSE]
+  if (!nrow(expected)) stop("No DEG threshold-summary rows found for primary tier: ", primary)
+
+  lines <- readLines(summary_file, warn = FALSE)
+  pattern <- "^\\s*-\\s+(.+):\\s+([0-9]+) DEGs \\(Up: ([0-9]+), Down: ([0-9]+)\\)"
+  matches <- regexec(pattern, lines, perl = TRUE)
+  parsed <- regmatches(lines, matches)
+  parsed <- parsed[lengths(parsed) == 5L]
+  if (!length(parsed)) stop("No parseable DEG headline counts found in Analysis_summary.txt.")
+  observed <- do.call(rbind, lapply(parsed, function(x) {
+    data.frame(Comparison = x[[2]], Total = as.integer(x[[3]]),
+               UP = as.integer(x[[4]]), DOWN = as.integer(x[[5]]), stringsAsFactors = FALSE)
+  }))
+  idx <- match(expected$Comparison, observed$Comparison)
+  if (anyNA(idx)) stop("Analysis_summary.txt is missing comparisons: ",
+                       paste(expected$Comparison[is.na(idx)], collapse = ", "))
+  mismatch <- expected$Total != observed$Total[idx] |
+    expected$UP != observed$UP[idx] | expected$DOWN != observed$DOWN[idx]
+  if (any(mismatch)) stop("Headline DEG counts disagree with DEG_threshold_summary.csv: ",
+                          paste(expected$Comparison[mismatch], collapse = ", "))
+  invisible(TRUE)
+}
+
+# Human scientific-review gate. Rendering is allowed while items are pending;
+# publication requires every item to be approved or explicitly not applicable.
+report_review_items <- function() {
+  data.frame(
+    item_id = c(
+      "design_unit", "sample_qc", "contrast_direction", "deg_inference",
+      "ora_scope", "gsea_interpretation", "geneset_statistics",
+      "claim_evidence", "alternatives_limitations", "figure_integrity"
+    ),
+    review_item = c(
+      "Experimental unit, design formula and covariates are correct",
+      "Sample QC flags and exclusions are justified and documented",
+      "Every contrast direction and reference group is verified",
+      "Primary FDR/effect-size threshold and sensitivity tiers are labelled",
+      "ORA direction, input list and background universe are appropriate",
+      "GSEA rank metric, NES direction and leading-edge evidence are reviewed",
+      "GSVA/TME statistics, multiplicity and gene-set provenance are reviewed",
+      "Headline claims trace to saved files and calibrated evidence levels",
+      "Alternative explanations, limitations and falsifiers are stated",
+      "Primary figures are readable, non-empty and match their source tables"
+    ),
+    status = "pending",
+    reviewer = "",
+    reviewed_at = "",
+    notes = "",
+    stringsAsFactors = FALSE
+  )
+}
+
+scaffold_report_review <- function(outdir = ".", overwrite = FALSE) {
+  if (!dir.exists(outdir)) stop("Report output directory not found: ", outdir)
+  path <- file.path(outdir, "report_review_checklist.csv")
+  if (file.exists(path) && !isTRUE(overwrite)) return(invisible(path))
+  utils::write.csv(report_review_items(), path, row.names = FALSE, na = "")
+  invisible(path)
+}
+
+validate_report_review <- function(checklist, require_signoff = TRUE) {
+  if (is.character(checklist) && length(checklist) == 1L) {
+    if (!file.exists(checklist)) stop("Report review checklist not found: ", checklist)
+    checklist <- utils::read.csv(checklist, stringsAsFactors = FALSE, check.names = FALSE)
+  }
+  required <- c("item_id", "review_item", "status", "reviewer", "reviewed_at", "notes")
+  missing <- setdiff(required, colnames(checklist))
+  if (length(missing)) stop("Report review checklist is missing columns: ", paste(missing, collapse = ", "))
+  if (anyDuplicated(checklist$item_id) || any(!nzchar(trimws(checklist$item_id)))) {
+    stop("Report review item_id values must be present and unique.")
+  }
+  allowed <- c("pending", "approved", "not_applicable")
+  if (any(!checklist$status %in% allowed)) stop("Report review checklist contains an unsupported status.")
+  if (isTRUE(require_signoff)) {
+    if (any(checklist$status == "pending")) {
+      stop("Report review remains pending: ", paste(checklist$item_id[checklist$status == "pending"], collapse = ", "))
+    }
+    signed <- checklist$status == "approved"
+    if (any(signed & (!nzchar(trimws(checklist$reviewer)) | !nzchar(trimws(checklist$reviewed_at))))) {
+      stop("Approved report-review items require reviewer and reviewed_at.")
+    }
+    na_without_reason <- checklist$status == "not_applicable" & !nzchar(trimws(checklist$notes))
+    if (any(na_without_reason)) stop("Not-applicable report-review items require a reason in notes.")
+  }
+  invisible(TRUE)
+}
+
+# Deterministic technical QA plus the optional human sign-off gate. Results are
+# always written to report_validation.csv before a failed validation stops.
+validate_analysis_report <- function(outdir = ".",
+                                     report_file = file.path(outdir, "RNAseq_report.html"),
+                                     publish = FALSE) {
+  checks <- list()
+  add_check <- function(check, passed, detail) {
+    checks[[length(checks) + 1L]] <<- data.frame(
+      check = check, passed = isTRUE(passed), detail = detail, stringsAsFactors = FALSE
+    )
+  }
+
+  html_ok <- file.exists(report_file) && is.finite(file.info(report_file)$size) && file.info(report_file)$size > 10000
+  add_check("rendered_html", html_ok, if (html_ok) "HTML exists and is non-trivial." else "HTML missing or too small.")
+
+  coverage_file <- file.path(outdir, "report_coverage_manifest.csv")
+  coverage_error <- tryCatch({
+    coverage <- utils::read.csv(coverage_file, stringsAsFactors = FALSE, check.names = FALSE)
+    validate_report_coverage(coverage, require_resolved_optional = publish)
+    NULL
+  }, error = function(e) conditionMessage(e))
+  add_check("coverage_contract", is.null(coverage_error), .report_or(coverage_error, "Coverage contract passed."))
+
+  ledger_file <- file.path(outdir, "claim_evidence_ledger.csv")
+  ledger_error <- if (file.exists(ledger_file)) tryCatch({
+    validate_claim_evidence_ledger(ledger_file, base_dir = outdir); NULL
+  }, error = function(e) conditionMessage(e)) else NULL
+  add_check("claim_ledger", is.null(ledger_error), .report_or(ledger_error, "No invalid claim ledger detected."))
+
+  reproducibility <- file.exists(file.path(outdir, "sessionInfo.txt")) &&
+    (file.exists(file.path(outdir, "0-Config", "analysis_config_used.R")) ||
+       file.exists(file.path(outdir, "run_manifest.csv")))
+  add_check("reproducibility_metadata", reproducibility,
+            if (reproducibility) "Session and configuration provenance found." else "Missing session or configuration provenance.")
+
+  headline_error <- tryCatch({
+    validate_report_headline_values(outdir); NULL
+  }, error = function(e) conditionMessage(e))
+  add_check("headline_recomputation", is.null(headline_error),
+            .report_or(headline_error, "Headline DEG counts match the saved threshold table."))
+
+  pdfs <- list.files(outdir, pattern = "[.]pdf$", recursive = TRUE, full.names = TRUE)
+  bad_pdfs <- pdfs[is.na(file.info(pdfs)$size) | file.info(pdfs)$size <= 1500]
+  add_check("pdf_structure", !length(bad_pdfs),
+            if (!length(bad_pdfs)) paste(length(pdfs), "PDF files passed the non-empty check.") else
+              paste("Empty/incomplete PDFs:", paste(basename(bad_pdfs), collapse = ", ")))
+
+  review_file <- file.path(outdir, "report_review_checklist.csv")
+  review_error <- tryCatch({
+    validate_report_review(review_file, require_signoff = publish); NULL
+  }, error = function(e) conditionMessage(e))
+  add_check("scientific_review", is.null(review_error), .report_or(
+    review_error,
+    if (publish) "Scientific review signed off." else "Checklist schema is valid; pending items are allowed for draft rendering."
+  ))
+
+  result <- do.call(rbind, checks)
+  utils::write.csv(result, file.path(outdir, "report_validation.csv"), row.names = FALSE, na = "")
+  if (any(!result$passed)) {
+    stop(if (publish) "Report is not ready to publish: " else "Report validation failed: ",
+         paste(result$check[!result$passed], collapse = ", "))
+  }
+  invisible(result)
+}
+
+# Canonical report sections that accept a project annotation. Keys map to
+# report_interpretation/<key>.md files rendered in place by the report
+# template's show_interpretation() calls; labels describe the target section.
+report_interpretation_sections <- function() {
+  c(
+    scope = "Scope, samples, and inferential definitions",
+    qc = "Sample quality",
+    deg = "Differential expression",
+    ora = "Over-representation analysis",
+    gsea = "Rank-based enrichment (GSEA)",
+    custom_genesets = "Custom gene-set scoring",
+    cross_contrast = "Cross-contrast comparison",
+    synthesis = "Evidence-linked synthesis and hypotheses",
+    limitations = "Limitations, uncertainty, and robustness"
+  )
+}
+
+# Remove whole-line HTML comments (scaffold guidance) from annotation lines;
+# the report template applies the same rule before rendering.
+strip_interpretation_comments <- function(lines) {
+  lines[!grepl("^\\s*<!--.*-->\\s*$", lines)]
+}
+
+# Create report_interpretation/ under `outdir` with one starter file per
+# report section. Existing files are never touched unless overwrite = TRUE,
+# so re-scaffolding cannot destroy written annotations. A starter file
+# contains only whole-line HTML comments, which the report template strips;
+# it therefore renders nothing until real prose is added. Annotations are
+# subordinate to saved evidence and to the claim-evidence ledger.
+#
+# @return Invisibly, a list with the directory, created keys and skipped keys.
+scaffold_report_interpretation <- function(outdir = ".", overwrite = FALSE) {
+  if (!dir.exists(outdir)) stop("Report output directory not found: ", outdir)
+  dir <- file.path(outdir, "report_interpretation")
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  sections <- report_interpretation_sections()
+  created <- character(0)
+  skipped <- character(0)
+  for (key in names(sections)) {
+    path <- file.path(dir, paste0(key, ".md"))
+    if (file.exists(path) && !isTRUE(overwrite)) {
+      skipped <- c(skipped, key)
+      next
+    }
+    writeLines(c(
+      sprintf("<!-- Section: %s -->", sections[[key]]),
+      "<!-- Write the reviewed, project-specific annotation for this section below. -->",
+      "<!-- Whole-line HTML comments (like these) never render; a file containing -->",
+      "<!-- only comments is skipped entirely. Inline `r code` is evaluated at render. -->",
+      ""
+    ), path)
+    created <- c(created, key)
+  }
+  invisible(list(dir = dir, created = created, skipped = skipped))
 }
 
 # List PDF figures under a directory, optionally filtered by a regex pattern.

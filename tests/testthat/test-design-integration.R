@@ -83,3 +83,21 @@ test_that("non-paired batch path writes batch into colData", {
   mm <- stats::model.matrix(~ batch + condition, data = colData)
   expect_equal(nrow(mm), length(samples))
 })
+
+test_that("General notebook stays aligned with runner threshold, GSVA and report paths", {
+  repo <- tryCatch(rprojroot::find_root(rprojroot::is_git_root), error = function(e) getwd())
+  notebook <- jsonlite::fromJSON(file.path(repo, "notebooks", "RNAseq_General.ipynb"), simplifyVector = FALSE)
+  code <- paste(vapply(notebook$cells, function(cell) {
+    if (identical(cell$cell_type, "code")) paste(unlist(cell$source), collapse = "") else ""
+  }, character(1)), collapse = "\n")
+  expect_match(code, "DEFAULT_DEG_PVALUE_COLUMN")
+  expect_match(code, "GSVA_group_comparison[.]csv")
+  expect_match(code, "pathway_utils.R", fixed = TRUE)
+  expect_match(code, "primary_threshold = DEFAULT_THRESHOLD", fixed = TRUE)
+  expect_match(code, "template = report_template", fixed = TRUE)
+  expect_match(code, "sample = rownames(colData)", fixed = TRUE)
+  runner <- readLines(file.path(repo, "templates", "General", "run_analysis.R"), warn = FALSE)
+  expect_true(any(grepl("pathway_utils.R", runner, fixed = TRUE)))
+  expect_true(any(grepl("primary_threshold = DEFAULT_THRESHOLD", runner, fixed = TRUE)))
+  expect_true(any(grepl("sample = rownames(colData)", runner, fixed = TRUE)))
+})

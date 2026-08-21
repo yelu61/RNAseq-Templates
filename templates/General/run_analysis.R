@@ -25,6 +25,7 @@ options(stringsAsFactors = FALSE)
 invocation_dir <- normalizePath(getwd(), mustWork = TRUE)
 cmd_args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", grep("^--file=", cmd_args, value = TRUE))
+file_arg <- gsub("~\\+~", " ", file_arg)
 script_dir <- if (length(file_arg) > 0 && nzchar(file_arg)) dirname(normalizePath(file_arg[1])) else invocation_dir
 
 user_args <- commandArgs(trailingOnly = TRUE)
@@ -47,6 +48,25 @@ cat("========================================\n\n")
 
 # Source the config into the global environment so all parameters are available.
 source(config_path, local = globalenv())
+
+# Compatibility defaults for project configs copied before these options existed.
+if (!exists("DEFAULT_DEG_PVALUE_COLUMN", inherits = FALSE)) {
+  default_row <- THRESHOLD_GRID[THRESHOLD_GRID$name == DEFAULT_THRESHOLD, , drop = FALSE]
+  DEFAULT_DEG_PVALUE_COLUMN <- if ("p_column" %in% colnames(default_row) &&
+                                    !is.na(default_row$p_column[[1]]) &&
+                                    nzchar(default_row$p_column[[1]])) {
+    default_row$p_column[[1]]
+  } else {
+    DEG_PVALUE_COLUMN
+  }
+}
+if (!exists("SCAFFOLD_REPORT_INTERPRETATION", inherits = FALSE)) {
+  SCAFFOLD_REPORT_INTERPRETATION <- FALSE
+}
+if (!exists("RUN_ROLE", inherits = FALSE)) RUN_ROLE <- "candidate"
+if (!exists("PARENT_RUN_ID", inherits = FALSE)) PARENT_RUN_ID <- NA_character_
+if (!exists("RUN_CHANGE_NOTE", inherits = FALSE)) RUN_CHANGE_NOTE <- ""
+if (!exists("RUN_RETENTION", inherits = FALSE)) RUN_RETENTION <- "full"
 
 # ---- Resolve RNAseq_lib -------------------------------------------------------
 lib_dir <- Sys.getenv("RNASEQ_LIB_DIR", unset = NA_character_)
@@ -116,7 +136,8 @@ if (isTRUE(RUN_TME)) {
 }
 
 for (f in c("plot_utils.R", "io_utils.R", "data_utils.R", "deg_utils.R",
-            "enrichment_utils.R", "batch_utils.R", "design_utils.R", "report_utils.R")) {
+            "enrichment_utils.R", "pathway_utils.R", "batch_utils.R", "design_utils.R",
+            "report_utils.R", "run_utils.R")) {
   source(file.path(lib_dir, f))
 }
 # TME helpers are sourced later, only when RUN_TME is TRUE.
@@ -136,12 +157,14 @@ config_objects <- c(
   "COUNT_COLS", "SAMPLE_NAMES", "GROUPS", "GROUP_LEVELS", "BATCH_VECTOR", "PAIR_ID",
   "SAMPLE_EXCLUDE", "MIN_LIBRARY_SIZE", "MIN_DETECTED_GENES", "MAX_ZERO_FRACTION",
   "MIN_MEDIAN_CORRELATION_Z", "COMPARISONS", "DEG_PVALUE_COLUMN", "DEG_LFC_COLUMN",
-  "GSEA_RANK_COLUMN", "THRESHOLD_GRID", "DEFAULT_THRESHOLD", "MIN_COUNT", "DESIGN_FORMULA",
+  "GSEA_RANK_COLUMN", "THRESHOLD_GRID", "DEFAULT_THRESHOLD", "DEFAULT_DEG_PVALUE_COLUMN", "MIN_COUNT", "DESIGN_FORMULA",
+  "custom_gene_sets", "KEY_GENES",
   "PAIRWISE_TEST_METHOD", "PAIRWISE_P_ADJUST_METHOD", "RUN_TF_ANALYSIS", "RUN_COMPARECLUSTER",
-  "COMPARECLUSTER_ONTOLOGY", "EXPORT_EXCEL", "GENERATE_HTML_REPORT",
+  "COMPARECLUSTER_ONTOLOGY", "EXPORT_EXCEL", "GENERATE_HTML_REPORT", "REPORT_TITLE", "SCAFFOLD_REPORT_INTERPRETATION",
   "RUN_TME", "TME_GENE_LENGTH_COLUMN", "TME_GENE_LENGTH_UNIT", "TME_GENE_START_COL",
   "TME_GENE_END_COL", "RUN_TME_ESTIMATE", "RUN_TME_IOBR", "TME_IOBR_METHODS",
-  "TME_IOBR_PERM", "RUN_TME_SSGSEA", "TME_ORTHOLOG_CACHE"
+  "TME_IOBR_PERM", "RUN_TME_SSGSEA", "TME_ORTHOLOG_CACHE",
+  "RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
 config_lines <- c(
   "# RNAseq_General analysis configuration snapshot",
@@ -250,7 +273,8 @@ if (!is.null(BATCH_VECTOR) && length(BATCH_VECTOR) == ncol(vsd)) {
 plot_sample_distance_pdf(vsd, "./3-Visualization/Sample_distance_heatmap.pdf")
 
 write.csv(data.frame(gene_name = rownames(vsd_mat), vsd_mat, check.names = FALSE), "./1-DEG/vsd_matrix.csv", row.names = FALSE)
-write.csv(as.data.frame(colData, check.names = FALSE), "./1-DEG/colData.csv", row.names = FALSE)
+write.csv(data.frame(sample = rownames(colData), as.data.frame(colData), check.names = FALSE),
+          "./1-DEG/colData.csv", row.names = FALSE)
 save(rawcount, countData_before_gene_filter, countData, group, colData, sample_qc,
      retention_df, preprocessing_summary, dds, vsd, vsd_mat, file = "./1-DEG/step0-input.Rdata")
 
@@ -297,7 +321,7 @@ for (comp_name in names(res_list)) {
   plot_volcano_pdf(res_list[[comp_name]],
                    comp_name = paste0(comp_name, " (", DEFAULT_THRESHOLD, ")"),
                    pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                   pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN,
+                   pvalue_column = DEFAULT_DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN,
                    filename = paste0("./3-Visualization/Volcano_", comp_name, "_", DEFAULT_THRESHOLD, ".pdf"))
 }
 
@@ -316,8 +340,8 @@ plot_expression_heatmap_pdf(vsd_mat[top_genes_mad, ],
 # Top DEGs heatmap
 all_sig_genes <- unique(unlist(lapply(default_res_list, function(res) {
   res %>%
-    filter(.data[[DEG_PVALUE_COLUMN]] < DEG_P_CUTOFF, abs(.data[[DEG_LFC_COLUMN]]) > DEG_LFC_CUTOFF) %>%
-    arrange(.data[[DEG_PVALUE_COLUMN]]) %>%
+    filter(.data[[DEFAULT_DEG_PVALUE_COLUMN]] < DEG_P_CUTOFF, abs(.data[[DEG_LFC_COLUMN]]) > DEG_LFC_CUTOFF) %>%
+    arrange(.data[[DEFAULT_DEG_PVALUE_COLUMN]]) %>%
     head(30) %>%
     pull(gene_name)
 })))
@@ -501,7 +525,7 @@ if (RUN_COMPARECLUSTER && n_groups >= 3) {
   cp_up <- list(); cp_down <- list()
   for (comp_name in names(res_list)) {
     ed <- genes_for_enrichment(res_list[[comp_name]], DEG_P_CUTOFF, DEG_LFC_CUTOFF,
-                               pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN)
+                               pvalue_column = DEFAULT_DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN)
     if (length(ed$up) >= 5) {
       up_entrez <- map_symbols_to_entrez(ed$up, org_db)
       if (nrow(up_entrez) >= 5) cp_up[[comp_name]] <- up_entrez$ENTREZID
@@ -559,6 +583,19 @@ if (!is.null(custom_gene_sets)) {
     gsva_scores <- gsva(params, verbose = FALSE, BPPARAM = SerialParam())
     gsva_scores_df <- as.data.frame(gsva_scores)
     write.csv(gsva_scores_df, "./2-GSEA/GSVA_scores.csv")
+
+    # Machine-readable per-comparison GSVA statistics (p + BH p.adj + direction),
+    # so pathway-level claims do not rest on group means / boxplot stars alone.
+    gsva_comp_pairs <- lapply(COMPARISONS, function(cp) c(cp[3], cp[2]))  # c(control, treat)
+    gsva_stats <- tryCatch(
+      pathway_group_comparison(gsva_scores,
+                               group = as.character(colData[colnames(gsva_scores_df), "condition"]),
+                               group_levels = GROUP_LEVELS, comparisons = gsva_comp_pairs,
+                               method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD),
+      error = function(e) { message("GSVA group comparison skipped: ", conditionMessage(e)); NULL })
+    if (!is.null(gsva_stats) && nrow(gsva_stats) > 0) {
+      write.csv(gsva_stats, "./2-GSEA/GSVA_group_comparison.csv", row.names = FALSE)
+    }
 
     plot_expression_heatmap_pdf(gsva_scores_df, filename = "./3-Visualization/GSVA_heatmap.pdf",
                                 title = "GSVA Scores",
@@ -627,7 +664,7 @@ if (RUN_DEG_OVERLAP) {
   # (and skip Analysis_summary.txt) after the expensive DEG/GSEA/GSVA steps.
   tryCatch({
     sig_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                                    pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "sig")
+                                    pvalue_column = DEFAULT_DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "sig")
     if (length(sig_sets) >= 2) {
       plot_deg_upset_pdf(sig_sets, filename = "./3-Visualization/DEG_overlap_upset.pdf",
                          title = paste("DEG Overlaps -", DEFAULT_THRESHOLD), width = 14, height = 8)
@@ -637,9 +674,9 @@ if (RUN_DEG_OVERLAP) {
       write.csv(data.frame(gene = common_genes), "./3-Visualization/DEG_overlap_common_genes.csv", row.names = FALSE)
     }
     up_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                                   pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "up")
+                                   pvalue_column = DEFAULT_DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "up")
     down_sets <- build_deg_gene_sets(default_res_list, pvalue_thresh = DEG_P_CUTOFF, log2fc_thresh = DEG_LFC_CUTOFF,
-                                     pvalue_column = DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "down")
+                                     pvalue_column = DEFAULT_DEG_PVALUE_COLUMN, lfc_column = DEG_LFC_COLUMN, direction = "down")
     if (length(up_sets) >= 2) plot_deg_upset_pdf(up_sets, filename = "./3-Visualization/DEG_UP_overlap_upset.pdf", title = "UP DEG Overlaps")
     if (length(down_sets) >= 2) plot_deg_upset_pdf(down_sets, filename = "./3-Visualization/DEG_DOWN_overlap_upset.pdf", title = "DOWN DEG Overlaps")
   }, error = function(e) message("Skipping DEG overlap figures: ", conditionMessage(e)))
@@ -853,14 +890,15 @@ summary_report <- paste0(
   "   - Samples manually excluded: ", ifelse(length(SAMPLE_EXCLUDE) == 0, "None", paste(SAMPLE_EXCLUDE, collapse = ", ")), "\n",
   "   - Groups after optional QC exclusion: ", paste(unique(as.character(colData$condition)), collapse = ", "), "\n",
   "   - DESeq2 design: ", deparse(DESIGN_FORMULA), "\n",
-  "   - DEG p-value column: ", DEG_PVALUE_COLUMN, "\n",
+  "   - DEG p-value column (run-wide): ", DEG_PVALUE_COLUMN, "\n",
+  "   - Default-threshold p-value column: ", DEFAULT_DEG_PVALUE_COLUMN, "\n",
   "   - DEG log2FC column: ", DEG_LFC_COLUMN, "\n",
   "   - GSEA rank column: ", GSEA_RANK_COLUMN, "\n",
   "   - Pairwise plot test: ", PAIRWISE_TEST_METHOD, " with ", PAIRWISE_P_ADJUST_METHOD, " adjustment\n",
   "   - Low-count filter: count >= ", MIN_COUNT, " in at least ", min_replicates, " samples\n",
   "   - Genes after filtering: ", nrow(countData), "\n\n",
   "2. Differential Expression Default Threshold: ", DEFAULT_THRESHOLD,
-  " (", DEG_PVALUE_COLUMN, " < ", DEG_P_CUTOFF, " & |", DEG_LFC_COLUMN, "| > ", DEG_LFC_CUTOFF, ")\n"
+  " (", DEFAULT_DEG_PVALUE_COLUMN, " < ", DEG_P_CUTOFF, " & |", DEG_LFC_COLUMN, "| > ", DEG_LFC_CUTOFF, ")\n"
 )
 for (comp_name in names(default_res_list)) {
   res <- default_res_list[[comp_name]]
@@ -885,28 +923,64 @@ cat(summary_report)
 writeLines(summary_report, "./Analysis_summary.txt")
 writeLines(capture.output(sessionInfo()), "./sessionInfo.txt")
 
+if (isTRUE(SCAFFOLD_REPORT_INTERPRETATION)) {
+  scaffold <- scaffold_report_interpretation(".")
+  cat("Report interpretation scaffold:", length(scaffold$created), "created,",
+      length(scaffold$skipped), "preserved.\n")
+}
+
 # =============================================================================
 # 15. HTML report
 # =============================================================================
 if (isTRUE(GENERATE_HTML_REPORT)) {
   has_quarto <- requireNamespace("quarto", quietly = TRUE) && nzchar(Sys.which("quarto"))
   has_rmarkdown <- requireNamespace("rmarkdown", quietly = TRUE)
+  report_generated <- FALSE
   if (!has_quarto && !has_rmarkdown) {
     message("Skipping HTML report: install the quarto CLI (+ R 'quarto' package) or the 'rmarkdown' package.")
   } else {
+    # The bundled template lives in the template repo (dirname(lib_dir)/reports),
+    # not in the calling project, so resolve it explicitly from lib_dir rather
+    # than relying on the caller's git root (projects are often not git repos).
+    report_template <- file.path(dirname(normalizePath(lib_dir)), "reports", "analysis_report.qmd")
     report_path <- tryCatch(
       render_analysis_report(outdir = ".", report_file = "RNAseq_report.html",
-                             params = list(title = REPORT_TITLE, author = Sys.info()[["user"]])),
+                             template = report_template,
+                             params = list(title = REPORT_TITLE, author = Sys.info()[["user"]],
+                                           primary_threshold = DEFAULT_THRESHOLD)),
       error = function(e) { message("HTML report failed: ", conditionMessage(e)); NULL }
     )
-    if (!is.null(report_path)) cat("HTML report written to:", report_path, "\n")
+    if (!is.null(report_path)) { cat("HTML report written to:", report_path, "\n"); report_generated <- TRUE }
+    if (!is.null(report_path)) {
+      tryCatch(
+        validate_analysis_report(".", report_path, publish = FALSE),
+        error = function(e) message("Draft report validation warning: ", conditionMessage(e))
+      )
+    }
   }
 }
+
+# The per-run manifest is the safe concurrency boundary. A project-level
+# RUN_REGISTRY.csv is rebuilt separately after one or more runners finish.
+lifecycle_fields <- c("RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION")
+presentation_fields <- c("EXPORT_EXCEL", "GENERATE_HTML_REPORT", "REPORT_TITLE",
+                         "SCAFFOLD_REPORT_INTERPRETATION")
+analysis_config_objects <- setdiff(config_objects, c(lifecycle_fields, presentation_fields))
+analysis_config <- stats::setNames(lapply(analysis_config_objects, function(obj) {
+  if (exists(obj, inherits = TRUE)) get(obj, inherits = TRUE) else NULL
+}), analysis_config_objects)
+write_run_manifest(
+  run_dir = ".", config_path = config_path, input_file = INPUT_FILE,
+  analysis_config = analysis_config,
+  role = RUN_ROLE, parent_run_id = PARENT_RUN_ID,
+  retention = RUN_RETENTION, change_note = RUN_CHANGE_NOTE
+)
 
 cat("\n========================================\n")
 cat("RNAseq_General analysis COMPLETE.\n")
 cat("Outputs: 1-DEG/  2-GSEA/  3-Visualization/")
 if (isTRUE(RUN_TME)) cat("  4-TME/")
 cat("  Analysis_summary.txt")
-if (isTRUE(GENERATE_HTML_REPORT)) cat("  RNAseq_report.html")
+cat("  run_manifest.csv")
+if (isTRUE(GENERATE_HTML_REPORT) && isTRUE(report_generated)) cat("  RNAseq_report.html")
 cat("\n========================================\n")

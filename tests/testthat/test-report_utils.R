@@ -72,6 +72,126 @@ test_that("claim-evidence ledger requires calibrated levels and provenance", {
   expect_error(validate_claim_evidence_ledger(ledger), "unsupported evidence levels")
 })
 
+test_that("claim-evidence ledger verifies project-relative source files", {
+  root <- tempfile()
+  dir.create(file.path(root, "1-DEG"), recursive = TRUE)
+  writeLines("evidence", file.path(root, "1-DEG", "result.csv"))
+  ledger <- data.frame(
+    claim_id = "C1", claim = "A differed from B", claim_level = "E1_association",
+    scope = "in vitro", evidence = "DE result", source_files = "1-DEG/result.csv",
+    assumptions = "valid design", alternatives = "batch", falsifier = "independent null",
+    next_evidence = "repeat experiment"
+  )
+  expect_true(validate_claim_evidence_ledger(ledger, base_dir = root))
+  ledger$source_files <- "1-DEG/missing.csv"
+  expect_error(validate_claim_evidence_ledger(ledger, base_dir = root), "missing source files")
+  unlink(root, recursive = TRUE)
+})
+
+test_that("interpretation scaffold creates per-section files without overwriting", {
+  root <- tempfile()
+  dir.create(root)
+
+  res <- scaffold_report_interpretation(root)
+  sections <- report_interpretation_sections()
+  expect_true(dir.exists(file.path(root, "report_interpretation")))
+  expect_identical(sort(res$created), sort(names(sections)))
+  for (key in names(sections)) {
+    expect_true(file.exists(file.path(root, "report_interpretation", paste0(key, ".md"))))
+  }
+  # Starter files contain only whole-line HTML comments -> render nothing.
+  starter <- readLines(file.path(root, "report_interpretation", "deg.md"), warn = FALSE)
+  expect_false(any(nzchar(trimws(strip_interpretation_comments(starter)))))
+
+  # A second run skips everything and preserves written annotations.
+  deg_path <- file.path(root, "report_interpretation", "deg.md")
+  writeLines("Treatment induces interferon signalling.", deg_path)
+  res2 <- scaffold_report_interpretation(root)
+  expect_length(res2$created, 0)
+  expect_identical(sort(res2$skipped), sort(names(sections)))
+  expect_identical(readLines(deg_path, warn = FALSE), "Treatment induces interferon signalling.")
+
+  # overwrite = TRUE regenerates starters.
+  res3 <- scaffold_report_interpretation(root, overwrite = TRUE)
+  expect_identical(sort(res3$created), sort(names(sections)))
+  expect_false(any(grepl("interferon", readLines(deg_path, warn = FALSE))))
+  unlink(root, recursive = TRUE)
+})
+
+test_that("strip_interpretation_comments removes only whole-line HTML comments", {
+  lines <- c(
+    "<!-- guidance -->",
+    "  <!-- indented guidance -->",
+    "Real prose stays.",
+    "Inline <!-- comment --> stays too.",
+    "<!-- unterminated never matches"
+  )
+  out <- strip_interpretation_comments(lines)
+  expect_identical(out, lines[3:5])
+})
+
+test_that("report review scaffold is durable and publish sign-off is strict", {
+  root <- tempfile()
+  dir.create(root)
+  path <- scaffold_report_review(root)
+  review <- read.csv(path, stringsAsFactors = FALSE)
+  expect_true(validate_report_review(review, require_signoff = FALSE))
+  expect_error(validate_report_review(review, require_signoff = TRUE), "remains pending")
+
+  review$status <- "approved"
+  review$reviewer <- "reviewer"
+  review$reviewed_at <- "2026-08-21"
+  write.csv(review, path, row.names = FALSE)
+  expect_true(validate_report_review(path, require_signoff = TRUE))
+
+  original <- readLines(path, warn = FALSE)
+  scaffold_report_review(root)
+  expect_identical(readLines(path, warn = FALSE), original)
+  unlink(root, recursive = TRUE)
+})
+
+test_that("analysis report validation separates draft rendering from publication", {
+  root <- tempfile()
+  dir.create(file.path(root, "0-Config"), recursive = TRUE)
+  writeLines("config", file.path(root, "0-Config", "analysis_config_used.R"))
+  writeLines("session", file.path(root, "sessionInfo.txt"))
+  writeLines(paste(rep("x", 11000), collapse = ""), file.path(root, "RNAseq_report.html"))
+  dir.create(file.path(root, "1-DEG"), recursive = TRUE, showWarnings = FALSE)
+  write.csv(data.frame(Threshold = "standard", Comparison = "A_vs_B", UP = 2,
+                       DOWN = 1, Total = 3),
+            file.path(root, "1-DEG", "DEG_threshold_summary.csv"), row.names = FALSE)
+  writeLines("   - A_vs_B: 3 DEGs (Up: 2, Down: 1)", file.path(root, "Analysis_summary.txt"))
+
+  coverage <- build_report_coverage_manifest(root)
+  coverage$status <- "covered"
+  coverage$report_location <- "main_body_or_appendix_index"
+  coverage$omission_reason <- ""
+  write.csv(coverage, file.path(root, "report_coverage_manifest.csv"), row.names = FALSE)
+  checklist <- scaffold_report_review(root)
+
+  expect_true(all(validate_analysis_report(root)$passed))
+  expect_error(validate_analysis_report(root, publish = TRUE), "not ready to publish")
+
+  review <- read.csv(checklist, stringsAsFactors = FALSE)
+  review$status <- "approved"
+  review$reviewer <- "reviewer"
+  review$reviewed_at <- "2026-08-21"
+  write.csv(review, checklist, row.names = FALSE)
+  expect_true(all(validate_analysis_report(root, publish = TRUE)$passed))
+  unlink(root, recursive = TRUE)
+})
+
+test_that("headline validation catches a stale text summary", {
+  root <- tempfile()
+  dir.create(file.path(root, "1-DEG"), recursive = TRUE)
+  write.csv(data.frame(Threshold = "standard", Comparison = "A_vs_B", UP = 2,
+                       DOWN = 1, Total = 3),
+            file.path(root, "1-DEG", "DEG_threshold_summary.csv"), row.names = FALSE)
+  writeLines("   - A_vs_B: 4 DEGs (Up: 3, Down: 1)", file.path(root, "Analysis_summary.txt"))
+  expect_error(validate_report_headline_values(root), "disagree")
+  unlink(root, recursive = TRUE)
+})
+
 test_that("rmarkdown twin of the .qmd report template exists and does not drift", {
   repo <- tryCatch(rprojroot::find_root(rprojroot::is_git_root), error = function(e) getwd())
   qmd <- file.path(repo, "reports", "analysis_report.qmd")
@@ -102,5 +222,35 @@ test_that("render_analysis_report falls back to the .Rmd twin without Quarto", {
   )
   expect_true(file.exists(report))
   expect_gt(file.info(report)$size, 10000)
+  unlink(outdir, recursive = TRUE)
+})
+
+test_that("report honors the declared primary threshold for detailed DEG tables", {
+  skip_if(requireNamespace("quarto", quietly = TRUE) && nzchar(Sys.which("quarto")),
+          "Quarto available: fallback path not exercised")
+  skip_if_not(requireNamespace("rmarkdown", quietly = TRUE), "rmarkdown not installed")
+  skip_if_not(rmarkdown::pandoc_available(), "pandoc not available")
+  outdir <- tempfile()
+  dir.create(outdir)
+  for (d in c("1-DEG/strict", "1-DEG/standard", "2-GSEA", "3-Visualization")) {
+    dir.create(file.path(outdir, d), recursive = TRUE)
+  }
+  deg <- data.frame(
+    gene_name = c("StrictGene", "OtherGene"),
+    log2FoldChange_shrunken = c(2, -1.5),
+    padj = c(0.01, 0.02),
+    stringsAsFactors = FALSE
+  )
+  utils::write.csv(deg, file.path(outdir, "1-DEG/strict/DEG_results_case.csv"), row.names = FALSE)
+  deg$gene_name <- c("StandardGene", "OtherGene")
+  utils::write.csv(deg, file.path(outdir, "1-DEG/standard/DEG_results_case.csv"), row.names = FALSE)
+  report <- file.path(outdir, "RNAseq_report.html")
+  render_analysis_report(
+    outdir = outdir, report_file = report,
+    params = list(primary_threshold = "strict")
+  )
+  html <- paste(readLines(report, warn = FALSE), collapse = "\n")
+  expect_match(html, "StrictGene")
+  expect_false(grepl("StandardGene", html, fixed = TRUE))
   unlink(outdir, recursive = TRUE)
 })

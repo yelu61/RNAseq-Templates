@@ -18,7 +18,7 @@
    Rscript run_analysis.R my_config.R     # 指定另一个 config
    ```
 
-跑完产出与 notebook 相同的 `0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ Analysis_summary.txt sessionInfo.txt`，以及（若 `GENERATE_HTML_REPORT <- TRUE`)`RNAseq_report.html`。
+跑完产出与 notebook 相同的 `0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ Analysis_summary.txt sessionInfo.txt`，另有 `run_manifest.csv`，以及（若 `GENERATE_HTML_REPORT <- TRUE`)`RNAseq_report.html`。
 
 ## 真实项目推荐目录
 
@@ -39,6 +39,11 @@ results/report_assets/           # 可重建的网页预览图
 每次新分析使用新的 `run_id`，记录模板版本、配置与输入校验和；不要覆盖旧
 运行。完整约定见 [真实项目输出结构](../../references/PROJECT_OUTPUT_LAYOUT.md)。
 
+`config.R` 的 `RUN_ROLE`、`PARENT_RUN_ID`、`RUN_CHANGE_NOTE` 和
+`RUN_RETENTION` 记录 candidate/canonical/sensitivity 等生命周期信息。完成
+多个 run 后执行 `Rscript tools/build_run_registry.R analysis/runs`，统一生成
+`RUN_REGISTRY.csv` 并识别完全重复 run；工具只报告，不自动清理文件。
+
 ## 可选分析开关(config.R)
 
 | 开关 | 作用 | 依赖 |
@@ -49,11 +54,17 @@ results/report_assets/           # 可重建的网页预览图
 | `EXPORT_EXCEL` | 导出多阈值 DEG 到 `1-DEG/DEG_results.xlsx` | openxlsx |
 | `GENERATE_HTML_REPORT` | 渲染统一 HTML 报告 | quarto CLI 或 rmarkdown |
 
+`THRESHOLD_GRID` 可为某一行添加 `p_column = "pvalue"`，作为低 DEG 情形下补充 ORA 的**探索层**；默认层的图、交集和报告会自动使用该层实际解析出的 P 值列。名义 P 层不能作为主结论阈值。
+
 **TME 特别注意**：去卷积用 TPM，而标准流程用 VST，两者不可逆转换。所以 `RUN_TME=TRUE` 时脚本会从原始 counts + 基因长度重新算 TPM——你的注释文件需要基因长度信息：
 - 有长度列 → 设 `TME_GENE_LENGTH_COLUMN <- "gene_length"`;
 - 否则用起止坐标 → 设 `TME_GENE_START_COL` / `TME_GENE_END_COL`(featureCounts 注释通常自带）。
 - 小鼠数据会自动经 biomaRt 转人源直系同源（需联网）；人源数据离线即可。
+- 小鼠项目建议设置 `TME_ORTHOLOG_CACHE` 到项目的 `data/processed/`：首次成功映射后，重复运行不再依赖网络；已有缓存但新增 symbol 联网失败时会保留已缓存的可映射基因并给出 warning。
+- General runner 默认 IOBR 方法为 `estimate/cibersort/epic/mcpcounter`；`xcell` 需要在线 biomaRt，只有在网络和参考库已验证时才显式加入。
 - 子开关 `RUN_TME_ESTIMATE` / `RUN_TME_IOBR` / `RUN_TME_SSGSEA` 可分别控制三个方法。
+
+HTML 报告的项目说明不要写进共享模板或已生成 HTML。首次运行时设 `SCAFFOLD_REPORT_INTERPRETATION <- TRUE`，再编辑 `report_interpretation/<section>.md`；这些文件会在重渲染时保留并嵌入相应章节。运行 `Rscript tools/render_report.R <run_dir> --scaffold` 可独立重渲染；完成 `report_review_checklist.csv` 后加 `--publish` 才能通过发布门禁。
 
 ## 针对性再可视化(visualize_results.R)
 
@@ -102,3 +113,8 @@ echo "all done"
 - 想逐 cell 检查中间对象（`vsd_mat`、`res_list`、`gsea_results`)。
 
 `run_analysis.R` 已把 `vsd_matrix.csv`、`colData.csv`、`DEG_results.Rdata`、`step0-input.Rdata` 都存到 `1-DEG/`,notebook 或下游模板（WGCNA/TimeCourse）可直接读取这些中间结果，无需重跑。
+
+General 提供两类 notebook：`RNAseq_General.ipynb` 是可独立完整执行的流程；
+`RNAseq_General_RunReview.ipynb` 只读一个已完成的 `RUN_DIR`，把后续基因、
+基因集和可视化调整写到独立 `REVIEW_OUTDIR`。真实项目常规生产以 CLI run
+为统计事实来源，审阅 notebook 不修改该 run。

@@ -1,0 +1,114 @@
+---
+title: "NARRATIVE REPORT TITLE (replace)"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    theme: flatly
+    self_contained: true
+params:
+  project_root: "."
+  run_id: "RUN_ID (replace)"
+---
+
+<!--
+NARRATIVE REPORT SCAFFOLD (RNAseq-Templates).
+
+This is a STARTER for a project-specific, conclusion-led narrative report —
+the layer that sits above the generic technical `RNAseq_report.html`. Read
+references/NARRATIVE_REPORT.md before writing prose. Contract highlights:
+
+  - Every headline number is read from saved run outputs at render time via
+    the citers (sv/gl/gp/gnes/ora_terms). NEVER hand-type a value.
+  - Headings are conclusions, not topic labels ("Combo vs NIR is a structural
+    null", not "DEG results").
+  - One bio-box per major section: what it means, in plain language.
+  - Figures come ONLY from the run-bundle PDFs via show_pdf() — the single
+    source of truth. Never embed screenshots or hand-copied images.
+  - Before curating into results/reports/, the rendered HTML MUST pass
+    validate_narrative_report().
+
+Whole-line HTML comments (like this block) are scaffold guidance and do not
+render. Delete a section's guidance once the prose is written; delete any
+section that is not applicable rather than leaving a stub.
+-->
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+# Locate the shared template library. Set RNASEQ_LIB_DIR, or fall back to the
+# RNAseq-Templates repo found by walking up from the project.
+lib_dir <- Sys.getenv("RNASEQ_LIB_DIR", unset = NA)
+if (is.na(lib_dir) || !dir.exists(lib_dir)) {
+  stop("Set RNASEQ_LIB_DIR to the RNAseq_lib directory of RNAseq-Templates.")
+}
+source(file.path(lib_dir, "narrative_utils.R"))
+
+run_dir <- file.path(params$project_root, "analysis", "runs", params$run_id)
+# Bring sv/gl/gp/gnes/ora_terms/show_pdf into scope for all chunks.
+list2env(make_report_citers(run_dir), envir = globalenv())
+show_table <- function(df, caption = NULL) {
+  if (is.null(df) || !nrow(df)) return(cat("_（无记录）_\n"))
+  knitr::kable(df, caption = caption, row.names = FALSE)
+}
+```
+
+```{css, echo=FALSE}
+.summary-box { background:#eef4f7; border-left:5px solid #2e6f8e; padding:14px 18px; border-radius:6px; margin:1em 0; }
+.caution-box { background:#fff6e5; border-left:5px solid #c07f2a; padding:14px 18px; border-radius:6px; margin:1em 0; }
+.bio-box { background:#eef7ee; border-left:5px solid #2e8b57; padding:14px 18px; border-radius:6px; margin:1em 0; }
+.bio-tag { color:#2e8b57; font-weight:700; letter-spacing:1px; }
+```
+
+# 技术摘要 {.tabset}
+
+::: {.summary-box}
+<!-- 3–5 句话：研究问题、设计（组/重复）、最硬的一条结论、最重要的限制。全用 citer 引用数值。 -->
+:::
+
+# 实验设计与样本质量
+
+<!-- 结论式标题（替换本行上方标题）。正文写：分组/重复/一个关键 QC 观察。 -->
+
+```{r fig-qc, results='asis'}
+# show_pdf("3-Visualization/PCA_plot.pdf", "PCA：样本按处理臂分离", base_dir = run_dir, width = "70%")
+```
+
+::: {.bio-box}
+<span class="bio-tag">解读</span> <!-- 这段结构对结论意味着什么？局限是什么？ -->
+:::
+
+# 差异表达
+
+```{r fig-deg, results='asis'}
+# show_pdf("3-Visualization/DEG_threshold_summary_barplot.pdf", "各阈值档 DEG 计数", base_dir = run_dir, width = "70%")
+```
+
+<!-- 用 `r sv("standard", "X_vs_Y")` 引用计数，`r gl("Gene","X_vs_Y")` 引用 log2FC，`r gp(...)` 引用 padj。 -->
+
+::: {.bio-box}
+<span class="bio-tag">解读</span> <!-- 生物学含义 -->
+:::
+
+# ORA
+
+<!-- `r ora_terms("X_vs_Y", "UP", "GO")` 引用 top 条目。标注阈值敏感性。 -->
+
+# GSEA
+
+<!-- 强调不依赖 DEG 阈值；用 `r gnes("pattern","X_vs_Y")` 引用 NES。 -->
+
+# 综合：证据分级与工作模型
+
+<!-- 每条结论挂证据等级（E0–E5，见 REPORT_CONTRACT.md）。工作模型明确标注 exploratory。 -->
+
+# 稳健性与局限
+
+<!-- n、批次、未记录的元数据、名义-p 档的位置。 -->
+
+```{r qa, include=FALSE}
+# QA gate — runs at render time so a broken report fails loudly.
+# validate_narrative_report cannot run here (HTML not yet written); run it in
+# the render script after rmarkdown::render(). See NARRATIVE_REPORT.md.
+```
