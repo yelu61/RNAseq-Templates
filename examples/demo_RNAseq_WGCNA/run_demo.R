@@ -74,7 +74,8 @@ expected_files <- c(
   file.path(outdir_abs, "WGCNA_gene_modules.csv"),
   file.path(outdir_abs, "Module_trait_correlation.csv"),
   file.path(run_root, "Analysis_summary.txt"),
-  file.path(run_root, "sessionInfo.txt")
+  file.path(run_root, "sessionInfo.txt"),
+  file.path(run_root, "run_manifest.csv")
 )
 missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {

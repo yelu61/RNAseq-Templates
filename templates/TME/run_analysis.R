@@ -123,10 +123,11 @@ suppressPackageStartupMessages({
 })
 if (isTRUE(RUN_SSGSEA)) suppressPackageStartupMessages(library(GSVA))
 
-for (f in c("plot_utils.R", "io_utils.R", "tme_utils.R", "data_utils.R", "report_utils.R")) {
+for (f in c("plot_utils.R", "io_utils.R", "tme_utils.R", "data_utils.R", "report_utils.R", "run_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
+initialize_run_lifecycle(globalenv())
 
 # ---- Output directories + config snapshot ------------------------------------
 CONFIG_DIR <- file.path(OUTDIR, "0-Config")
@@ -142,7 +143,8 @@ config_objects <- c(
   "SPECIES", "GROUP_COLORS", "RUN_ESTIMATE", "RUN_IOBR", "IOBR_METHODS", "IOBR_PERM",
   "IOBR_ARRAYS", "RUN_CIBERSORT", "CIBERSORT_SCRIPT", "CIBERSORT_SIGNATURE",
   "CIBERSORT_PERM", "CIBERSORT_QN", "RUN_CIBERSORT_COMPARISON", "OUTDIR",
-  "GENERATE_HTML_REPORT", "REPORT_TITLE"
+  "GENERATE_HTML_REPORT", "REPORT_TITLE", "RUN_ROLE", "PARENT_RUN_ID",
+  "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
 config_lines <- c(
   "# RNAseq_TME analysis configuration snapshot",
@@ -631,6 +633,13 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
     if (!is.null(report_path)) cat("HTML report written to:", report_path, "\n")
   }
 }
+
+manifest_input <- if (identical(INPUT_MODE, "raw_counts")) RAW_COUNTS_FILE else EXPR_FILE
+write_template_run_manifest(
+  run_dir = OUTDIR, config_path = config_path, input_file = manifest_input,
+  config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
+  envir = globalenv()
+)
 
 cat("\n========================================\n")
 cat("RNAseq_TME analysis COMPLETE.\n")

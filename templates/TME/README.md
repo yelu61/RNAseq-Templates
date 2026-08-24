@@ -1,8 +1,8 @@
 # RNAseq_TME — command-line template
 
-Non-interactive tumor-microenvironment (TME) deconvolution pipeline. This is the
-headless counterpart of `notebooks/RNAseq_TME_Deconvolution_Template.ipynb` —
-same steps, driven by a config file instead of a parameter cell: expression →
+Non-interactive tumor-microenvironment (TME) deconvolution pipeline. It shares
+the analysis intent and helper library of `notebooks/RNAseq_TME_Deconvolution_Template.ipynb`;
+the production runner is authoritative: expression →
 ESTIMATE / IOBR / native CIBERSORT → ssGSEA immune-signature scoring.
 
 ## Files
@@ -62,6 +62,7 @@ these at the project root; set a path to nest the run under a directory):
                                     tme_results.Rdata (for visualize_results.R)
 Analysis_summary.txt                text summary of the run
 sessionInfo.txt                     package versions (reproducibility)
+run_manifest.csv                    inputs/config/code signatures + lifecycle
 ```
 
 ## Optional methods and graceful degradation

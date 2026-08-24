@@ -88,7 +88,8 @@ expected_files <- file.path(outdir_abs, c(
   "5-TimeCourse/mfuzz_clusters.csv",
   "1-DEG_Timepoint/Timepoint_DEG_summary.csv",
   "Analysis_summary.txt",
-  "sessionInfo.txt"
+  "sessionInfo.txt",
+  "run_manifest.csv"
 ))
 missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {

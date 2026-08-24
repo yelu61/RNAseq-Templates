@@ -11,7 +11,8 @@ a `config.R` + `run_analysis.R` + `visualize_results.R` runner under
 helper modules have unit tests. `tools/notebook_to_runner.R` converts a
 notebook's parameter cell into a `config.R` + runner draft.
 
-**Current release: v0.9.0** (see [CHANGELOG.md](CHANGELOG.md)).
+**Current release: v0.11.0** (see [CHANGELOG.md](CHANGELOG.md)). The `v0.11.x`
+line is feature-frozen and in maintenance mode.
 
 ## Completed
 
@@ -48,7 +49,11 @@ notebook's parameter cell into a `config.R` + runner draft.
 - [x] Added run manifests, duplicate registry and explicit retention lifecycle
 - [x] Added independent report re-rendering plus scientific-review publish gate
 
-## Planned / Future
+## Frozen scope and deferred work
+
+Maintenance releases may fix defects, compatibility, security, tests,
+documentation, and required database/API adaptations. The unchecked items
+below are explicitly deferred; they are not commitments for `v0.11.x`.
 
 - [x] Add automated CI/GitHub Actions to run `examples/run_demo_smoke_test.R` on push
 - [x] Add formal unit tests for all `RNAseq_lib` helpers

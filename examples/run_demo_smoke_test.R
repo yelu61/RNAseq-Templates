@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Smoke test for RNAseq-Templates.
-# Runs the General notebook core pipeline on the bundled demo data and checks
-# that all expected output files are produced.
+# Runs the General helper-level pipeline plus every production runner on bundled
+# demo data and checks that all expected output files are produced.
 #
 # Usage from repository root:
 #   Rscript examples/run_demo_smoke_test.R
@@ -304,6 +304,7 @@ cat("========================================\n")
 # test fails if any demo fails.
 setwd(repo_root)
 demo_scripts <- c(
+  "demo_RNAseq_General/run_demo.R",
   "demo_RNAseq_limma_voom/run_demo.R",
   "demo_RNAseq_WGCNA/run_demo.R",
   "demo_RNAseq_TME/regenerate_demo_data.R",

@@ -1,8 +1,8 @@
 # RNAseq_WGCNA — command-line template
 
-Non-interactive WGCNA co-expression pipeline. This is the headless counterpart
-of `notebooks/RNAseq_WGCNA_Template.ipynb` — same steps, driven by a config
-file instead of a parameter cell. It builds co-expression modules from a
+Non-interactive WGCNA co-expression pipeline. It shares the analysis intent and
+helper library of `notebooks/RNAseq_WGCNA_Template.ipynb`; the production
+runner is authoritative. It builds co-expression modules from a
 normalized expression matrix, correlates module eigengenes with sample traits,
 and exports per-module hub genes.
 
@@ -69,6 +69,7 @@ snapshot, run summary and session info are written next to it at the run root:
   WGCNA_results.Rdata             targeted save for visualize_results.R
 Analysis_summary.txt              text summary of the run
 sessionInfo.txt                   package versions (reproducibility)
+run_manifest.csv                  inputs/config/code signatures + lifecycle
 ```
 
 ## Key parameters

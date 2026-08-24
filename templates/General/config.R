@@ -3,7 +3,7 @@
 # =============================================================================
 # This is the ONLY file you need to edit for a new project.
 # `run_analysis.R` sources this file, then runs the full standard pipeline
-# (the same steps as notebooks/RNAseq_General.ipynb) non-interactively.
+# using the same analysis intent and helper library as the General notebook.
 #
 # Usage:
 #   Rscript run_analysis.R                  # uses ./config.R

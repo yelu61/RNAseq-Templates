@@ -95,7 +95,8 @@ expected_files <- file.path(outdir_abs, c(
   "4-TME/ssGSEA_immune_scores.csv",
   "4-TME/tme_results.Rdata",
   "Analysis_summary.txt",
-  "sessionInfo.txt"
+  "sessionInfo.txt",
+  "run_manifest.csv"
 ))
 missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {

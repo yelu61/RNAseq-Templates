@@ -1,8 +1,8 @@
 # RNAseq_Limma_Voom — command-line template
 
-Non-interactive limma-voom differential-expression pipeline. This is the
-headless counterpart of `notebooks/RNAseq_limma_voom_Template.ipynb` — same
-steps, driven by a config file instead of a parameter cell.
+Non-interactive limma-voom differential-expression pipeline. It shares the
+analysis intent and helper library of `notebooks/RNAseq_limma_voom_Template.ipynb`;
+the production runner is authoritative and may harden ordering or output layout.
 
 ## Files
 
@@ -44,6 +44,7 @@ these at the project root; set a path to nest the run under a directory):
                                     ThemeEnrichment/ (theme dot-heatmaps, single-term gseaplot2)
 Analysis_summary.txt                text summary of the run
 sessionInfo.txt                     package versions (reproducibility)
+run_manifest.csv                    inputs/config/code signatures + lifecycle
 ```
 
 ## When to use limma-voom vs the General (DESeq2) template

@@ -20,6 +20,16 @@ test_that("write_run_manifest records checksums and lifecycle metadata", {
   expect_match(x$backend_signature, "^[0-9a-f]{32}$")
 })
 
+test_that("initialize_run_lifecycle supplies defaults and validates overrides", {
+  env <- new.env(parent = emptyenv())
+  expect_invisible(initialize_run_lifecycle(env))
+  expect_equal(env$RUN_ROLE, "candidate")
+  expect_equal(env$RUN_RETENTION, "full")
+
+  env$RUN_ROLE <- "latest"
+  expect_error(initialize_run_lifecycle(env), "RUN_ROLE")
+})
+
 test_that("build_run_registry identifies exact duplicates but not changed configs", {
   runs <- tempfile("runs-")
   dir.create(runs)

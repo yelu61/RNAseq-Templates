@@ -3,8 +3,8 @@
 # =============================================================================
 # This is the ONLY file you need to edit for a new project.
 # `run_analysis.R` sources this file, then runs the full TCGA/GEO public-data
-# pipeline (the same steps as notebooks/RNAseq_TCGA_GEO_Template.ipynb)
-# non-interactively: 3-way data acquisition, clinical cleanup, DESeq2
+# pipeline using the same analysis intent and helper library as the TCGA/GEO
+# notebook: 3-way data acquisition, clinical cleanup, DESeq2
 # Tumor-vs-Normal, single-gene expression + survival (KM/Cox), ORA + GSEA.
 #
 # Usage:
@@ -71,6 +71,12 @@ OUTDIR           <- "."
 # layout; wiring is present but off by default so a run does not emit a sparse report.
 GENERATE_HTML_REPORT <- FALSE
 REPORT_TITLE     <- "TCGA/GEO Tumor-vs-Normal Analysis Report"
+
+# ---- 1.9 Run lifecycle -------------------------------------------------------
+RUN_ROLE        <- "candidate"
+PARENT_RUN_ID   <- NA_character_
+RUN_CHANGE_NOTE <- ""
+RUN_RETENTION   <- "full"
 
 # =============================================================================
 # Derived values & validation (normally no need to edit below this line)

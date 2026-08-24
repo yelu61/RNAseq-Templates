@@ -80,10 +80,11 @@ species_org   <- get(species_org_db)
 organism_code <- if (SPECIES == "human") "hsa" else "mmu"
 
 for (f in c("plot_utils.R", "io_utils.R", "data_utils.R", "deg_utils.R",
-            "enrichment_utils.R", "limma_voom_utils.R", "report_utils.R")) {
+            "enrichment_utils.R", "limma_voom_utils.R", "report_utils.R", "run_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
+initialize_run_lifecycle(globalenv())
 
 # ---- Output directories + config snapshot ------------------------------------
 for (d in c("0-Config", "1-DEG", "2-GSEA", "3-Visualization")) {
@@ -94,7 +95,8 @@ config_objects <- c(
   "SPECIES", "INPUT_FILE", "INPUT_FORMAT", "GENE_NAME_COL", "BIOTYPE_COL",
   "BIOTYPE_FILTER", "COUNT_COLS", "SAMPLE_NAMES", "GROUPS", "GROUP_LEVELS",
   "BATCH_VECTOR", "COMPARISONS", "DEG_PADJ_CUTOFF", "DEG_LFC_CUTOFF", "MIN_COUNT",
-  "MIN_SAMPLE_FRAC", "OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE"
+  "MIN_SAMPLE_FRAC", "OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE",
+  "RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
 config_lines <- c(
   "# RNAseq_Limma_Voom analysis configuration snapshot",
@@ -321,6 +323,12 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
     if (!is.null(report_path)) cat("HTML report written to:", report_path, "\n")
   }
 }
+
+write_template_run_manifest(
+  run_dir = OUTDIR, config_path = config_path, input_file = INPUT_FILE,
+  config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
+  envir = globalenv()
+)
 
 cat("\n========================================\n")
 cat("RNAseq_Limma_Voom analysis COMPLETE.\n")

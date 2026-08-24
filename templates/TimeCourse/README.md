@@ -1,8 +1,8 @@
 # RNAseq_TimeCourse — command-line template
 
-Non-interactive time-course (Mfuzz) pipeline. This is the headless counterpart of
-`notebooks/RNAseq_TimeCourse_Template.ipynb` — same steps, driven by a config
-file instead of a parameter cell:
+Non-interactive time-course (Mfuzz) pipeline. It shares the analysis intent and
+helper library of `notebooks/RNAseq_TimeCourse_Template.ipynb`; the production
+runner is authoritative:
 
 1. Aggregate normalized expression to per-time-point means.
 2. Mfuzz soft clustering (+ core-gene heatmap, trend panels, per-cluster GO ORA,
@@ -65,6 +65,7 @@ these at the project root; set a path to nest the run under a directory):
                                     GO_ORA_Cluster_*.csv, timecourse_results.Rdata
 Analysis_summary.txt                text summary of the run
 sessionInfo.txt                     package versions (reproducibility)
+run_manifest.csv                    inputs/config/code signatures + lifecycle
 ```
 
 Mfuzz-specific artefacts are grouped under `5-TimeCourse/` so the standard

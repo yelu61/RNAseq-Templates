@@ -1,6 +1,6 @@
 # General 模板 — 命令行运行（run_analysis.R + config.R)
 
-`notebooks/RNAseq_General.ipynb` 适合**交互式探索**（改 gene set 做 GSVA、临时加可视化、逐 cell 检查）。但在实际项目里，标准流程更适合**一键、可复现、可批量**地跑完——这就是 `run_analysis.R` + `config.R` 的用途。两者产出完全一致。
+`notebooks/RNAseq_General.ipynb` 适合**交互式探索**（改 gene set 做 GSVA、临时加可视化、逐 cell 检查）。但在实际项目里，标准流程更适合**一键、可复现、可批量**地跑完——这就是 `run_analysis.R` + `config.R` 的用途。两者共享分析意图与 helper；生产 runner 是最终统计事实来源，产物不要求逐文件一致。
 
 ## 用法
 
@@ -18,7 +18,7 @@
    Rscript run_analysis.R my_config.R     # 指定另一个 config
    ```
 
-跑完产出与 notebook 相同的 `0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ Analysis_summary.txt sessionInfo.txt`，另有 `run_manifest.csv`，以及（若 `GENERATE_HTML_REPORT <- TRUE`)`RNAseq_report.html`。
+跑完产出 `0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ Analysis_summary.txt sessionInfo.txt run_manifest.csv`，以及（若 `GENERATE_HTML_REPORT <- TRUE`)`RNAseq_report.html`。
 
 ## 真实项目推荐目录
 

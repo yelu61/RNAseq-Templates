@@ -76,10 +76,11 @@ suppressPackageStartupMessages({
 })
 WGCNA::allowWGCNAThreads()
 
-for (f in c("plot_utils.R", "data_utils.R", "report_utils.R")) {
+for (f in c("plot_utils.R", "data_utils.R", "report_utils.R", "run_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
+initialize_run_lifecycle(globalenv())
 
 # ---- Output directories + config snapshot ------------------------------------
 # WGCNA tables/figures go under OUTDIR (default "5-WGCNA"). The config snapshot,
@@ -94,7 +95,8 @@ config_objects <- c(
   "EXPR_FILE", "TRAIT_FILE", "GENE_COLUMN", "SAMPLE_COLUMN", "GROUP_COLUMN",
   "MIN_MAD_QUANTILE", "NETWORK_TYPE", "POWER_VECTOR", "SOFT_POWER",
   "MIN_MODULE_SIZE", "MERGE_CUT_HEIGHT", "TARGET_MODULES", "OUTDIR",
-  "GENERATE_HTML_REPORT", "REPORT_TITLE"
+  "GENERATE_HTML_REPORT", "REPORT_TITLE", "RUN_ROLE", "PARENT_RUN_ID",
+  "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
 config_lines <- c(
   "# RNAseq_WGCNA analysis configuration snapshot",
@@ -290,6 +292,12 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
     if (!is.null(report_path)) cat("HTML report written to:", report_path, "\n")
   }
 }
+
+write_template_run_manifest(
+  run_dir = RUN_ROOT, config_path = config_path, input_file = EXPR_FILE,
+  config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
+  envir = globalenv()
+)
 
 cat("\n========================================\n")
 cat("RNAseq_WGCNA analysis COMPLETE.\n")

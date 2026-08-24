@@ -86,10 +86,11 @@ species_org   <- get(species_org_db)
 organism_code <- if (SPECIES == "human") "hsa" else "mmu"
 
 for (f in c("plot_utils.R", "deg_utils.R", "enrichment_utils.R", "tcga_utils.R",
-            "survival_utils.R", "geo_utils.R", "data_utils.R", "report_utils.R")) {
+            "survival_utils.R", "geo_utils.R", "data_utils.R", "report_utils.R", "run_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
+initialize_run_lifecycle(globalenv())
 
 # ---- Output directories + config snapshot ------------------------------------
 for (d in c("0-Config", "1-DEG", "2-GSEA", "3-Visualization", "6-Survival")) {
@@ -108,7 +109,8 @@ config_objects <- c(
   "MIN_COUNT_PER_SAMPLE_FRAC", "MIN_COUNT", "TUMOR_NORMAL_DESIGN",
   "DEG_LFC_CUTOFF", "DEG_PADJ_CUTOFF",
   "GENES_FOR_SURVIVAL", "CLINICAL_VARS_FOR_KM", "TIME_UNIT",
-  "OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE"
+  "OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE", "RUN_ROLE",
+  "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
 config_lines <- c(
   "# RNAseq_TCGA_GEO analysis configuration snapshot",
@@ -533,6 +535,17 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
     if (!is.null(report_path)) cat("HTML report written to:", report_path, "\n")
   }
 }
+
+manifest_input <- if (isTRUE(DOWNLOAD_FROM_GDC) || isTRUE(DOWNLOAD_FROM_GEO)) {
+  NA_character_
+} else {
+  LOCAL_COUNTS_FILE
+}
+write_template_run_manifest(
+  run_dir = OUTDIR, config_path = config_path, input_file = manifest_input,
+  config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
+  envir = globalenv()
+)
 
 cat("\n========================================\n")
 cat("RNAseq_TCGA_GEO analysis COMPLETE.\n")

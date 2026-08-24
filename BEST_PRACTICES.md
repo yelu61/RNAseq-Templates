@@ -41,7 +41,7 @@ use `notebooks/` as an output root.
 
 ## 2 · Register the run
 
-Every General run writes `run_manifest.csv` (input/config checksums, analysis
+Every production runner writes `run_manifest.csv` (input/config checksums, analysis
 and backend-code signatures, git revision/dirty state, lifecycle role, parent,
 retention class). After one or more runs, rebuild the project registry:
 
@@ -56,7 +56,7 @@ the lifecycle/retention model.
 
 ## 3 · Technical report + annotations
 
-With `GENERATE_HTML_REPORT <- TRUE` the runner renders the generic technical
+For General runs, `GENERATE_HTML_REPORT <- TRUE` renders the generic technical
 `RNAseq_report.html` (complete, archival, machine-checked against
 [references/REPORT_CONTRACT.md](references/REPORT_CONTRACT.md)). Add durable,
 per-section project interpretation by setting
@@ -120,7 +120,7 @@ or manifest). Full ownership/duplication rules:
 A project reporting cycle is complete when **all** of these hold:
 
 - [ ] The run is a fresh `analysis/runs/<run_id>/` bundle with a `run_manifest.csv`, and `RUN_REGISTRY.csv` is rebuilt.
-- [ ] The technical report validates and, if published, the review checklist is signed (`--publish` succeeded).
+- [ ] For a General run, the technical report validates and, if published, the review checklist is signed (`--publish` succeeded); topic runs retain a reviewed summary until a topic-specific report contract exists.
 - [ ] Every headline number in every document is citer-generated or contract-validated — none hand-typed.
 - [ ] Every figure traces to a run-bundle PDF; no second editable image copy exists.
 - [ ] Exploratory nominal-p results are framed as hypothesis-generating (E0/E1), never headline.

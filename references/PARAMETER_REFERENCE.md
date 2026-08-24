@@ -1,8 +1,10 @@
-# 参数速查表 (Parameter Reference)
+# 生产 Runner 参数速查表 (Parameter Reference)
 
-本文件汇总了各 notebook 中常用的配置参数。每个参数包含名称、类型、默认值和用途说明。
+本文件以 `templates/<Topic>/config.R` 的生产 runner 参数为准。Notebook
+用于交互探索，少数演示默认值可能不同；遇到差异时以对应 runner config
+和冻结的 `0-Config/analysis_config_used.R` 为事实来源。
 
-## `RNAseq_General.ipynb`
+## General runner
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
@@ -37,21 +39,21 @@
 
 `p_column = "pvalue"` 的层只用于假设生成，不能作为项目主结论阈值；相应 ORA 必须由 adjusted-P 层或 GSEA/GSVA 等等级证据确认。
 
-## `RNAseq_limma_voom_Template.ipynb`
+## Limma_Voom runner
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `INPUT_FILE` / `INPUT_FORMAT` | — | — | 同 General |
 | `SAMPLE_NAMES` / `GROUPS` / `GROUP_LEVELS` | — | — | 同 General |
 | `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；决定富集分析使用的 org.db 和 KEGG organism code |
-| `BATCH_VECTOR` | character vector/NULL | `NULL` | 批次向量，传给 `limma::removeBatchEffect` |
+| `BATCH_VECTOR` | character vector/NULL | `NULL` | 批次协变量，加入 limma 设计矩阵；`removeBatchEffect` 仅用于可视化，不替代模型调整 |
 | `COMPARISONS` | list | — | 同 General |
 | `DEG_PADJ_CUTOFF` | numeric | `0.05` | DEG 阈值 |
 | `DEG_LFC_CUTOFF` | numeric | `0.5` | DEG log2FC 阈值 |
 | `MIN_COUNT` | numeric | `10` | filterByExpr 最小 count |
 | `MIN_SAMPLE_FRAC` | numeric | `0.5` | filterByExpr 最小样本比例 |
 
-## `RNAseq_TimeCourse_Template.ipynb`
+## TimeCourse runner
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
@@ -70,11 +72,11 @@
 | `MFUZZ_N_CLUSTERS` | numeric | `5` | Mfuzz 聚类数 |
 | `MFUZZ_MIN_ACORE` | numeric | `0.7` | Mfuzz core gene 阈值 |
 
-## `RNAseq_TCGA_GEO_Template.ipynb`
+## TCGA_GEO runner
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `DOWNLOAD_FROM_GDC` | logical | `TRUE` | 是否从 TCGA GDC 下载 |
+| `DOWNLOAD_FROM_GDC` | logical | `FALSE` | 是否从 TCGA GDC 下载；生产 config 默认本地离线模式 |
 | `DOWNLOAD_FROM_GEO` | logical | `FALSE` | 是否从 GEO 下载 SeriesMatrix |
 | `GEO_ACCESSION` | character | `"GSE12345"` | GEO accession |
 | `TCGA_PROJECT` | character | `"TCGA-STAD"` | TCGA project ID |
@@ -83,11 +85,11 @@
 | `LOCAL_COUNTS_FILE` / `LOCAL_TPM_FILE` / `LOCAL_CLINICAL_FILE` | character | — | 本地文件模式 |
 | `LOCAL_GENE_COLUMN` | character/NULL | `NULL` | 本地矩阵的基因 ID 列；数值型 Entrez ID 必须显式填写 |
 | `GENE_ID_MAP_FILE` | character/NULL | `NULL` | TCGA ENSEMBL→symbol 映射文件，NULL 自动从 SE 提取 |
-| `GENES_FOR_SURVIVAL` | character vector | `c("ICAM1")` | 做 KM/Cox 的基因 |
+| `GENES_FOR_SURVIVAL` | character vector | `c("MKI67")` | 做 KM/Cox 的基因 |
 | `CLINICAL_VARS_FOR_KM` | character vector | `c("ajcc_pathologic_stage")` | 临床变量 KM，连续变量自动二分组 |
 | `TIME_UNIT` | character | `"month"` | 生存时间单位 |
 
-## `RNAseq_TME_Deconvolution_Template.ipynb`
+## TME runner
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
@@ -130,15 +132,19 @@
 | IOBR `xcell` | 非 log TPM-like；行名 = HGNC symbol | 输出富集分数，非比例 |
 | ssGSEA | log 或非 log 均可；行名与 signature 匹配 | 内置免疫 signature 为人类基因符号 |
 
-## `RNAseq_WGCNA_Template.ipynb`
+## WGCNA runner
 
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `EXPR_FILE` / `META_FILE` | — | — | 同 TME |
-| `SOFT_THRESHOLD_POWERS` | numeric vector | `c(1:20)` | 软阈值候选幂 |
+| `EXPR_FILE` / `TRAIT_FILE` | character | — | 标准化表达矩阵与样本性状表 |
+| `GENE_COLUMN` / `SAMPLE_COLUMN` | character/NULL | `NULL` / `"sample"` | 基因列与样本 ID 列 |
+| `MIN_MAD_QUANTILE` | numeric | `0.5` | 保留 MAD 不低于该分位数的高变基因 |
+| `NETWORK_TYPE` | character | `"signed"` | `signed`、`unsigned` 或 `signed hybrid` |
+| `POWER_VECTOR` | numeric vector | `c(1:10, seq(12, 30, 2))` | 软阈值候选幂 |
+| `SOFT_POWER` | numeric/NULL | `NULL` | 手工固定软阈值；NULL 时自动选择并要求人工检查 |
 | `MIN_MODULE_SIZE` | numeric | `30` | 最小模块大小 |
 | `MERGE_CUT_HEIGHT` | numeric | `0.25` | 模块合并高度 |
-| `TRAIT_COLUMNS` | character vector | — | 与模块相关的性状/临床变量列 |
+| `TARGET_MODULES` | character vector/NULL | `NULL` | 限制 hub gene 导出的模块；NULL 为全部非 grey 模块 |
 
 ## 通用注意事项
 
@@ -147,7 +153,7 @@
 3. **比较方向**：每个 `COMPARISONS` 条目格式为 `c("name", "treatment", "control")`，结果表示 treatment vs control。
 4. **Excel 导出**：依赖 `openxlsx`，已通过 `install_dependencies.R` 安装。
 
-## General runner 生命周期参数
+## 所有 runner 的生命周期参数
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
@@ -156,5 +162,5 @@
 | `RUN_CHANGE_NOTE` | `""` | 与 parent 相比的唯一、简短变更原因 |
 | `RUN_RETENTION` | `"full"` | `full`、`slim` 或 `metadata_only`；模板仅记录，不自动清理 |
 
-General runner 在完成时写 `run_manifest.csv`。使用
+所有生产 runner 在完成时写 `run_manifest.csv`。使用
 `Rscript tools/build_run_registry.R analysis/runs` 汇总并识别完全重复 run。

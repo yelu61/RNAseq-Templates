@@ -3,7 +3,7 @@
 # =============================================================================
 # This is the ONLY file you need to edit for a new project.
 # `run_analysis.R` sources this file, then runs the full time-course pipeline
-# (the same steps as notebooks/RNAseq_TimeCourse_Template.ipynb) non-interactively:
+# using the same analysis intent and helper library as the TimeCourse notebook:
 # time-point mean aggregation -> Mfuzz soft clustering (+ per-cluster ORA) ->
 # time-point-vs-baseline DESeq2.
 #
@@ -65,6 +65,12 @@ OUTDIR         <- "."
 # off by default so a run does not emit a sparse report.
 GENERATE_HTML_REPORT <- FALSE
 REPORT_TITLE     <- "Time-Course (Mfuzz) Analysis Report"
+
+# ---- 1.9 Run lifecycle -------------------------------------------------------
+RUN_ROLE        <- "candidate"
+PARENT_RUN_ID   <- NA_character_
+RUN_CHANGE_NOTE <- ""
+RUN_RETENTION   <- "full"
 
 # =============================================================================
 # Derived values & validation (normally no need to edit below this line)

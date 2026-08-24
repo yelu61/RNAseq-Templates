@@ -79,10 +79,11 @@ suppressPackageStartupMessages({
 org_db <- get(species_org_db)
 
 for (f in c("plot_utils.R", "io_utils.R", "data_utils.R", "deg_utils.R",
-            "enrichment_utils.R", "timecourse_utils.R", "report_utils.R")) {
+            "enrichment_utils.R", "timecourse_utils.R", "report_utils.R", "run_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
+initialize_run_lifecycle(globalenv())
 
 # Mfuzz clustering is optional and has a heavy dependency. Degrade gracefully when
 # the package is missing so aggregation + time-point DEG still run (mirrors the
@@ -110,7 +111,8 @@ config_objects <- c(
   "MFUZZ_MIN_ACORE", "MFUZZ_SEED", "RAW_COUNTS_FILE", "COUNT_META_FILE",
   "COUNT_GENE_COL", "COUNT_SAMPLE_COL", "COUNT_BIOTYPE_COL", "COUNT_BIOTYPE_FILTER",
   "SUBJECT_COL", "RUN_TIMEPOINT_DEG", "BASELINE_TIME", "DEG_PADJ_CUTOFF",
-  "DEG_LFC_CUTOFF", "MIN_COUNT", "OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE"
+  "DEG_LFC_CUTOFF", "MIN_COUNT", "OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE",
+  "RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
 config_lines <- c(
   "# RNAseq_TimeCourse analysis configuration snapshot",
@@ -402,6 +404,12 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
     if (!is.null(report_path)) cat("HTML report written to:", report_path, "\n")
   }
 }
+
+write_template_run_manifest(
+  run_dir = OUTDIR, config_path = config_path, input_file = EXPR_FILE,
+  config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
+  envir = globalenv()
+)
 
 cat("\n========================================\n")
 cat("RNAseq_TimeCourse analysis COMPLETE.\n")

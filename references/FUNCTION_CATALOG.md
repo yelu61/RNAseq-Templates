@@ -430,6 +430,10 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 
 ## `run_utils.R` — run provenance and duplicate governance
 
+- `initialize_run_lifecycle(envir)`
+  Supply backward-compatible lifecycle defaults for old configs and reject unsupported role/retention values.
+- `write_template_run_manifest(...)`
+  Apply the shared manifest contract to any production runner while excluding presentation-only fields from its analysis signature.
 - `write_run_manifest(...)`
   Write one run-local manifest with input/config checksums, analysis and backend-code signatures, git revision/dirty state, lifecycle role, parent, retention class and size.
 - `build_run_registry(runs_dir, path)`

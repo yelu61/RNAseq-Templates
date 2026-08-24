@@ -73,6 +73,59 @@
   if (startsWith(absolute, prefix)) substring(absolute, nchar(prefix) + 1L) else basename(absolute)
 }
 
+initialize_run_lifecycle <- function(envir = parent.frame()) {
+  defaults <- list(
+    RUN_ROLE = "candidate",
+    PARENT_RUN_ID = NA_character_,
+    RUN_CHANGE_NOTE = "",
+    RUN_RETENTION = "full"
+  )
+  for (name in names(defaults)) {
+    if (!exists(name, envir = envir, inherits = FALSE)) {
+      assign(name, defaults[[name]], envir = envir)
+    }
+  }
+  if (!get("RUN_ROLE", envir = envir) %in%
+      c("candidate", "canonical", "sensitivity", "repro_check", "superseded")) {
+    stop("RUN_ROLE must be candidate/canonical/sensitivity/repro_check/superseded.")
+  }
+  if (!get("RUN_RETENTION", envir = envir) %in% c("full", "slim", "metadata_only")) {
+    stop("RUN_RETENTION must be full/slim/metadata_only.")
+  }
+  invisible(defaults)
+}
+
+write_template_run_manifest <- function(run_dir,
+                                        config_path,
+                                        input_file,
+                                        config_objects,
+                                        lib_dir,
+                                        runner_file,
+                                        envir = parent.frame()) {
+  lifecycle_fields <- c("RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION")
+  presentation_fields <- c("OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE",
+                           "SCAFFOLD_REPORT_INTERPRETATION")
+  analysis_objects <- setdiff(config_objects, c(lifecycle_fields, presentation_fields))
+  analysis_config <- stats::setNames(lapply(analysis_objects, function(name) {
+    if (exists(name, envir = envir, inherits = TRUE)) get(name, envir = envir, inherits = TRUE) else NULL
+  }), analysis_objects)
+  write_run_manifest(
+    run_dir = run_dir,
+    config_path = config_path,
+    input_file = input_file,
+    analysis_config = analysis_config,
+    role = get("RUN_ROLE", envir = envir, inherits = TRUE),
+    parent_run_id = get("PARENT_RUN_ID", envir = envir, inherits = TRUE),
+    retention = get("RUN_RETENTION", envir = envir, inherits = TRUE),
+    change_note = get("RUN_CHANGE_NOTE", envir = envir, inherits = TRUE),
+    backend_root = dirname(normalizePath(lib_dir)),
+    backend_files = c(
+      if (length(runner_file)) normalizePath(runner_file[[1]], mustWork = TRUE) else character(0),
+      list.files(lib_dir, pattern = "[.]R$", full.names = TRUE)
+    )
+  )
+}
+
 # Write one immutable run-level provenance record. This intentionally does not
 # update a shared registry: parallel runners can safely write their own
 # manifests, and the registry is rebuilt deterministically afterwards.

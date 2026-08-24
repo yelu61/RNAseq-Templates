@@ -19,13 +19,14 @@ analysis/
     0-Config/ 1-DEG/ 2-GSEA/ 3-Visualization/ 4-TME/
     Analysis_summary.txt sessionInfo.txt run_manifest.csv
   runs/RUN_REGISTRY.csv           rebuilt index; duplicate/lifecycle overview
-  notebook_output/run_review/     derived review-notebook outputs only
+  notebook_output/<analysis>/     exploratory notebook outputs only
 results/                          curated, canonical deliverables
   tables/ figures/ reports/
   report_assets/                  derived browser previews; rebuildable cache
 ```
 
-The native run bundle preserves completeness and reproducibility. `results/`
+All six production runners write the listed config snapshot, summary,
+`sessionInfo.txt`, and `run_manifest.csv`. The native run bundle preserves completeness and reproducibility. `results/`
 contains only reviewed tables, figures, and reports selected for scientific
 communication. Every curated artifact records its source run and source file.
 

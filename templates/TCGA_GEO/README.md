@@ -1,8 +1,8 @@
 # RNAseq_TCGA_GEO — command-line template
 
-Non-interactive TCGA/GEO public-data mining pipeline. This is the headless
-counterpart of `notebooks/RNAseq_TCGA_GEO_Template.ipynb` — same steps, driven
-by a config file instead of a parameter cell.
+Non-interactive TCGA/GEO public-data mining pipeline. It shares the analysis
+intent and helper library of `notebooks/RNAseq_TCGA_GEO_Template.ipynb`; the
+production runner is authoritative and may harden ordering or output layout.
 
 It acquires a Tumor/Normal cohort three ways (GDC download, GEO SeriesMatrix, or
 local files), cleans the clinical table, runs DESeq2 Tumor-vs-Normal, then does
@@ -71,6 +71,7 @@ notebook wrote files flat; this runner reconciles them into numbered dirs:
                                      univariate_Cox.csv/.pdf, multivariate_Cox.csv/.pdf
 Analysis_summary.txt                 text summary of the run
 sessionInfo.txt                      package versions (reproducibility)
+run_manifest.csv                     inputs/config/code signatures + lifecycle
 ```
 
 ### Notebook → numbered-layout mapping

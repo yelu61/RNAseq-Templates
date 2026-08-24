@@ -4,6 +4,22 @@ All notable changes to RNAseq-Templates are documented in this file.
 
 ## [Unreleased]
 
+The `v0.11.x` line is feature-frozen. Future entries are limited to maintenance
+fixes unless a new development line is opened explicitly.
+
+## [0.11.0] - 2026-08-24
+
+### Changed
+
+- Entered feature-frozen maintenance mode: only bug, security, compatibility,
+  database-adaptation, test, and documentation fixes are accepted on `v0.11.x`.
+- All six production runners now write the same immutable `run_manifest.csv`
+  provenance contract and expose the same lifecycle fields.
+- CI smoke coverage now directly executes the General production runner in
+  addition to the helper-level General workflow and the five topic runners.
+- Aligned runner-first usage, version, parameter, and output-contract
+  documentation with the production implementation.
+
 ### Added
 
 - **Two-notebook General workflow**: `RNAseq_General.ipynb` remains the complete,

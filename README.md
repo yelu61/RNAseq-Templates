@@ -1,9 +1,13 @@
 # RNAseq-Templates
 
 ![Smoke Test](https://github.com/yelu61/RNAseq-Templates/actions/workflows/smoke-test.yml/badge.svg)
-![Version](https://img.shields.io/badge/version-0.10.0-blue)
+![Version](https://img.shields.io/badge/version-0.11.0-blue)
 
-Notebook-first bulk RNA-seq **downstream** analysis templates, backed by a lightweight shared R helper library (`RNAseq_lib/`).
+Production-runner-first bulk RNA-seq **downstream** analysis templates, backed by a lightweight shared R helper library (`RNAseq_lib/`).
+
+> **Maintenance status:** `v0.11.x` is feature-frozen. This line accepts bug,
+> security, compatibility, database-adaptation, test, and documentation fixes;
+> new analysis modules are deferred to a future development line.
 
 Start from a count or TPM matrix and get reproducible, publication-oriented
 results. In real projects, let `bulk-rnaseq-analysis` inspect the data and
@@ -29,7 +33,7 @@ flowchart TB
     public["Public cohorts<br/>TCGA · GEO"]
 
     engine[["3 · Run selected template<br/>RNAseq_lib shared helpers"]]
-    output["4 · Result bundle<br/>tables · PDF figures · HTML report"]
+    output["4 · Result bundle<br/>tables · PDF figures · optional HTML report"]
 
     data --> router
     router --> standard & specialized & public
@@ -49,7 +53,7 @@ flowchart TB
     class output result
 ```
 
-Templates support **human or mouse where biologically applicable** (TCGA cohorts are human), are exercised by a CI smoke test on each push, and ship with runnable bundled-data demos under `examples/`. The required smoke path is offline and deterministic; optional KEGG services and IOBR integration still require network access or a populated local cache.
+Templates support **human or mouse where biologically applicable** (TCGA cohorts are human), are exercised by a CI smoke test on each push, and ship with runnable bundled-data demos under `examples/`. The required core assertions pass offline and deterministically; network-backed KEGG outputs may be skipped, while IOBR integration requires network access or a populated local cache.
 
 ## 🤖 Codex / Claude Code Skill
 
@@ -81,13 +85,13 @@ not copy or merge either analysis implementation.
 | I want to... | Use this template | Input | Key outputs |
 | --- | --- | --- | --- |
 | Standard DE across 2+ groups | General CLI runner; `RNAseq_General.ipynb` for a complete interactive rerun; `RNAseq_General_RunReview.ipynb` for read-only follow-up | raw counts or a completed run | multi-threshold DEG, ORA/GSEA/GSVA, QC, HTML report |
-| Prefer limma-voom / batch covariate | `RNAseq_limma_voom_Template.ipynb` | raw counts | voom DEG, volcano, GO ORA |
-| Analyze a time series / repeated measures | `RNAseq_TimeCourse_Template.ipynb` | VST matrix (from General) | Mfuzz clusters, time-point DEG |
-| Quantify immune / stromal infiltration | `RNAseq_TME_Deconvolution_Template.ipynb` | counts + gene lengths (TPM internal) | IOBR/ESTIMATE/ssGSEA scores, heatmaps |
-| Find co-expression modules | `RNAseq_WGCNA_Template.ipynb` | VST matrix (from General) | modules, module-trait cor, hub genes |
-| Mine TCGA / GEO public data | `RNAseq_TCGA_GEO_Template.ipynb` | TCGA/GEO download or local matrix | Tumor-vs-Normal DEG, KM/Cox survival |
+| Prefer limma-voom / batch covariate | Limma_Voom CLI runner; notebook for exploration | raw counts | voom DEG, volcano, GO ORA |
+| Analyze a time series / repeated measures | TimeCourse CLI runner; notebook for exploration | VST matrix + optional raw counts | Mfuzz clusters, time-point DEG |
+| Quantify immune / stromal infiltration | TME CLI runner; notebook for exploration | counts + gene lengths (TPM internal) | IOBR/ESTIMATE/ssGSEA scores, heatmaps |
+| Find co-expression modules | WGCNA CLI runner; notebook for exploration | VST/rlog/log2(TPM+1) | modules, module-trait cor, hub genes |
+| Mine TCGA / GEO public data | TCGA_GEO CLI runner; notebook for exploration | TCGA/GEO download or local matrix | Tumor-vs-Normal DEG, KM/Cox survival |
 
-See [references/TEMPLATE_SELECTION.md](references/TEMPLATE_SELECTION.md) for a decision flow and workflow combinations. When in doubt, **start with `RNAseq_General.ipynb`** — it covers the most common case and exports the `vsd_matrix.csv` / `colData.csv` that the WGCNA and TimeCourse templates consume.
+See [references/TEMPLATE_SELECTION.md](references/TEMPLATE_SELECTION.md) for a decision flow and workflow combinations. When in doubt, **select General**: use its CLI runner for a real project and its notebook only for interactive exploration. General exports the `vsd_matrix.csv` / `colData.csv` that WGCNA and TimeCourse can consume.
 
 > ⚠️ **Input contract:** TME deconvolution requires TPM (computed internally from raw counts + gene lengths). It **rejects VST/rlog**, which cannot be inverted to TPM.
 
@@ -173,8 +177,10 @@ cd /path/to/project && Rscript run_analysis.R
 
 Swap `General` for `Limma_Voom`, `WGCNA`, `TME`, `TimeCourse`, or `TCGA_GEO` to
 run that pipeline instead; each `run_analysis.R` shares the same bootstrap,
-numbered `0-Config/1-DEG/...` output layout, and config snapshot. It runs the
-same pipeline as the corresponding notebook and writes the same outputs.
+numbered `0-Config/1-DEG/...` output layout, config snapshot, session record and
+run manifest. Runners and notebooks share the same analysis intent and helper
+library, but the production runner is authoritative and output files may differ
+where it fixes notebook-only ordering, duplication, or layout issues.
 
 The runner preserves the invocation directory, which is the path base for
 relative input paths and `OUTDIR`; a relative config argument is resolved before
@@ -188,7 +194,7 @@ single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without
 recompute. See [templates/General/README.md](templates/General/README.md) for
 batch execution and library-path resolution.
 
-Every completed General run writes `run_manifest.csv`, including input/config
+Every completed production run writes `run_manifest.csv`, including input/config
 checksums, analysis and backend-code signatures, git revision/dirty state,
 lifecycle role, parent run and retention class. After running one or more
 bundles, rebuild the non-destructive registry:
@@ -387,6 +393,6 @@ git push -u origin main
 
 - This is not a formal R package. The helper library is deliberately lightweight so notebooks remain readable.
 - For publication figures, edit the saved PDFs from `3-Visualization/`.
-- For project-specific models with batch, paired design, or covariates, edit `DESIGN_FORMULA`, or use the new `BATCH_VECTOR` / `PAIR_ID` parameters in `RNAseq_General.ipynb`.
+- For project-specific models with batch, paired design, or covariates, edit the project config's `DESIGN_FORMULA`, `BATCH_VECTOR`, or `PAIR_ID` as appropriate.
 - Run `Rscript install_dependencies.R` once to install all required CRAN, Bioconductor, and GitHub packages.
 - Run `Rscript examples/run_demo_smoke_test.R` to verify the installation and core pipeline.

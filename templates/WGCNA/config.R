@@ -3,7 +3,7 @@
 # =============================================================================
 # This is the ONLY file you need to edit for a new project.
 # `run_analysis.R` sources this file, then runs the full WGCNA pipeline
-# (the same steps as notebooks/RNAseq_WGCNA_Template.ipynb) non-interactively:
+# using the same analysis intent and helper library as the WGCNA notebook:
 # expression + trait loading -> MAD filtering / sample QC -> soft-threshold
 # selection -> blockwise module detection -> module-trait correlation -> hub
 # gene export.
@@ -57,6 +57,12 @@ OUTDIR        <- "5-WGCNA"
 # default so a run does not emit a sparse report.
 GENERATE_HTML_REPORT <- FALSE
 REPORT_TITLE    <- "WGCNA Co-expression Network Report"
+
+# ---- 1.7 Run lifecycle -------------------------------------------------------
+RUN_ROLE        <- "candidate"
+PARENT_RUN_ID   <- NA_character_
+RUN_CHANGE_NOTE <- ""
+RUN_RETENTION   <- "full"
 
 # =============================================================================
 # Derived values & validation (normally no need to edit below this line)

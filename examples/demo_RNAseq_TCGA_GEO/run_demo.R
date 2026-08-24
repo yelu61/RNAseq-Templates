@@ -81,7 +81,8 @@ expected_files <- file.path(outdir_abs, c(
   "6-Survival/univariate_Cox.csv",
   "3-Visualization/Volcano_Tumor_vs_Normal.pdf",
   "Analysis_summary.txt",
-  "sessionInfo.txt"
+  "sessionInfo.txt",
+  "run_manifest.csv"
 ))
 missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {

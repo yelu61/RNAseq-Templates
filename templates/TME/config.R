@@ -3,8 +3,8 @@
 # =============================================================================
 # This is the ONLY file you need to edit for a new project.
 # `run_analysis.R` sources this file, then runs the full TME deconvolution
-# pipeline (the same steps as notebooks/RNAseq_TME_Deconvolution_Template.ipynb)
-# non-interactively: expression -> ESTIMATE / IOBR / native CIBERSORT -> ssGSEA.
+# pipeline using the same analysis intent and helper library as the TME notebook:
+# expression -> ESTIMATE / IOBR / native CIBERSORT -> ssGSEA.
 #
 # Usage:
 #   Rscript run_analysis.R                  # uses ./config.R
@@ -89,6 +89,12 @@ OUTDIR        <- "."
 # default so a run does not emit a sparse report.
 GENERATE_HTML_REPORT <- FALSE
 REPORT_TITLE         <- "TME Deconvolution Report"
+
+# ---- 1.9 Run lifecycle -------------------------------------------------------
+RUN_ROLE        <- "candidate"
+PARENT_RUN_ID   <- NA_character_
+RUN_CHANGE_NOTE <- ""
+RUN_RETENTION   <- "full"
 
 # =============================================================================
 # Derived values & validation (normally no need to edit below this line)
