@@ -1,2 +1,2 @@
-PASS: 26 Markdown files, 111 local file links, no missing targets.
+PASS: 23 Markdown files, 111 local file links, no missing targets.
 PASS: 95 source files match the isolated tested copy.

@@ -31,8 +31,9 @@ fixes unless a new development line is opened explicitly.
   counts. Automatic figures and report interpretation distinguish BH FDR
   significance from descriptive ranking.
 
-- Standardized pathway term labels inside ordinary/bidirectional ORA and GSEA
-  NES bar directions, keeping true bar lengths and separate FDR annotations.
+- Pathway terms overlay bars in single-sided ORA/GSEA plots; when both
+  directions are present, terms sit across zero from their corresponding bars.
+  True bar lengths and separate outer FDR annotations are preserved.
 
 ### Documentation and validation
 

@@ -1231,10 +1231,11 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
 
   max_fold <- max(abs(df$SignedFoldEnrichment))
-  # Anchor inside each bar near zero. Long labels may use the same row's
-  # whitespace beyond a short bar; the quantitative bar length never changes.
+  # Single-sided labels sit on the bars; diverging labels sit across zero
+  # from their bars. Bar lengths remain unchanged in either layout.
   df$LabelX <- sign(df$SignedFoldEnrichment) * pmin(abs(df$SignedFoldEnrichment) * 0.15, max_fold * 0.015)
-  df$LabelHjust <- ifelse(df$SignedFoldEnrichment >= 0, 0, 1)
+  if (both_sides) df$LabelX <- -df$LabelX
+  df$LabelHjust <- ifelse(df$LabelX >= 0, 0, 1)
   x_limits <- max_fold * c(if (any(df$SignedFoldEnrichment < 0)) -1.08 else 0,
                           if (any(df$SignedFoldEnrichment > 0)) 1.08 else 0)
 
@@ -1331,7 +1332,8 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
   max_nes <- max(abs(df$NES), na.rm = TRUE)
   df$LabelX <- sign(df$NES) * pmin(abs(df$NES) * 0.15, max_nes * 0.015)
-  df$LabelHjust <- ifelse(df$NES >= 0, 0, 1)
+  if (both_sides) df$LabelX <- -df$LabelX
+  df$LabelHjust <- ifelse(df$LabelX >= 0, 0, 1)
   # Keep FDR in a separate outer column so it cannot collide with terms on
   # short bars. A symmetric two-sided scale reserves equal label space.
   df$FDRX <- ifelse(df$NES >= 0, 1, -1) * max_nes * 1.18
@@ -1349,7 +1351,7 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
       size = 2.55, color = "#222222", lineheight = 0.92, show.legend = FALSE
     ) +
     ggplot2::geom_text(
-      ggplot2::aes(x = FDRX, label = FDRLabel, hjust = LabelHjust),
+      ggplot2::aes(x = FDRX, label = FDRLabel, hjust = ifelse(NES >= 0, 0, 1)),
       size = 2.55, color = "#222222", show.legend = FALSE
     ) +
     ggplot2::scale_fill_manual(values = c("Positive NES" = "#C8473E", "Negative NES" = "#3778A8")) +

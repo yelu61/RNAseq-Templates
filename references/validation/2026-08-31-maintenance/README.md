@@ -11,7 +11,7 @@ and repository demo outputs were not overwritten.
 
 | Evidence | Result |
 |---|---|
-| [Full unit suite](unit-tests-final.log) | 1,021 pass, 0 fail, 0 skip; 3 UpSetR/ggplot2 deprecation warnings |
+| [Full unit suite](unit-tests-final.log) | 1,024 pass, 0 fail, 0 skip; 3 UpSetR/ggplot2 deprecation warnings |
 | [Notebook/library parsing](notebook-syntax.log) / [Final R parsing](final-r-syntax.log) | 10 notebooks, 17 helper files; 85 final repository R files, including verification scripts |
 | [Full smoke](smoke.log) | General helper and six production runners pass; per-demo logs retained alongside this file |
 | [Native human/mouse TME](native-tme-cli.log) | Both complete CLI runs pass; 6 samples each, matching 547/511 reference genes, 22/25 cell types, 27/26 true ssGSEA signatures |
@@ -19,7 +19,7 @@ and repository demo outputs were not overwritten.
 | [Unsigned publish gate](report-unsigned-publish.log) / [validation rows](report-validation.log) | Expected exit 1: unresolved coverage and scientific review; no approval was manufactured |
 | [Result QA](output-qa.log) | 1,513 GO GSEA IDs, overlap limits and whole-family BH values verified; 0 unusable / 0 significant terms |
 | [PDF rendering QA](pdf-qa.log) | 20 PDFs render with nonblank first pages; PCA, volcano, DEG heatmap and ORA previews inspected |
-| [Bar-label regressions](bar-label-tests.log) | 158 plot assertions pass; 7 synthetic ordinary/one-sided/two-sided ORA/GSEA PDFs visually checked |
+| [Bar-label regressions](bar-label-tests.log) | 161 plot assertions pass; 7 synthetic ordinary/one-sided/two-sided ORA/GSEA PDFs visually checked |
 | [Analysis environment](analysis-session.log) | R 4.6.1 / macOS aarch64 and loaded package versions |
 | [Project-memory audit](project-structure.json) | 0 errors, 15 warnings for absent research-project files; software-repository equivalents accepted |
 
@@ -50,9 +50,12 @@ directories and need not remain available. Evidence checksums are recorded in
 [SHA256SUMS.txt](SHA256SUMS.txt).
 
 The [bar-label fixture](bar_label_previews.R) can regenerate the seven synthetic
-layout examples from the backend root. It preserves actual bar lengths; a long
-term on a very short bar uses adjacent same-row whitespace. These are layout
-fixtures, not scientific results. Representative retained previews:
+layout examples from the backend root. Single-sided terms overlay their bars;
+when both directions are plotted, terms sit across zero from their corresponding
+bars. GSEA FDR remains in an outer column on the bar's side. Actual bar lengths
+are preserved; a long term on a very short single-sided bar uses adjacent
+same-row whitespace. These are layout fixtures, not scientific results.
+Representative retained previews:
 
 - [Bidirectional ORA](bar-label-bidir-both.png)
 - [Positive/negative GSEA](bar-label-gsea-both.png)

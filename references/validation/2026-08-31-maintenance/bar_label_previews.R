@@ -31,6 +31,8 @@ for (f in list.files(out,pattern='[.]pdf$',full.names=TRUE)) {
   stopifnot(status == 0)
 }
 writeLines(c('Synthetic layout fixtures only; these are not biological results.',
+             'Single-sided terms overlay their bars; two-sided terms sit across zero from their bars.',
+             'GSEA FDR stays in a separate outer column on the bar side.',
              'No analysis values or GSEA significance thresholds were changed.',
              'All seven PDFs were rasterized at 120 dpi for visual QA.'),file.path(out,'README.txt'))
 

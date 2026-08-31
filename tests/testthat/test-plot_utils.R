@@ -349,7 +349,7 @@ test_that("GSEA NES plots label sign and FDR rather than pathway activation", {
   expect_gt(file.info(file)$size, 1000)
 })
 
-test_that("bidirectional ORA labels start inside unchanged bars for either direction", {
+test_that("ORA labels sit across diverging bars and on single-sided bars", {
   up <- make_enrich_df()
   up$FoldEnrichment <- c(8, 0.08, 4, 3, 2)
   up$Description[2] <- paste(rep("long pathway description", 5), collapse = " ")
@@ -363,8 +363,9 @@ test_that("bidirectional ORA labels start inside unchanged bars for either direc
     labels <- built$data[[3]]
     expect_equal(nrow(labels), nrow(p$data))
     expect_true(all(abs(labels$x) > 0 & abs(labels$x) < abs(bars$x)))
-    expect_equal(sign(labels$x), sign(bars$x))
-    expect_equal(labels$hjust, ifelse(bars$x >= 0, 0, 1))
+    expected_side <- if (!is.null(pair[[1]]) && !is.null(pair[[2]])) -sign(bars$x) else sign(bars$x)
+    expect_equal(sign(labels$x), expected_side)
+    expect_equal(labels$hjust, ifelse(expected_side >= 0, 0, 1))
     expected <- c(if (!is.null(pair[[1]])) pair[[1]]$FoldEnrichment,
                   if (!is.null(pair[[2]])) -pair[[2]]$FoldEnrichment)
     expect_equal(sort(bars$x), sort(expected))
@@ -390,10 +391,12 @@ test_that("GSEA term labels and FDR occupy separate positions without changing N
     fdr <- built$data[[4]]
     expect_equal(sort(bars$x), sort(df$NES[rows]))
     expect_true(all(abs(labels$x) > 0 & abs(labels$x) < abs(bars$x)))
-    expect_equal(sign(labels$x), sign(bars$x))
-    expect_equal(labels$hjust, ifelse(bars$x >= 0, 0, 1))
+    expected_side <- if (length(rows) == 4L) -sign(bars$x) else sign(bars$x)
+    expect_equal(sign(labels$x), expected_side)
+    expect_equal(labels$hjust, ifelse(expected_side >= 0, 0, 1))
     expect_true(all(abs(fdr$x) > abs(bars$x)))
     expect_equal(sign(fdr$x), sign(bars$x))
+    expect_equal(fdr$hjust, ifelse(bars$x >= 0, 0, 1))
     expect_true(all(grepl("FDR=", fdr$label, fixed = TRUE)))
     expect_equal(nrow(labels), length(rows))
     expect_equal(nrow(fdr), length(rows))

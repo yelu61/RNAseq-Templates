@@ -34,7 +34,7 @@
 | limma `MIN_SAMPLE_FRAC` 未生效 | 原始 count 样本比例过滤与 edgeR `filterByExpr` 同时满足 | 不同比例/不平衡数据/按库大小过滤测试；0 保留旧 edgeR-only 行为 |
 | GSEA 丢失不可计算通路 ID，且集合大小按原参考筛选 | 先按排名输入实际交集筛集合，避免上游 nominal-P 下标丢 ID；保留全部受检表及质量列 | 本机 GO、离线 KEGG 风格集合测试；BH 全家族复算、全 NA/部分 NA/零显著测试 |
 | 非空 GSEA 表被当作显著/激活证据 | 自动图只用有效 BH 显著项；人工指定非显著曲线标明状态；报告排除无效行并显示数量 | 图与双报告模板回归、真实 HTML 渲染；不以 NES 方向断言激活/抑制 |
-| 通路 bar 的默认 term 位置不一致 | 普通 ORA 保持条内；双向 ORA/GSEA 同步为零轴侧条内锚点，FDR 独立列 | 7 张单/双侧与长名称/短 bar 排版示例逐张渲染；不改变 bar 数值长度 |
+| 通路 bar 的默认 term 位置不一致 | 单向 ORA/GSEA 的 term 覆盖柱上；实际双向时 term 放在对应柱的零轴对侧；FDR 保持柱外独立列 | 7 张单/双侧与长名称/短 bar 排版示例逐张渲染；不改变 bar 数值长度 |
 | 专题报告在外部项目找不到共享模板 | 专题 runner 显式定位 backend report，保留 General 已有行为 | 仓库外、含空格工作目录下执行六入口实际报告分支回归 |
 
 ssGSEA 与 GSVA 的参数类区别见 [GSVA 官方说明](https://bioconductor.org/packages/release/bioc/vignettes/GSVA/inst/doc/GSVA.html)。
@@ -51,7 +51,7 @@ GSEA 兼容修复依据本机 `clusterProfiler 4.20.0` / `enrichit 0.2.0` 行为
 
 | 检查 | 结果 |
 |---|---|
-| 完整 `tests/testthat.R` | **1,021 PASS，0 FAIL，0 SKIP，3 WARN**；告警来自 UpSetR/ggplot2 弃用接口 |
+| 完整 `tests/testthat.R` | **1,024 PASS，0 FAIL，0 SKIP，3 WARN**；告警来自 UpSetR/ggplot2 弃用接口 |
 | notebook 与 R 语法 | 10 notebooks、17 共享 R 文件通过；最终仓库 85 个 R 文件（含验证脚本）解析通过 |
 | 完整 smoke | General helper + 六个生产 runner 全部通过；KEGG 网络访问失败明确跳过，不能视作 KEGG 网络验收 |
 | 人/鼠 native+ssGSEA CLI | 各 6 样本；22/25 细胞类，27/26 ssGSEA 签名；比例和=1，直接评分数值一致 |

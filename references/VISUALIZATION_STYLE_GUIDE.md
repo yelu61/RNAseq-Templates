@@ -82,10 +82,13 @@ replace visual inspection.
 
 ## Enrichment bar labels
 
-The default for ordinary ORA, bidirectional ORA and GSEA NES bars is to write
-the wrapped term at the zero-axis side **inside its bar direction**, without
-duplicating the term on the y axis. Preserve measured bar lengths. A long label
-on a very short bar may extend into that row's whitespace rather than distort
-the statistic or shrink text until unreadable. Positive/negative labels align
-outward from zero; GSEA FDR annotations must remain separate and unobstructed.
+For single-sided ORA or GSEA NES plots, place the wrapped term **on its bar**
+near zero. When both directions are present, place each term **across zero from
+its bar**: a rightward bar has its term on the left, and a leftward bar has its
+term on the right. Choose the layout from the directions actually plotted,
+not the function name, and do not duplicate terms on the y axis.
+Preserve measured bar lengths. A long label on a very short single-sided bar
+may extend into that row's whitespace rather than distort the statistic or
+shrink text until unreadable. GSEA FDR annotations stay in a separate outer
+column on the bar's side, independently of term alignment.
 Check both directions, one-sided results, short bars and long/duplicate labels.

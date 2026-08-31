@@ -2,7 +2,7 @@
 
 ⠏ |          0 | batch_utils                                                    
 ⠋ |          1 | batch_utils                                                    
-✔ |          6 | batch_utils [2.1s]
+✔ |          6 | batch_utils [2.2s]
 
 ⠏ |          0 | cli-paths                                                      
 ⠼ |         15 | cli-paths                                                      
@@ -12,7 +12,7 @@
 ✔ |         57 | cli-paths
 
 ⠏ |          0 | data_utils                                                     
-⠙ |         32 | data_utils                                                     
+⠏ |         30 | data_utils                                                     
 ⠼ |         45 | data_utils                                                     
 ✔ |         58 | data_utils
 
@@ -96,7 +96,7 @@ Backtrace:
 ⠏ |          0 | enrichment_utils                                               
 ⠏ |         10 | enrichment_utils                                               
 ⠏ |         40 | enrichment_utils                                               
-✔ |         40 | enrichment_utils [18.4s]
+✔ |         40 | enrichment_utils [18.5s]
 
 ⠏ |          0 | geo_utils                                                      
 ✔ |          5 | geo_utils
@@ -105,14 +105,14 @@ Backtrace:
 ✔ |          8 | io_utils
 
 ⠏ |          0 | limma-voom-utils                                               
-⠦ |          7 | limma-voom-utils                                               
+⠧ |          8 | limma-voom-utils                                               
 ✔ |         24 | limma-voom-utils
 
 ⠏ |          0 | narrative_utils                                                
 ✔ |         21 | narrative_utils
 
 ⠏ |          0 | notebook_to_runner                                             
-⠦ |         37 | notebook_to_runner                                             
+⠧ |         38 | notebook_to_runner                                             
 ✔ |         68 | notebook_to_runner
 
 ⠏ |          0 | pathway_utils                                                  
@@ -120,22 +120,22 @@ Backtrace:
 ⠼ |         35 | pathway_utils                                                  
 ⠴ |         36 | pathway_utils                                                  
 ⠇ |         39 | pathway_utils                                                  
-✔ |         42 | pathway_utils [1.6s]
+⠋ |         41 | pathway_utils                                                  
+✔ |         42 | pathway_utils [1.7s]
 
 ⠏ |          0 | plot_utils                                                     
 ⠸ |         34 | plot_utils                                                     
 ⠙ |         62 | plot_utils                                                     
-⠼ |         65 | plot_utils                                                     
+⠴ |         66 | plot_utils                                                     
 ⠏ |         80 | plot_utils                                                     
 ⠙ |         92 | plot_utils                                                     
 ⠧ |         98 | plot_utils                                                     
 ⠙ |        102 | plot_utils                                                     
-⠏ |        110 | plot_utils                                                     
-⠙ |        122 | plot_utils                                                     
+⠧ |        118 | plot_utils                                                     
 ⠴ |        126 | plot_utils                                                     
-⠦ |        137 | plot_utils                                                     
-⠧ |        148 | plot_utils                                                     
-✔ |        158 | plot_utils [1.7s]
+⠧ |        138 | plot_utils                                                     
+⠏ |        150 | plot_utils                                                     
+✔ |        161 | plot_utils [1.7s]
 
 ⠏ |          0 | report_utils                                                   
 ⠹ |         43 | report_utils                                                   
@@ -144,14 +144,14 @@ Backtrace:
 ✔ |         65 | report_utils [1.0s]
 
 ⠏ |          0 | run_utils                                                      
-⠴ |         16 | run_utils                                                      
-⠴ |         26 | run_utils                                                      
-⠋ |         31 | run_utils                                                      
-⠇ |         39 | run_utils                                                      
-⠧ |         48 | run_utils                                                      
-⠋ |         71 | run_utils                                                      
-⠹ |         83 | run_utils                                                      
-⠼ |         95 | run_utils                                                      
+⠸ |         14 | run_utils                                                      
+⠹ |         23 | run_utils                                                      
+⠏ |         30 | run_utils                                                      
+⠙ |         32 | run_utils                                                      
+⠼ |         45 | run_utils                                                      
+⠙ |         52 | run_utils                                                      
+⠦ |         77 | run_utils                                                      
+⠇ |         89 | run_utils                                                      
 ⠙ |        102 | run_utils                                                      
 ✔ |        104 | run_utils [1.5s]
 
@@ -172,14 +172,14 @@ Backtrace:
 
 ⠏ |          0 | tme_utils                                                      
 ⠹ |         13 | tme_utils                                                      
-⠹ |         23 | tme_utils                                                      
+⠙ |         22 | tme_utils                                                      
 ⠏ |         30 | tme_utils                                                      
 ⠸ |         34 | tme_utils                                                      
 ⠇ |         39 | tme_utils                                                      
 ⠇ |         49 | tme_utils                                                      
-⠦ |         57 | tme_utils                                                      
+⠧ |         58 | tme_utils                                                      
 ⠇ |         59 | tme_utils                                                      
-✔ |         77 | tme_utils [1.7s]
+✔ |         77 | tme_utils [1.6s]
 
 ⠏ |          0 | tme-routing                                                    
 ⠹ |          3 | tme-routing                                                    
@@ -198,26 +198,25 @@ TME outputs written to 4-TME
 
   Control Treatment 
         1         1 
-
-⠴ |         66 | tme-routing                                                    Expression: 511 genes x 2 samples
-
-  Control Treatment 
-        1         1 
-
-⠇ |         69 | tme-routing                                                    Expression: 511 genes x 2 samples
+Expression: 511 genes x 2 samples
 
   Control Treatment 
         1         1 
 
-⠇ |         79 | tme-routing                                                    
-✔ |         83 | tme-routing [1.8s]
+⠦ |         67 | tme-routing                                                    
+⠹ |         73 | tme-routing                                                    Expression: 511 genes x 2 samples
+
+  Control Treatment 
+        1         1 
+
+✔ |         83 | tme-routing [1.7s]
 
 ⠏ |          0 | wgcna-correctness                                              
 ⠋ |          1 | wgcna-correctness                                              
-⠦ |         67 | wgcna-correctness                                              
+⠋ |         71 | wgcna-correctness                                              
 ✔ |         93 | wgcna-correctness
 
 ══ Results ═════════════════════════════════════════════════════════════════════
-Duration: 32.6 s
+Duration: 32.7 s
 
-[ FAIL 0 | WARN 3 | SKIP 0 | PASS 1021 ]
+[ FAIL 0 | WARN 3 | SKIP 0 | PASS 1024 ]
