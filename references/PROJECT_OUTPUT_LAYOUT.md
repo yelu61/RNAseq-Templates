@@ -40,8 +40,10 @@ tables and figures are created beside the notebook. Adding a later curated
 
 Avoid this by setting one explicit run root before execution, verifying it in
 the first cell, and never treating `notebooks/` as an output root. A notebook
-copied into a project should be source code; the run bundle should live under
-`analysis/runs/<run_id>/` (or another declared native-output directory).
+copied into a project should be source code; full exploratory output belongs in
+`analysis/notebook_output/<analysis>/`, while production CLI bundles belong in
+`analysis/runs/<run_id>/`. A run-review notebook reads that CLI bundle and writes
+only its derivatives to a separate review directory.
 
 ## Ownership and duplication rules
 
@@ -52,12 +54,18 @@ copied into a project should be source code; the run bundle should live under
 - PNG report previews are derived assets; PDF/SVG files are figure masters.
 - Never overwrite a completed run. Use a new `run_id` and record backend
   revision, configuration hash, input checksums, session information, and
-  worktree state.
+  worktree state. Runners reject existing native artifacts before writing; this
+  does not lock against concurrent jobs or later manual edits. Require a fresh
+  directory and archive the finalized bundle after report/figure review.
 - Classify each run as `candidate`, `canonical`, `sensitivity`, `repro_check`
   or `superseded`; record its parent and concise change note. Rebuild
-  `RUN_REGISTRY.csv` from per-run manifests after batch execution. Exact
-  duplicate means the input checksum, analysis signature and backend-code
-  signature all match. The manifest also records backend revision and dirty
+  `RUN_REGISTRY.csv` from per-run manifests after batch execution. A candidate
+  duplicate requires complete schema-v2 input/reference inventories and matching
+  analysis, backend and runtime signatures. `run_inputs.csv` hashes declared
+  auxiliary files; `run_runtime.csv` records R/packages. Unknown references,
+  missing checksums and old schemas block grouping. This is not proof of
+  identical results: custom inputs still need project-level provenance. Do not
+  prune from `duplicate_of` alone. The manifest also records backend revision and dirty
   state. Within one duplicate family, a full canonical run is preferred as the
   retained owner;
   other rows point to it through `duplicate_of`.

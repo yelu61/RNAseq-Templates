@@ -1,0 +1,53 @@
+========================================
+RNAseq_TME — run_analysis.R
+Working dir : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo 
+Config file : /private/tmp/tme-native-cli-9b3a35d8cf18/mouse/config.R 
+========================================
+
+RNAseq_lib  : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/RNAseq_lib 
+
+Expression: 511 genes x 6 samples
+
+  Control Treatment 
+        3         3 
+Warning message:
+Unmapped orthologs dropped from human-reference input: 90 
+Native TME matrix: 511 genes x 6 samples
+Running native CIBERSORT: 6 samples; 511 genes; perm = 0; QN = FALSE
+Signature matrix: 511 genes x 25 cell types
+Native CIBERSORT completed for 6 samples.
+Native CIBERSORT results saved to /tmp/tme-native-cli-9b3a35d8cf18/mouse/run/4-TME/CIBERSORT_native_results.csv 
+Fontconfig error: No writable cache directories
+Warning messages:
+1: Use of .data in tidyselect expressions was deprecated in tidyselect 1.2.0.
+ℹ Please use `all_of(var)` (or `any_of(var)`) instead of `.data[[var]]` 
+2: In .validate_figure_dimensions(width, height) :
+  Figure height 16.90 in exceeds the conservative journal-page height 9.72 in; treat it as an analysis/supplementary archive figure.
+ssGSEA immune scores saved to /tmp/tme-native-cli-9b3a35d8cf18/mouse/run/4-TME/ssGSEA_immune_scores.csv 
+========================================
+TME Deconvolution Analysis Summary
+========================================
+
+1. Data Overview
+   - Input mode: expression
+   - Species: mouse
+   - Samples: 6
+   - Groups: Control, Treatment
+   - Native / human-reference genes: 511 / 404
+
+2. Methods Run
+   - ESTIMATE (native): no
+   - IOBR (none)
+   - Native CIBERSORT: yes
+   - ssGSEA signatures scored: 26
+
+3. Output Files
+   - /tmp/tme-native-cli-9b3a35d8cf18/mouse/run/0-Config/analysis_config_used.R
+   - /tmp/tme-native-cli-9b3a35d8cf18/mouse/run/4-TME (TPM matrix, ESTIMATE/IOBR/CIBERSORT tables, ssGSEA, all PDFs, tme_results.Rdata)
+
+========================================
+
+========================================
+RNAseq_TME analysis COMPLETE.
+Outputs under: /private/tmp/tme-native-cli-9b3a35d8cf18/mouse/run 
+========================================

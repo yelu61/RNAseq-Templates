@@ -73,6 +73,9 @@ expected_files <- c(
   file.path(outdir_abs, "WGCNA_network.rds"),
   file.path(outdir_abs, "WGCNA_gene_modules.csv"),
   file.path(outdir_abs, "Module_trait_correlation.csv"),
+  file.path(outdir_abs, "Module_trait_pvalue.csv"),
+  file.path(outdir_abs, "Module_trait_n_samples.csv"),
+  file.path(outdir_abs, "Hub_genes_all_modules.csv"),
   file.path(run_root, "Analysis_summary.txt"),
   file.path(run_root, "sessionInfo.txt"),
   file.path(run_root, "run_manifest.csv")
@@ -81,6 +84,51 @@ missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {
   stop("WGCNA demo FAILED (runner exit status ", status, "). Missing expected outputs:\n",
        paste(missing_files, collapse = "\n"))
+}
+
+# Validate numerical exports against the saved input and eigengenes. File
+# existence alone did not catch numeric/color mismatches or duplicated hubs.
+network <- readRDS(file.path(outdir_abs, "WGCNA_network.rds"))
+gene_modules <- read.csv(file.path(outdir_abs, "WGCNA_gene_modules.csv"),
+                         colClasses = c(gene = "character"))
+hubs <- read.csv(file.path(outdir_abs, "Hub_genes_all_modules.csv"),
+                  colClasses = c(gene = "character"))
+assigned <- gene_modules$gene[gene_modules$module != "grey"]
+stopifnot(
+  identical(gene_modules$gene, colnames(network$datExpr)),
+  setequal(sub("^ME", "", colnames(network$MEs)), unique(gene_modules$module)),
+  nrow(hubs) == length(assigned), !anyDuplicated(hubs$gene),
+  setequal(hubs$gene, assigned)
+)
+for (mod in unique(hubs$module)) {
+  hub <- read.csv(file.path(outdir_abs, paste0("Hub_genes_", mod, ".csv")),
+                  colClasses = c(gene = "character"))
+  expected <- vapply(hub$gene, function(gene) {
+    stats::cor(network$datExpr[, gene], network$MEs[[paste0("ME", mod)]],
+               use = "pairwise.complete.obs")
+  }, numeric(1))
+  stopifnot(
+    setequal(hub$gene, gene_modules$gene[gene_modules$module == mod]),
+    all(hub$module == mod), !anyDuplicated(hub$gene),
+    isTRUE(all.equal(hub$kME, unname(expected), tolerance = 1e-12)),
+    all(diff(abs(hub$kME)) <= 0)
+  )
+}
+saved <- new.env()
+load(file.path(outdir_abs, "WGCNA_results.Rdata"), envir = saved)
+effective_n <- as.matrix(read.csv(file.path(outdir_abs, "Module_trait_n_samples.csv"),
+                                  row.names = 1, check.names = FALSE))
+stopifnot(isTRUE(all.equal(effective_n, saved$moduleTraitN, check.attributes = FALSE)))
+for (i in seq_len(ncol(saved$MEs))) for (j in seq_len(ncol(saved$trait_numeric))) {
+  paired <- complete.cases(saved$MEs[, i], saved$trait_numeric[, j])
+  stopifnot(saved$moduleTraitN[i, j] == sum(paired))
+  if (sum(paired) > 2 && is.finite(saved$moduleTraitCor[i, j])) {
+    expected <- stats::cor.test(saved$MEs[paired, i], saved$trait_numeric[paired, j])
+    stopifnot(isTRUE(all.equal(unname(saved$moduleTraitP[i, j]), expected$p.value,
+                              tolerance = 1e-12)))
+  } else {
+    stopifnot(is.na(saved$moduleTraitP[i, j]))
+  }
 }
 
 cat("\n========================================\n")

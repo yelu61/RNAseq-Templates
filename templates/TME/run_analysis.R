@@ -64,6 +64,10 @@ if (is.na(lib_dir) || !dir.exists(lib_dir)) {
   }
 }
 cat("RNAseq_lib  :", normalizePath(lib_dir), "\n\n")
+source(file.path(lib_dir, "run_utils.R"))
+assert_fresh_run_dir(OUTDIR)
+requested_tme_methods <- c(RUN_ESTIMATE, RUN_IOBR, RUN_CIBERSORT,
+                          if (exists("RUN_SSGSEA")) RUN_SSGSEA else TRUE)
 
 # Project root used to locate bundled resources (references/CIBERSORT/).
 repo_root <- tryCatch(rprojroot::find_root(rprojroot::is_git_root, path = script_dir),
@@ -107,7 +111,8 @@ if (isTRUE(RUN_CIBERSORT)) {
   }
 }
 # ssGSEA (sections 8-9) needs GSVA; degrade gracefully if it is unavailable.
-RUN_SSGSEA <- TRUE
+if (!exists("RUN_SSGSEA")) RUN_SSGSEA <- TRUE
+if (!exists("ORTHOLOG_CACHE")) ORTHOLOG_CACHE <- NULL
 if (!requireNamespace("GSVA", quietly = TRUE)) {
   message("The 'GSVA' package is not installed; skipping ssGSEA immune-signature scoring.")
   RUN_SSGSEA <- FALSE
@@ -142,7 +147,7 @@ config_objects <- c(
   "GENE_START_COL", "GENE_END_COL", "SAMPLE_COLUMN", "GROUP_COLUMN", "GROUP_LEVELS",
   "SPECIES", "GROUP_COLORS", "RUN_ESTIMATE", "RUN_IOBR", "IOBR_METHODS", "IOBR_PERM",
   "IOBR_ARRAYS", "RUN_CIBERSORT", "CIBERSORT_SCRIPT", "CIBERSORT_SIGNATURE",
-  "CIBERSORT_PERM", "CIBERSORT_QN", "RUN_CIBERSORT_COMPARISON", "OUTDIR",
+  "CIBERSORT_PERM", "CIBERSORT_QN", "RUN_CIBERSORT_COMPARISON", "RUN_SSGSEA", "ORTHOLOG_CACHE", "OUTDIR",
   "GENERATE_HTML_REPORT", "REPORT_TITLE", "RUN_ROLE", "PARENT_RUN_ID",
   "RUN_CHANGE_NOTE", "RUN_RETENTION"
 )
@@ -169,6 +174,10 @@ if (is.null(GROUP_LEVELS)) GROUP_LEVELS <- levels(meta[[GROUP_COLUMN]])
 
 # Build a method-valid expression matrix. Raw counts are converted to TPM;
 # expression mode only accepts TPM or log2(TPM+1), never VST/rlog.
+if (!INPUT_MODE %in% c("raw_counts", "expression")) stop("INPUT_MODE must be 'raw_counts' or 'expression'.")
+if (INPUT_MODE == "expression" && !EXPR_UNIT %in% c("tpm", "log2_tpm")) {
+  stop("TME expression input requires 'tpm' or 'log2_tpm'; VST/rlog is not valid for deconvolution.")
+}
 if (INPUT_MODE == "raw_counts") {
   if (!file.exists(RAW_COUNTS_FILE)) stop("RAW_COUNTS_FILE not found: ", RAW_COUNTS_FILE)
   message("Computing TPM from raw integer counts for TME deconvolution.")
@@ -176,24 +185,16 @@ if (INPUT_MODE == "raw_counts") {
   raw_annot <- read_count_table(RAW_COUNTS_FILE, input_format = RAW_COUNTS_FORMAT)
   if (is.null(GENE_COLUMN)) GENE_COLUMN <- colnames(raw_annot)[1]
   if (!GENE_COLUMN %in% colnames(raw_annot)) stop("GENE_COLUMN not found: ", GENE_COLUMN)
-  count_col_names <- detect_count_columns(raw_annot, GENE_COLUMN, annotation_cols = NULL)
+  count_col_names <- intersect(colnames(raw_annot), meta[[SAMPLE_COLUMN]])
+  if (!length(count_col_names)) stop("No common samples between raw counts and metadata.")
 
-  # Build raw count matrix with Ensembl/symbol row names
-  counts_mat <- as.matrix(raw_annot[, count_col_names, drop = FALSE])
-  mode(counts_mat) <- "numeric"
-  rownames(counts_mat) <- as.character(raw_annot[[GENE_COLUMN]])
-  validate_count_matrix(counts_mat)
-
-  # Extract gene lengths and compute TPM
-  gene_lengths_kb <- extract_gene_lengths(
-    raw_annot,
-    id_col = GENE_COLUMN,
-    length_col = GENE_LENGTH_COLUMN,
-    start_col = GENE_START_COL,
-    end_col = GENE_END_COL,
+  # TPM denominator includes every counted feature before ID/symbol filtering.
+  expr_tpm <- build_tme_tpm(
+    raw_annot, gene_column = GENE_COLUMN, count_columns = count_col_names,
+    length_column = GENE_LENGTH_COLUMN,
+    start_column = GENE_START_COL, end_column = GENE_END_COL,
     length_unit = GENE_LENGTH_UNIT
   )
-  expr_tpm <- counts_to_tpm(counts_mat, gene_lengths_kb)
 
   # Subset to common samples
   common_samples <- intersect(colnames(expr_tpm), meta[[SAMPLE_COLUMN]])
@@ -230,26 +231,16 @@ validate_samples_match(colnames(expr_tme_input), meta[[SAMPLE_COLUMN]], strict_o
 cat("Expression:", nrow(expr_tme_input), "genes x", ncol(expr_tme_input), "samples\n")
 print(table(meta[[GROUP_COLUMN]], useNA = "ifany"))
 
-# Convert mouse gene symbols to HGNC for TME methods (IOBR/ESTIMATE/CIBERSORT/
-# EPIC/xCell use human signatures). For mouse Ensembl IDs, convert to MGI first
-# then to HGNC. babelgene/biomaRt conversion needs network; the human-symbol path
-# does not.
-input_id_type <- detect_gene_id_type(rownames(expr_tme_input))
-if (SPECIES == "mouse") {
-  expr_symbol <- if (input_id_type == "ensembl") {
-    convert_expression_rownames(expr_tme_input, species = "mouse", target = "symbol")
-  } else expr_tme_input
-  expr_tme <- convert_expression_rownames(expr_symbol, species = "mouse", target = "human_symbol")
-} else if (input_id_type == "ensembl") {
-  expr_tme <- convert_expression_rownames(expr_tme_input, species = "human", target = "symbol")
-} else {
-  expr_tme <- deduplicate_expression_by_symbol(expr_tme_input)
-}
-
-# Only log2(TPM+1) has a valid inverse. VST/rlog is rejected above.
-expr_tme <- prepare_tme_expression(expr_tme, is_log = expr_is_log2_tpm, species = "human", verbose = TRUE)
-validate_tme_input(expr_tme)
-cat("TME expression matrix:", nrow(expr_tme), "genes x", ncol(expr_tme), "samples\n")
+# Keep native-species symbols for native CIBERSORT; build human orthologs only
+# when a human-reference method was requested and its package is available.
+tme_inputs <- prepare_tme_inputs(expr_tme_input, species = SPECIES,
+  is_log = expr_is_log2_tpm, need_human = RUN_ESTIMATE || RUN_IOBR || RUN_SSGSEA,
+  ortholog_cache = ORTHOLOG_CACHE, outdir = TME_DIR,
+  native_symbols = if (INPUT_MODE == "raw_counts" && "gene_name" %in% names(raw_annot))
+    setNames(as.character(raw_annot$gene_name), as.character(raw_annot[[GENE_COLUMN]])) else NULL)
+expr_native <- tme_inputs$native
+expr_tme <- tme_inputs$human
+cat("Native TME matrix:", nrow(expr_native), "genes x", ncol(expr_native), "samples\n")
 
 # Resolve group colors for consistent plotting
 if (is.null(GROUP_COLORS) || !all(GROUP_LEVELS %in% names(GROUP_COLORS))) {
@@ -258,10 +249,7 @@ if (is.null(GROUP_COLORS) || !all(GROUP_LEVELS %in% names(GROUP_COLORS))) {
   group_colors <- GROUP_COLORS[GROUP_LEVELS]
 }
 
-# NOTE (bug fix): the notebook defines group_df_for_plot only in a LATER
-# visualization section, but the native-CIBERSORT section references it earlier,
-# so a top-to-bottom run with RUN_CIBERSORT = TRUE fails. Define it here, BEFORE
-# any section that uses it.
+# Define plotting metadata before any method uses it.
 group_df_for_plot <- meta[, c(SAMPLE_COLUMN, GROUP_COLUMN), drop = FALSE]
 
 # =============================================================================
@@ -318,16 +306,18 @@ if (isTRUE(RUN_IOBR)) {
 native_cibersort <- NULL
 if (isTRUE(RUN_CIBERSORT)) {
   native_cibersort <- run_native_cibersort(
-    expr_tme,
+    expr_native,
     signature_file = CIBERSORT_SIGNATURE,
     cibersort_script = CIBERSORT_SCRIPT,
-    is_log = FALSE,                        # expr_tme is already de-logged by prepare_tme_expression()
+    is_log = FALSE,                        # native input is already linear
     perm = CIBERSORT_PERM,
     QN = CIBERSORT_QN,
     id_column = SAMPLE_COLUMN,
     verbose = TRUE
   )
   write.csv(native_cibersort, file.path(TME_DIR, "CIBERSORT_native_results.csv"), row.names = FALSE)
+  write.csv(attr(native_cibersort, "reference_coverage"),
+            file.path(TME_DIR, "CIBERSORT_native_reference_coverage.csv"), row.names = FALSE)
   cat("Native CIBERSORT results saved to", file.path(TME_DIR, "CIBERSORT_native_results.csv"), "\n")
 
   # Native CIBERSORT stacked barplot + boxplot + per-cell-type plots
@@ -400,8 +390,15 @@ if (isTRUE(RUN_CIBERSORT)) {
 }
 
 # Native vs IOBR CIBERSORT comparison
-if (isTRUE(RUN_CIBERSORT) && isTRUE(RUN_IOBR) && "cibersort" %in% names(iobr_results) &&
-    isTRUE(RUN_CIBERSORT_COMPARISON) && !is.null(native_cibersort)) {
+compare_cibersort <- isTRUE(RUN_CIBERSORT) && isTRUE(RUN_IOBR) &&
+  "cibersort" %in% names(iobr_results) && isTRUE(RUN_CIBERSORT_COMPARISON) && !is.null(native_cibersort)
+if (compare_cibersort) {
+  compare_cibersort <- cibersort_comparison_compatible(SPECIES, CIBERSORT_SIGNATURE,
+    attr(iobr_results[["cibersort"]], "cibersort_signature"), CIBERSORT_QN, IOBR_ARRAYS,
+    input_max = max(expr_tme))
+  if (!compare_cibersort) message("Skipping native-vs-IOBR comparison: human species, identical references, input scale and QN settings were not verified.")
+}
+if (compare_cibersort) {
   # compare_native_iobr_cibersort() strips IOBR's "_CIBERSORT" column suffix and
   # otherwise normalizes cell-type names, so the raw IOBR table can be passed in.
   cmp <- compare_native_iobr_cibersort(
@@ -499,21 +496,15 @@ if (isTRUE(RUN_IOBR) && "xcell" %in% names(iobr_results)) {
 ssgsea_scores <- NULL
 gs <- list()
 if (isTRUE(RUN_SSGSEA)) {
-  expr_for_ssgsea <- as.data.frame(expr_tme, check.names = FALSE)
-
-  row_upper <- toupper(rownames(expr_for_ssgsea))
-  upper_to_real <- setNames(rownames(expr_for_ssgsea), row_upper)
-  gs <- lapply(immune_gene_sets, function(x) unique(upper_to_real[intersect(toupper(x), names(upper_to_real))]))
-  gs <- gs[lengths(gs) >= 2]
+  immune_scores <- run_tme_ssgsea(expr_tme, outdir = TME_DIR)
+  gs <- immune_scores$gene_sets
+  ssgsea_scores <- immune_scores$scores
 
   if (length(gs) == 0) {
     message("No immune signature genes matched the expression matrix; skipping ssGSEA. ",
             "Check that row names are human gene symbols (or that mouse-to-human conversion succeeded).")
     RUN_SSGSEA <- FALSE
   } else {
-    params <- gsvaParam(as.matrix(expr_for_ssgsea), gs, kcdf = "Gaussian", minSize = 2, maxSize = Inf)
-    ssgsea_scores <- gsva(params, verbose = FALSE)
-    write.csv(ssgsea_scores, file.path(TME_DIR, "ssGSEA_immune_scores.csv"))
     cat("ssGSEA immune scores saved to", file.path(TME_DIR, "ssGSEA_immune_scores.csv"), "\n")
   }
 }
@@ -585,8 +576,12 @@ if (isTRUE(RUN_SSGSEA) && !is.null(ssgsea_scores)) {
 # =============================================================================
 # 10. Save results, summary, session info
 # =============================================================================
+if (any(requested_tme_methods) && is.null(estimate_scores) && !length(iobr_results) &&
+    is.null(native_cibersort) && is.null(ssgsea_scores)) {
+  stop("None of the requested TME methods produced results. Review missing dependencies and signature coverage.")
+}
 # Targeted save so visualize_results.R can re-plot without re-running deconvolution.
-save(expr_tme, expr_tme_input, iobr_results, tme_combined, estimate_scores,
+save(expr_tme, expr_native, tme_inputs, expr_tme_input, iobr_results, tme_combined, estimate_scores,
      native_cibersort, ssgsea_scores, gs, meta, group_df_for_plot, group_colors,
      SAMPLE_COLUMN, GROUP_COLUMN, GROUP_LEVELS, SPECIES, GROUP_COLORS,
      RUN_ESTIMATE, RUN_IOBR, RUN_CIBERSORT, RUN_SSGSEA,
@@ -599,9 +594,9 @@ summary_report <- paste0(
   "1. Data Overview\n",
   "   - Input mode: ", INPUT_MODE, "\n",
   "   - Species: ", SPECIES, "\n",
-  "   - Samples: ", ncol(expr_tme), "\n",
+  "   - Samples: ", ncol(expr_native), "\n",
   "   - Groups: ", paste(GROUP_LEVELS, collapse = ", "), "\n",
-  "   - TME genes after prep: ", nrow(expr_tme), "\n\n",
+  "   - Native / human-reference genes: ", nrow(expr_native), " / ", if (is.null(expr_tme)) 0L else nrow(expr_tme), "\n\n",
   "2. Methods Run\n",
   "   - ESTIMATE (native): ", ifelse(isTRUE(RUN_ESTIMATE) && !is.null(estimate_scores), "yes", "no"), "\n",
   "   - IOBR (", ifelse(length(iobr_results) > 0, paste(names(iobr_results), collapse = ", "), "none"), ")\n",
@@ -627,6 +622,7 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
   } else {
     report_path <- tryCatch(
       render_analysis_report(outdir = OUTDIR, report_file = file.path(OUTDIR, "RNAseq_report.html"),
+                             template = file.path(dirname(normalizePath(lib_dir)), "reports", "analysis_report.qmd"),
                              params = list(title = REPORT_TITLE, author = Sys.info()[["user"]])),
       error = function(e) { message("HTML report failed: ", conditionMessage(e)); NULL }
     )
@@ -635,10 +631,26 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
 }
 
 manifest_input <- if (identical(INPUT_MODE, "raw_counts")) RAW_COUNTS_FILE else EXPR_FILE
+manifest_inputs <- c(metadata = META_FILE)
+if (any(grepl("^org[.]", tme_inputs$mapping$source))) {
+  org_db <- get(.get_org_db_name(SPECIES), envir = asNamespace(.get_org_db_name(SPECIES)))
+  manifest_inputs <- c(manifest_inputs, annotation_database = AnnotationDbi::dbfile(org_db))
+}
+if (!is.null(native_cibersort)) {
+  manifest_inputs <- c(manifest_inputs, cibersort_script = CIBERSORT_SCRIPT,
+                       cibersort_signature = CIBERSORT_SIGNATURE)
+}
+if (SPECIES == "mouse" && !is.null(expr_tme) && !is.null(ORTHOLOG_CACHE)) {
+  manifest_inputs <- c(manifest_inputs, ortholog_cache = ORTHOLOG_CACHE)
+} else if (SPECIES == "mouse" && !is.null(expr_tme)) {
+  manifest_inputs <- c(manifest_inputs, ortholog_reference = NA_character_)
+}
+if (!is.null(estimate_scores)) manifest_inputs <- c(manifest_inputs, estimate_reference = NA_character_)
+if (length(iobr_results)) manifest_inputs <- c(manifest_inputs, iobr_reference = NA_character_)
 write_template_run_manifest(
   run_dir = OUTDIR, config_path = config_path, input_file = manifest_input,
   config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
-  envir = globalenv()
+  envir = globalenv(), input_files = manifest_inputs
 )
 
 cat("\n========================================\n")

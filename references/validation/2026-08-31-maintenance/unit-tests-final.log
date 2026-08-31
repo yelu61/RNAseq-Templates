@@ -1,0 +1,223 @@
+✔ | F W  S  OK | Context
+
+⠏ |          0 | batch_utils                                                    
+⠋ |          1 | batch_utils                                                    
+✔ |          6 | batch_utils [2.1s]
+
+⠏ |          0 | cli-paths                                                      
+⠼ |         15 | cli-paths                                                      
+⠇ |         19 | cli-paths                                                      
+⠦ |         27 | cli-paths                                                      
+⠼ |         35 | cli-paths                                                      
+✔ |         57 | cli-paths
+
+⠏ |          0 | data_utils                                                     
+⠙ |         32 | data_utils                                                     
+⠼ |         45 | data_utils                                                     
+✔ |         58 | data_utils
+
+⠏ |          0 | deg_utils                                                      
+⠹ |   2     11 | deg_utils                                                      
+⠼ |   3     12 | deg_utils                                                      
+✔ |   3     26 | deg_utils
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-deg_utils.R:93:3'): plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure
+`aes_string()` was deprecated in ggplot2 3.0.0.
+ℹ Please use tidy evaluation idioms with `aes()`.
+ℹ See also `vignette("ggplot2-in-packages")` for more information.
+ℹ The deprecated feature was likely used in the UpSetR package.
+  Please report the issue at <https://github.com/hms-dbmi/UpSetR/issues>.
+Backtrace:
+     ▆
+  1. ├─testthat::expect_invisible(...) at test-deg_utils.R:93:3
+  2. │ └─base::withVisible(call)
+  3. └─global plot_deg_upset_pdf(sets, outfile, title = "test")
+  4.   └─global save_pdf_device(...)
+  5.     └─draw()
+  6.       ├─base::print(...)
+  7.       └─UpSetR::upset(...)
+  8.         ├─base::suppressMessages(...)
+  9.         │ └─base::withCallingHandlers(...)
+ 10.         └─UpSetR:::Make_main_bar(...)
+ 11.           ├─ggplot2::ggplot(data = Main_bar_data, aes_string(x = "x", y = "freq"))
+ 12.           ├─ggplot2:::ggplot.default(...)
+ 13.           │ └─ggplot2:::validate_mapping(mapping)
+ 14.           │   └─S7::S7_inherits(mapping)
+ 15.           └─ggplot2::aes_string(x = "x", y = "freq")
+ 16.             └─ggplot2:::deprecate_warn0(...)
+
+Warning ('test-deg_utils.R:93:3'): plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure
+Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use `linewidth` instead.
+ℹ The deprecated feature was likely used in the UpSetR package.
+  Please report the issue at <https://github.com/hms-dbmi/UpSetR/issues>.
+Backtrace:
+     ▆
+  1. ├─testthat::expect_invisible(...) at test-deg_utils.R:93:3
+  2. │ └─base::withVisible(call)
+  3. └─global plot_deg_upset_pdf(sets, outfile, title = "test")
+  4.   └─global save_pdf_device(...)
+  5.     └─draw()
+  6.       ├─base::print(...)
+  7.       └─UpSetR::upset(...)
+  8.         └─UpSetR:::Make_matrix_plot(...)
+  9.           └─ggplot2::geom_line(...)
+ 10.             └─ggplot2::layer(...)
+ 11.               └─ggplot2:::deprecate_warn0(...)
+
+Warning ('test-deg_utils.R:93:3'): plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure
+The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
+ℹ Please use the `linewidth` argument instead.
+ℹ The deprecated feature was likely used in the UpSetR package.
+  Please report the issue at <https://github.com/hms-dbmi/UpSetR/issues>.
+Backtrace:
+     ▆
+  1. ├─testthat::expect_invisible(...) at test-deg_utils.R:93:3
+  2. │ └─base::withVisible(call)
+  3. └─global plot_deg_upset_pdf(sets, outfile, title = "test")
+  4.   └─global save_pdf_device(...)
+  5.     └─draw()
+  6.       ├─base::print(...)
+  7.       └─UpSetR::upset(...)
+  8.         └─UpSetR:::Make_size_plot(...)
+  9.           ├─ggplot2::theme(...)
+ 10.           │ └─ggplot2:::find_args(..., complete = NULL, validate = NULL)
+ 11.           │   └─base::mget(args, envir = env)
+ 12.           └─ggplot2::element_line(colour = "gray0", size = 0.3)
+ 13.             └─ggplot2:::deprecate_warn0("3.4.0", "element_line(size)", "element_line(linewidth)")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | design_utils                                                   
+✔ |          5 | design_utils
+
+⠏ |          0 | design-integration                                             
+✔ |         21 | design-integration
+
+⠏ |          0 | enrichment_utils                                               
+⠏ |         10 | enrichment_utils                                               
+⠏ |         40 | enrichment_utils                                               
+✔ |         40 | enrichment_utils [18.4s]
+
+⠏ |          0 | geo_utils                                                      
+✔ |          5 | geo_utils
+
+⠏ |          0 | io_utils                                                       
+✔ |          8 | io_utils
+
+⠏ |          0 | limma-voom-utils                                               
+⠦ |          7 | limma-voom-utils                                               
+✔ |         24 | limma-voom-utils
+
+⠏ |          0 | narrative_utils                                                
+✔ |         21 | narrative_utils
+
+⠏ |          0 | notebook_to_runner                                             
+⠦ |         37 | notebook_to_runner                                             
+✔ |         68 | notebook_to_runner
+
+⠏ |          0 | pathway_utils                                                  
+⠏ |         10 | pathway_utils                                                  
+⠼ |         35 | pathway_utils                                                  
+⠴ |         36 | pathway_utils                                                  
+⠇ |         39 | pathway_utils                                                  
+✔ |         42 | pathway_utils [1.6s]
+
+⠏ |          0 | plot_utils                                                     
+⠸ |         34 | plot_utils                                                     
+⠙ |         62 | plot_utils                                                     
+⠼ |         65 | plot_utils                                                     
+⠏ |         80 | plot_utils                                                     
+⠙ |         92 | plot_utils                                                     
+⠧ |         98 | plot_utils                                                     
+⠙ |        102 | plot_utils                                                     
+⠏ |        110 | plot_utils                                                     
+⠙ |        122 | plot_utils                                                     
+⠴ |        126 | plot_utils                                                     
+⠦ |        137 | plot_utils                                                     
+⠧ |        148 | plot_utils                                                     
+✔ |        158 | plot_utils [1.7s]
+
+⠏ |          0 | report_utils                                                   
+⠹ |         43 | report_utils                                                   
+⠙ |         52 | report_utils                                                   
+⠼ |         55 | report_utils                                                   
+✔ |         65 | report_utils [1.0s]
+
+⠏ |          0 | run_utils                                                      
+⠴ |         16 | run_utils                                                      
+⠴ |         26 | run_utils                                                      
+⠋ |         31 | run_utils                                                      
+⠇ |         39 | run_utils                                                      
+⠧ |         48 | run_utils                                                      
+⠋ |         71 | run_utils                                                      
+⠹ |         83 | run_utils                                                      
+⠼ |         95 | run_utils                                                      
+⠙ |        102 | run_utils                                                      
+✔ |        104 | run_utils [1.5s]
+
+⠏ |          0 | run-review-notebook                                            
+✔ |         10 | run-review-notebook
+
+⠏ |          0 | survival_utils                                                 
+✔ |         19 | survival_utils
+
+⠏ |          0 | tcga_utils                                                     
+✔ |         14 | tcga_utils
+
+⠏ |          0 | timecourse_utils                                               0 genes excluded.
+0 genes excluded.
+
+⠋ |          1 | timecourse_utils                                               
+✔ |         17 | timecourse_utils
+
+⠏ |          0 | tme_utils                                                      
+⠹ |         13 | tme_utils                                                      
+⠹ |         23 | tme_utils                                                      
+⠏ |         30 | tme_utils                                                      
+⠸ |         34 | tme_utils                                                      
+⠇ |         39 | tme_utils                                                      
+⠇ |         49 | tme_utils                                                      
+⠦ |         57 | tme_utils                                                      
+⠇ |         59 | tme_utils                                                      
+✔ |         77 | tme_utils [1.7s]
+
+⠏ |          0 | tme-routing                                                    
+⠹ |          3 | tme-routing                                                    
+⠴ |          6 | tme-routing                                                    
+⠹ |         13 | tme-routing                                                    
+⠴ |         16 | tme-routing                                                    
+⠼ |         25 | tme-routing                                                    Running TME deconvolution (requires gene lengths for TPM)...
+TME outputs written to 4-TME 
+
+⠙ |         42 | tme-routing                                                    Expression: 547 genes x 2 samples
+
+  Control Treatment 
+        1         1 
+
+⠼ |         55 | tme-routing                                                    Expression: 547 genes x 2 samples
+
+  Control Treatment 
+        1         1 
+
+⠴ |         66 | tme-routing                                                    Expression: 511 genes x 2 samples
+
+  Control Treatment 
+        1         1 
+
+⠇ |         69 | tme-routing                                                    Expression: 511 genes x 2 samples
+
+  Control Treatment 
+        1         1 
+
+⠇ |         79 | tme-routing                                                    
+✔ |         83 | tme-routing [1.8s]
+
+⠏ |          0 | wgcna-correctness                                              
+⠋ |          1 | wgcna-correctness                                              
+⠦ |         67 | wgcna-correctness                                              
+✔ |         93 | wgcna-correctness
+
+══ Results ═════════════════════════════════════════════════════════════════════
+Duration: 32.6 s
+
+[ FAIL 0 | WARN 3 | SKIP 0 | PASS 1021 ]

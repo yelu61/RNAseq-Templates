@@ -62,6 +62,9 @@ if (is.na(lib_dir) || !dir.exists(lib_dir)) {
 }
 cat("RNAseq_lib  :", normalizePath(lib_dir), "\n\n")
 
+source(file.path(lib_dir, "run_utils.R"))
+assert_fresh_run_dir(OUTDIR)
+
 # ---- Load libraries -----------------------------------------------------------
 # BUG FIX (vs the notebook): select the OrgDb from SPECIES instead of the
 # hard-coded org.Hs.eg.db the notebook used for the Mfuzz cluster ORA.
@@ -79,7 +82,7 @@ suppressPackageStartupMessages({
 org_db <- get(species_org_db)
 
 for (f in c("plot_utils.R", "io_utils.R", "data_utils.R", "deg_utils.R",
-            "enrichment_utils.R", "timecourse_utils.R", "report_utils.R", "run_utils.R")) {
+            "enrichment_utils.R", "timecourse_utils.R", "report_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
@@ -398,6 +401,7 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
   } else {
     report_path <- tryCatch(
       render_analysis_report(outdir = OUTDIR, report_file = file.path(OUTDIR, "RNAseq_report.html"),
+                             template = file.path(dirname(normalizePath(lib_dir)), "reports", "analysis_report.qmd"),
                              params = list(title = REPORT_TITLE, author = Sys.info()[["user"]])),
       error = function(e) { message("HTML report failed: ", conditionMessage(e)); NULL }
     )
@@ -405,8 +409,17 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
   }
 }
 
+manifest_inputs <- c(metadata = META_FILE)
+if (isTRUE(RUN_MFUZZ)) {
+  manifest_inputs <- c(manifest_inputs, annotation_db = AnnotationDbi::dbfile(org_db))
+}
+if (isTRUE(RUN_TIMEPOINT_DEG)) {
+  manifest_inputs <- c(manifest_inputs, raw_counts = RAW_COUNTS_FILE,
+                       count_metadata = COUNT_META_FILE)
+}
 write_template_run_manifest(
   run_dir = OUTDIR, config_path = config_path, input_file = EXPR_FILE,
+  input_files = manifest_inputs,
   config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
   envir = globalenv()
 )

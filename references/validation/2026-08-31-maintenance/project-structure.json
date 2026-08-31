@@ -1,0 +1,101 @@
+{
+  "target": "/Users/luye/Library/Mobile Documents/com~apple~CloudDocs/Projects/RNAseq-Templates",
+  "profile": "research",
+  "counts": {
+    "error": 0,
+    "warning": 15,
+    "info": 0
+  },
+  "findings": [
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "AGENTS.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "CLAUDE.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/PROJECT_BRIEF.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/PROJECT_STATUS.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/DECISION_LOG.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/TODO.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/DATA_DICTIONARY.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/ANALYSIS_PLAN.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/SESSION_HANDOFF.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "PIPELINE.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/RESULTS_SUMMARY.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "docs/REPRODUCIBILITY.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "prompts/notebook_audit.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "prompts/figure_story.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    },
+    {
+      "level": "warning",
+      "code": "missing-file",
+      "path": "prompts/result_interpretation.md",
+      "message": "Recommended project file is missing; document an accepted equivalent or scaffold it."
+    }
+  ]
+}

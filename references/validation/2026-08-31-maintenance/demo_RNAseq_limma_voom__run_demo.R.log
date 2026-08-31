@@ -1,0 +1,74 @@
+========================================
+RNAseq_Limma_Voom — run_analysis.R
+Working dir : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom 
+Config file : /private/var/folders/1k/_4d1xmz92p9cv5qjbggt1m8c0000gn/T/Rtmp54flXT/filed9f35e6dfcb2.R 
+========================================
+
+RNAseq_lib  : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/RNAseq_lib 
+
+
+calcNormFactors has been renamed to normLibSizes
+Fontconfig error: No writable cache directories
+            Comparison UP DOWN Total
+1 Treatment_vs_Control  0    0     0
+Warning messages:
+1: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use `linewidth` instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+2: The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
+ℹ Please use the `linewidth` argument instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+'select()' returned 1:many mapping between keys and columns
+Warning message:
+In clusterProfiler::bitr(symbols, fromType = "SYMBOL", toType = "ENTREZID",  :
+  0.02% of input gene IDs are fail to map...
+GO ORA skipped: only 0 mapped Entrez IDs (min_genes = 5)
+KEGG ORA skipped: only 0 mapped Entrez IDs (min_genes = 5)
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG GSEA skipped because analysis failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+Skipping GSEA plot suite: 1513 valid terms; 0 pass BH FDR <= 0.05 for GO GSEA Treatment_vs_Control
+Warning messages:
+1: In clusterProfiler::bitr(symbols, fromType = "SYMBOL", toType = "ENTREZID",  :
+  0.02% of input gene IDs are fail to map...
+2: In prepare_gsea_inputs(geneList, scoreType, exponent) :
+  There are ties in the preranked stats (0.32% of the list). The order of those tied genes will be arbitrary, which may produce unexpected results.
+3: In file(con, "r") :
+  URL 'https://rest.kegg.jp/link/mmu/pathway': status was 'Couldn't resolve host name'
+Warning message:
+In plot_theme_dotheatmap_from_results(go_gsea_map, file.path(theme_outdir,  :
+  No enrichment terms to plot.
+========================================
+limma-voom Analysis Summary
+========================================
+
+1. Data Overview
+   - Species: mouse
+   - Samples: 6
+   - Groups: Control, Treatment
+   - Batch covariate: none
+   - Genes after filtering: 5971
+
+2. Differential Expression (padj < 0.05 & |log2FC| > 0.5)
+   - Treatment_vs_Control: 0 DEGs (Up: 0, Down: 0)
+
+3. Output Files
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/1-DEG (per-comparison DEG tables, results Rdata)
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/2-GSEA (GO/KEGG ORA + GSEA tables)
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/3-Visualization (volcano, heatmap, ORA/GSEA, theme maps)
+
+========================================
+
+========================================
+RNAseq_Limma_Voom analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output 
+========================================
+
+========================================
+limma-voom demo PASSED (drove templates/Limma_Voom/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output 
+========================================

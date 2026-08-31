@@ -127,6 +127,31 @@ This guide lists common issues and how to fix them.
 - Make sure `GEOquery` is installed via `install_dependencies.R`.
 - Some GEO series are very large and require a stable network connection; consider downloading manually and using local-file mode.
 
+## Maintenance migration (v0.11.1)
+
+### Q: The runner refuses to reuse my directory
+
+This protects old results, even if a new configuration disables their module.
+Create a new `analysis/runs/<run_id>/` and point input paths to immutable source
+files or a previous run. Do not copy a previous run's `1-DEG/` into the new run.
+For figure/report-only changes, use RunReview or the independent report renderer.
+
+### Q: GSEA has a nonempty table but no automatic plots
+
+Check the companion `_quality.csv`. Tables retain all tested terms, including
+unavailable statistics; automatic plots require valid IDs/statistics and BH FDR
+significance. Zero significant terms is a valid negative result, not a reason to
+lower the primary threshold. Unexpected analysis/network failures are different:
+check the log and treat a required failed step as incomplete.
+
+### Q: New results differ from v0.11.0
+
+WGCNA hubs, mouse native CIBERSORT, true immune ssGSEA, TPM preparation and GSEA
+input-overlap filtering received correctness fixes. limma now applies
+`MIN_SAMPLE_FRAC`; set it to zero only when intentionally reproducing the old
+edgeR-only filter. Use a new run and record its parent/change note; do not
+rename or overwrite old results. See [FREEZE_AUDIT.md](FREEZE_AUDIT.md).
+
 ## Still stuck?
 
 Prepare the following information when asking for help:

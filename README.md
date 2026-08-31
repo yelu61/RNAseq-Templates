@@ -1,13 +1,17 @@
 # RNAseq-Templates
 
 ![Smoke Test](https://github.com/yelu61/RNAseq-Templates/actions/workflows/smoke-test.yml/badge.svg)
-![Version](https://img.shields.io/badge/version-0.11.0-blue)
+![Version](https://img.shields.io/badge/version-0.11.1-blue)
 
 Production-runner-first bulk RNA-seq **downstream** analysis templates, backed by a lightweight shared R helper library (`RNAseq_lib/`).
 
 > **Maintenance status:** `v0.11.x` is feature-frozen. This line accepts bug,
 > security, compatibility, database-adaptation, test, and documentation fixes;
 > new analysis modules are deferred to a future development line.
+> The `v0.11.1` maintenance update corrects WGCNA hub exports, TME species/ssGSEA
+> routing, GSEA result quality and run provenance. The
+> [freeze audit](references/FREEZE_AUDIT.md) distinguishes validated paths from
+> project-specific scientific review and environment restoration still required.
 
 Start from a count or TPM matrix and get reproducible, publication-oriented
 results. In real projects, let `bulk-rnaseq-analysis` inspect the data and
@@ -128,7 +132,7 @@ notebooks/
   RNAseq_TME_Deconvolution_Template.ipynb  # immune/stromal deconvolution
   RNAseq_WGCNA_Template.ipynb           # co-expression network
   RNAseq_TCGA_GEO_Template.ipynb        # TCGA/GEO mining + survival
-RNAseq_lib/                # shared R helpers (15 modules)
+RNAseq_lib/                # shared R helpers (17 modules)
   io_utils.R  deg_utils.R  enrichment_utils.R  plot_utils.R
   tme_utils.R  tcga_utils.R  limma_voom_utils.R  timecourse_utils.R
   survival_utils.R  batch_utils.R  design_utils.R  geo_utils.R
@@ -169,11 +173,10 @@ many projects, headless servers), use the script runner. **Every template —
 General and all five topic templates — ships a `config.R` + `run_analysis.R` +
 `visualize_results.R` trio under `templates/`.**
 
-```bash
-cp templates/General/{config.R,run_analysis.R,visualize_results.R} /path/to/project/
-# edit /path/to/project/config.R, then:
-cd /path/to/project && Rscript run_analysis.R
-```
+Keep the backend at a recorded commit, copy `config.R` into the analysis
+project, and invoke the central runner from a **new** `analysis/runs/<run_id>/`.
+Use the complete [safe execution example](BEST_PRACTICES.md#1--reproducible-run),
+which sets the library path explicitly and refuses an existing run directory.
 
 Swap `General` for `Limma_Voom`, `WGCNA`, `TME`, `TimeCourse`, or `TCGA_GEO` to
 run that pipeline instead; each `run_analysis.R` shares the same bootstrap,
@@ -183,28 +186,36 @@ library, but the production runner is authoritative and output files may differ
 where it fixes notebook-only ordering, duplication, or layout issues.
 
 The runner preserves the invocation directory, which is the path base for
-relative input paths and `OUTDIR`; a relative config argument is resolved before
-loading. In production, enter a fresh `analysis/runs/<run_id>/` before invoking
+relative input paths; a relative config argument is resolved before loading.
+General writes directly there and does not expose `OUTDIR`; topic runners also
+resolve relative `OUTDIR` there (WGCNA uses its parent as the run root).
+In production, enter a fresh `analysis/runs/<run_id>/` before invoking
 the central runner, so no output is written into the template source tree.
 
 `run_analysis.R` also supports optional TME deconvolution (`RUN_TME`, output to
 `4-TME/`) and caches `gseaResult` objects to `2-GSEA/gsea_results.rds`. After a
-run, `Rscript visualize_results.R` regenerates targeted figures (key genes,
+run, a project-local `visualize_results.R` with explicit input/output paths regenerates targeted figures (key genes,
 single-term gseaplot2, ORA theme dot-heatmaps) from the saved results without
 recompute. See [templates/General/README.md](templates/General/README.md) for
 batch execution and library-path resolution.
 
-Every completed production run writes `run_manifest.csv`, including input/config
-checksums, analysis and backend-code signatures, git revision/dirty state,
-lifecycle role, parent run and retention class. After running one or more
+Every completed production run writes `run_manifest.csv`, `run_inputs.csv` and
+`run_runtime.csv`: primary/auxiliary/reference checksums, loaded package and R
+versions, analysis/backend signatures, git revision/dirty state, lifecycle role,
+parent run and retention class. Runners reject existing native output artifacts
+before writing a new config snapshot. After running one or more
 bundles, rebuild the non-destructive registry:
 
 ```bash
-Rscript tools/build_run_registry.R /path/to/project/analysis/runs
+Rscript /path/to/backend/tools/build_run_registry.R /path/to/project/analysis/runs
 ```
 
-`RUN_REGISTRY.csv` marks exact duplicates through `duplicate_of`; it recommends
-review but never deletes an output automatically.
+`RUN_REGISTRY.csv` marks candidate duplicates through `duplicate_of`; it recommends
+review but never deletes an output automatically. Only schema-v2 runs with
+complete declared input/reference checksums and matching analysis, code and
+runtime signatures are eligible. Uncaptured online references (including KEGG),
+missing checksums and older manifests are ineligible. This remains a review
+hint, not proof of identical results or permission to delete a run.
 
 To convert a notebook's parameter cell into a `config.R` + `run_analysis.R`
 draft for a new pipeline, use the converter:
@@ -370,6 +381,7 @@ For low-DEG projects, append a clearly labelled exploratory row such as `name = 
 ## Documentation
 
 - [BEST_PRACTICES.md](BEST_PRACTICES.md): the canonical end-to-end project lifecycle (configure → run → register → report → publish → curate) and the definition of done.
+- [references/FREEZE_AUDIT.md](references/FREEZE_AUDIT.md): verified freeze status, known limitations and maintenance acceptance criteria.
 - [GETTING_STARTED.md](GETTING_STARTED.md): zero-programming-experience guide (Chinese).
 - [references/PARAMETER_REFERENCE.md](references/PARAMETER_REFERENCE.md): glossary of all notebook parameters.
 - [references/FUNCTION_CATALOG.md](references/FUNCTION_CATALOG.md): index of `RNAseq_lib` helpers.

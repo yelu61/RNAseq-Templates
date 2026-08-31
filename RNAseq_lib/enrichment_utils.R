@@ -63,27 +63,133 @@ run_kegg_ora <- function(symbols, org_db, universe, organism, p_cutoff = 0.05, m
   })
 }
 
-# clusterProfiler gseGO/gseKEGG use adaptive fgsea permutation (no exposed seed
-# arg as of 4.20), so NES/pvalue/p.adjust jitter run-to-run. Seeding immediately
-# before the call makes the permutation reproducible. `seed` defaults to a fixed
-# value so every existing caller becomes reproducible without modification.
+# Keep every returned row for audit; validity and BH significance are separate.
+# Missing labels may use the known ID in displays, but missing IDs are never
+# reconstructed from row names or guessed pathway names.
+audit_gsea_table <- function(gsea_result, fdr_cutoff = NULL) {
+  df <- if (is.null(gsea_result)) data.frame() else as.data.frame(gsea_result)
+  if (is.null(fdr_cutoff)) {
+    saved <- if ("fdr_cutoff" %in% names(df)) unique(df$fdr_cutoff) else numeric()
+    fdr_cutoff <- if (length(saved) == 1L) saved else 0.05
+  }
+  if (length(fdr_cutoff) != 1L || !is.finite(fdr_cutoff) || fdr_cutoff < 0 || fdr_cutoff > 1) {
+    stop("fdr_cutoff must be a finite number between 0 and 1.")
+  }
+  for (nm in c("ID", "Description")) if (!nm %in% names(df)) df[[nm]] <- rep(NA_character_, nrow(df))
+  for (nm in c("NES", "pvalue", "p.adjust")) if (!nm %in% names(df)) df[[nm]] <- rep(NA_real_, nrow(df))
+  issues <- rep("", nrow(df))
+  add_issue <- function(bad, label) {
+    issues[bad] <<- ifelse(nzchar(issues[bad]), paste(issues[bad], label, sep = "; "), label)
+  }
+  id <- as.character(df$ID)
+  add_issue(is.na(id) | !nzchar(trimws(id)) | id == "NA", "missing_ID")
+  add_issue(!is.na(id) & (duplicated(id) | duplicated(id, fromLast = TRUE)), "duplicate_ID")
+  for (nm in c("NES", "pvalue", "p.adjust")) {
+    value <- suppressWarnings(as.numeric(as.character(df[[nm]])))
+    add_issue(!is.finite(value), paste0("nonfinite_", nm))
+    if (nm != "NES") add_issue(is.finite(value) & (value < 0 | value > 1), paste0("out_of_range_", nm))
+    df[[nm]] <- value
+  }
+  if ("backend_record_missing" %in% names(df)) {
+    add_issue(!is.na(df$backend_record_missing) & df$backend_record_missing, "backend_record_not_returned")
+  }
+  valid <- !nzchar(issues)
+  df$result_issue <- issues
+  df$significant <- valid & df$p.adjust <= fdr_cutoff
+  df$result_status <- ifelse(!valid, "unusable", ifelse(df$significant, "significant", "not_significant"))
+  df$fdr_cutoff <- rep(fdr_cutoff, nrow(df))
+  list(table = df, summary = data.frame(
+    table_rows = nrow(df), valid_terms = sum(valid), unusable_rows = sum(!valid),
+    significant_terms = sum(df$significant), fdr_cutoff = fdr_cutoff,
+    stringsAsFactors = FALSE
+  ))
+}
+
+significant_gsea_terms <- function(gsea_result, fdr_cutoff = NULL) {
+  df <- audit_gsea_table(gsea_result, fdr_cutoff)$table
+  df <- df[df$significant, , drop = FALSE]
+  df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
+}
+
+write_gsea_tables <- function(gsea_result, filename) {
+  if (is.null(gsea_result)) return(invisible(NULL))
+  audit <- audit_gsea_table(gsea_result)
+  utils::write.csv(audit$table, filename, row.names = FALSE, na = "")
+  quality_file <- sub("[.]csv$", "_quality.csv", filename, ignore.case = TRUE)
+  if (identical(quality_file, filename)) quality_file <- paste0(filename, "_quality.csv")
+  utils::write.csv(audit$summary, quality_file, row.names = FALSE, na = "")
+  invisible(audit)
+}
+
+# Both backend generations receive the same input-overlap-filtered gene sets.
+# enrichit 0.2.0 otherwise filters raw reference sizes and its nominal-P filter
+# loses IDs for NA rows. NULL disables that filter; DOSE/fgsea uses cutoff 1.
+run_gsea_with_reference <- function(entrez_list, reference, min_size = 10,
+                                    max_size = 500, p_cutoff = 0.05, seed = 123) {
+  mapping <- unique(reference@gsid2gene[, c("gsid", "gene")])
+  mapping <- mapping[!is.na(mapping$gsid) & !is.na(mapping$gene), , drop = FALSE]
+  reference_sizes <- table(mapping$gsid)
+  mapping <- mapping[mapping$gene %in% names(entrez_list), , drop = FALSE]
+  overlap <- table(mapping$gsid)
+  eligible <- names(overlap)[overlap >= min_size & overlap <= max_size]
+  if (!length(eligible)) {
+    message("GSEA skipped: no gene sets meet the input-overlap size limits.")
+    return(NULL)
+  }
+  reference@gsid2gene <- mapping[mapping$gsid %in% eligible, , drop = FALSE]
+  if (!is.null(seed)) set.seed(seed)
+  enrichit_backend <- "method" %in% names(formals(clusterProfiler::GSEA))
+  result <- clusterProfiler::GSEA(
+    geneList = entrez_list, gson = reference, minGSSize = min_size, maxGSSize = max_size,
+    pAdjustMethod = "BH", pvalueCutoff = if (enrichit_backend) NULL else 1
+  )
+  if (is.null(result)) {
+    result <- methods::new("gseaResult", result = data.frame(),
+      geneList = entrez_list, geneSets = split(reference@gsid2gene$gene, reference@gsid2gene$gsid))
+  }
+  df <- as.data.frame(result)
+  # Older backends may omit uncomputable terms. Their identities are known from
+  # the eligible reference, but why no record was returned is not inferred.
+  missing_ids <- setdiff(eligible, df$ID)
+  if (length(missing_ids)) {
+    missing <- data.frame(ID = missing_ids, stringsAsFactors = FALSE)
+    for (nm in setdiff(names(df), "ID")) missing[[nm]] <- NA
+    missing$backend_record_missing <- TRUE
+    df$backend_record_missing <- rep(FALSE, nrow(df))
+    df <- dplyr::bind_rows(df, missing)
+  } else {
+    df$backend_record_missing <- rep(FALSE, nrow(df))
+  }
+  known <- match(df$ID, reference@gsid2name$gsid)
+  if (!"Description" %in% names(df)) df$Description <- rep(NA_character_, nrow(df))
+  blank_description <- is.na(df$Description) | !nzchar(trimws(df$Description))
+  df$Description[blank_description] <- reference@gsid2name$name[known[blank_description]]
+  df$input_overlap <- as.integer(overlap[as.character(df$ID)])
+  df$reference_size <- as.integer(reference_sizes[as.character(df$ID)])
+  result@result <- audit_gsea_table(df, p_cutoff)$table
+  result@params$pvalueCutoff <- if (enrichit_backend) NULL else 1
+  result@params$fdr_cutoff <- p_cutoff
+  result
+}
+
 run_go_gsea <- function(entrez_list, org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05, seed = 123) {
   if (length(entrez_list) < min_size) {
     message("GO GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
     return(NULL)
   }
-  if (!is.null(seed)) set.seed(seed)
-  tryCatch(clusterProfiler::gseGO(
-    geneList = entrez_list,
-    OrgDb = org_db,
-    keyType = "ENTREZID",
-    ont = ont,
-    minGSSize = min_size,
-    maxGSSize = max_size,
-    pAdjustMethod = "BH",
-    pvalueCutoff = p_cutoff
-  ), error = function(e) {
-    message("GO GSEA skipped because gseGO failed: ", conditionMessage(e))
+  ont <- match.arg(toupper(ont), c("ALL", "BP", "MF", "CC"))
+  tryCatch({
+    reference <- clusterProfiler::gson_GO(org_db, keytype = "ENTREZID", ont = ont)
+    result <- run_gsea_with_reference(entrez_list, reference, min_size, max_size, p_cutoff, seed)
+    if (!is.null(result)) {
+      result@organism <- reference@species
+      result@setType <- ont
+      result@keytype <- "ENTREZID"
+      result@result$ONTOLOGY <- unname(AnnotationDbi::Ontology(GO.db::GOTERM)[result@result$ID])
+    }
+    result
+  }, error = function(e) {
+    message("GO GSEA skipped because analysis failed: ", conditionMessage(e))
     NULL
   })
 }
@@ -93,16 +199,17 @@ run_kegg_gsea <- function(entrez_list, organism, min_size = 10, max_size = 500, 
     message("KEGG GSEA skipped: ranked list length ", length(entrez_list), " (min_size = ", min_size, ")")
     return(NULL)
   }
-  if (!is.null(seed)) set.seed(seed)
-  tryCatch(clusterProfiler::gseKEGG(
-    geneList = entrez_list,
-    organism = organism,
-    minGSSize = min_size,
-    maxGSSize = max_size,
-    pAdjustMethod = "BH",
-    pvalueCutoff = p_cutoff
-  ), error = function(e) {
-    message("KEGG GSEA skipped because gseKEGG failed: ", conditionMessage(e))
+  tryCatch({
+    reference <- if (inherits(organism, "GSON")) organism else clusterProfiler::gson_KEGG(organism)
+    result <- run_gsea_with_reference(entrez_list, reference, min_size, max_size, p_cutoff, seed)
+    if (!is.null(result)) {
+      result@organism <- reference@species
+      result@setType <- "KEGG"
+      result@keytype <- reference@keytype
+    }
+    result
+  }, error = function(e) {
+    message("KEGG GSEA skipped because analysis failed: ", conditionMessage(e))
     NULL
   })
 }

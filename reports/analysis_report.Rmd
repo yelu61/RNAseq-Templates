@@ -24,6 +24,9 @@ outdir <- params$outdir
 deg_dir <- file.path(outdir, "1-DEG")
 gsea_dir <- file.path(outdir, "2-GSEA")
 viz_dir <- file.path(outdir, "3-Visualization")
+report_lib <- file.path(dirname(knitr::current_input(dir = TRUE)), "..", "RNAseq_lib")
+source(file.path(report_lib, "enrichment_utils.R"), local = TRUE)
+source(file.path(report_lib, "report_utils.R"), local = TRUE)
 
 read_csv_safe <- function(path, ...) {
   if (!file.exists(path)) return(NULL)
@@ -173,26 +176,7 @@ ora_top_terms <- function(contrast, threshold = primary_threshold(), n = 6) {
   if (is.null(out) || !nrow(out)) NULL else out[order(out$padj), , drop = FALSE]
 }
 
-# Top GSEA gene sets for one contrast, split by enrichment direction (NES sign).
-gsea_top_terms <- function(contrast, n = 5) {
-  files <- c(GO = file.path(gsea_dir, paste0("GSEA_GO_", contrast, ".csv")),
-             KEGG = file.path(gsea_dir, paste0("GSEA_KEGG_", contrast, ".csv")))
-  rows <- lapply(names(files), function(db) {
-    df <- read_csv_safe(files[[db]])
-    if (is.null(df) || !nrow(df) || !all(c("Description", "NES") %in% colnames(df))) return(NULL)
-    df <- df[!is.na(df$NES) & !is.na(df$p.adjust), , drop = FALSE]
-    if (!nrow(df)) return(NULL)
-    pick <- function(x, dirn) {
-      if (!nrow(x)) return(NULL)
-      x <- utils::head(x[order(x$p.adjust), , drop = FALSE], n)
-      data.frame(Ontology = db, Direction = dirn, Term = x$Description,
-                 NES = round(x$NES, 2), padj = signif(x$p.adjust, 3), stringsAsFactors = FALSE)
-    }
-    rbind(pick(df[df$NES > 0, , drop = FALSE], "Up"), pick(df[df$NES < 0, , drop = FALSE], "Down"))
-  })
-  out <- do.call(rbind, rows)
-  if (is.null(out) || !nrow(out)) NULL else out[order(out$padj), , drop = FALSE]
-}
+
 ```
 
 <style>
@@ -435,23 +419,40 @@ DEG cutoff. GO terms can be redundant and disease-labelled KEGG terms often
 reflect shared ribosomal, mitochondrial or inflammatory genes. Leading-edge
 genes—not the pathway title alone—should anchor biological interpretation.
 
-## Top enriched gene sets by NES
+## GSEA validity, FDR and ranked gene sets
 
-The strongest positively and negatively enriched gene sets per comparison,
-ranked by adjusted P value. Positive NES = enriched among up-regulated genes;
-negative NES = enriched among down-regulated genes.
+Only terms with a known ID and finite NES, nominal P value and BH-adjusted
+P value enter the ranking below. Positive and negative NES refer to the top
+and bottom of the supplied ranking; they do not establish pathway activation
+or inhibition. The table explicitly labels terms that do not pass the saved
+BH FDR cutoff (0.05 for legacy tables without a saved cutoff).
+
+Counts below describe the saved tables, not the full reference database.
+Legacy nominal-P-filtered tables cannot establish the complete tested family.
+Unusable rows remain in the source CSV with observable issues; the report does
+not reconstruct lost IDs or infer why a statistic could not be computed.
 
 ```{r gsea-top-terms, results='asis'}
-contrasts_gsea <- list_contrasts()
+gsea_files <- list.files(gsea_dir, pattern = "^GSEA_(GO|KEGG)_.+[.]csv$")
+gsea_files <- gsea_files[!grepl("_quality[.]csv$", gsea_files)]
+contrasts_gsea <- unique(sub("^GSEA_(GO|KEGG)_(.+)[.]csv$", "\\2", gsea_files))
 if (!length(contrasts_gsea)) {
   cat("_No per-contrast GSEA tables found._\n")
 } else {
   for (cc in contrasts_gsea) {
-    tt <- gsea_top_terms(cc)
-    if (is.null(tt)) next
+    result <- gsea_report_tables(gsea_dir, cc)
     cat("\n### ", cc, "\n\n")
-    print(knitr::kable(tt, caption = paste("Top GSEA gene sets by direction (GO/KEGG):", cc), row.names = FALSE))
+    print(knitr::kable(result$summary, caption = "GSEA table validity and BH FDR counts", row.names = FALSE))
     cat("\n")
+    if (!is.null(result$summary) && sum(result$summary$significant_terms) == 0) {
+      cat("**No valid terms pass the BH FDR cutoff.** Any ranked terms below are descriptive only.\n\n")
+    }
+    if (is.null(result$terms) || !nrow(result$terms)) {
+      cat("_No usable GSEA terms are available for ranking._\n")
+    } else {
+      print(knitr::kable(result$terms, caption = paste("Ranked GSEA terms; see Significance column:", cc), row.names = FALSE))
+      cat("\n")
+    }
   }
 }
 ```

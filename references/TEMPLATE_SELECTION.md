@@ -2,6 +2,13 @@
 
 Not sure which workflow to use? Use the decision table below, then run the corresponding CLI runner for production or its notebook for exploration.
 
+Check the [current freeze audit](FREEZE_AUDIT.md) first: `v0.11.1` fixes WGCNA
+hub exports and mouse native CIBERSORT; affected `v0.11.0` results require a
+new run. General's paired
+switch does not retain an extra batch term, and TimeCourse does not implement
+treatment-by-time interactions or a general mixed-effects model. Template
+selection does not replace a design review.
+
 ## Quick Decision Table
 
 | Your research question | Recommended template | Key features |
@@ -62,7 +69,7 @@ flowchart LR
    - Run the TimeCourse CLI runner for Mfuzz clustering and time-point DEG.
 
 3. **Public data mining**
-   - Use the TCGA_GEO CLI runner directly. It can download data or read local files.
+   - Use TCGA_GEO for its lightweight Tumor/Normal or local-file workflow. Route advanced TCGA/TARGET/GTEx, pan-cancer or multi-omics studies through `bulk-rnaseq-analysis` to the separate TCGA toolkit. Inspect GEO preprocessing first: a normalized microarray SeriesMatrix is not input for DESeq2 or limma-voom.
 
 ## Notes
 

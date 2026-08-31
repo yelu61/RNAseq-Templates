@@ -1,0 +1,100 @@
+========================================
+RNAseq_TCGA_GEO — run_analysis.R
+Working dir : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO 
+Config file : /private/var/folders/1k/_4d1xmz92p9cv5qjbggt1m8c0000gn/T/RtmpbAY3w3/filee0633024ef6f.R 
+========================================
+
+RNAseq_lib  : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/RNAseq_lib 
+
+
+Local-file mode (offline).
+Counts: 5000 genes x 24 samples
+TPM: 5000 genes x 24 samples
+
+Normal  Tumor 
+     6     18 
+converting counts to integer mode
+estimating size factors
+estimating dispersions
+gene-wise dispersion estimates
+mean-dispersion relationship
+final dispersion estimates
+fitting model and testing
+Significant DEGs: 641 
+Fontconfig error: No writable cache directories
+Warning messages:
+1: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use `linewidth` instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+2: The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
+ℹ Please use the `linewidth` argument instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+Survival samples: 18  | Events: 9 
+Ignoring unknown labels:
+• colour : "MKI67"
+Ignoring unknown labels:
+• colour : "MKI67_quartile"
+Ignoring unknown labels:
+• colour : "ajcc_pathologic_stage"
+`height` was translated to `width`.
+Warning message:
+`geom_errorbarh()` was deprecated in ggplot2 4.0.0.
+ℹ Please use the `orientation` argument of `geom_errorbar()` instead. 
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/hsa/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/hsa/pathway'
+Skipping enrichment plot suite: no significant terms for GO ORA
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/hsa/pathway"...
+KEGG GSEA skipped because analysis failed: cannot open the connection to 'https://rest.kegg.jp/link/hsa/pathway'
+Skipping GSEA plot suite: 823 valid terms; 0 pass BH FDR <= 0.05 for GO GSEA
+Warning messages:
+1: In file(con, "r") :
+  URL 'https://rest.kegg.jp/link/hsa/pathway': status was 'Couldn't resolve host name'
+2: In file(con, "r") :
+  URL 'https://rest.kegg.jp/link/hsa/pathway': status was 'Couldn't resolve host name'
+3: In plot_theme_dotheatmap_from_results(go_ora_map, file.path(theme_outdir,  :
+  No enrichment terms to plot.
+4: In plot_theme_dotheatmap_from_results(go_gsea_map, file.path(theme_outdir,  :
+  No enrichment terms to plot.
+========================================
+TCGA/GEO Tumor-vs-Normal Analysis Summary
+========================================
+
+1. Data Overview
+   - Species: human
+   - Samples retained: 24
+   - Genes (rows): 5000
+   - TPM available: yes
+   - Tumor/Normal design: yes
+
+2. Differential Expression (padj < 0.05 & |log2FC| > 0.5)
+   - Tumor_vs_Normal: 641 DEGs (Up: 326, Down: 315)
+
+3. Survival
+   - Survival samples: 18 (events: 9)
+   - Genes tested: MKI67
+
+4. Output Files
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/1-DEG (DESeq2 table, results Rdata)
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/2-GSEA (GO/KEGG ORA + GSEA tables)
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/3-Visualization (volcano, expression boxplots, ORA/GSEA suites, ThemeEnrichment/)
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/6-Survival (clinical_clean.csv, KM + Cox forest figures, Cox/clinical-KM tables)
+
+========================================
+
+========================================
+RNAseq_TCGA_GEO analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output 
+========================================
+
+========================================
+TCGA-GEO demo (local-file mode) PASSED (drove templates/TCGA_GEO/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output 
+========================================

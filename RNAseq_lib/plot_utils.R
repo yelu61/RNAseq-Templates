@@ -1078,6 +1078,8 @@ prepare_enrich_df <- function(enrich_result, show_category = 15) {
   if (is.null(enrich_result)) return(data.frame())
   df <- as.data.frame(enrich_result)
   if (nrow(df) == 0) return(df)
+  if ("NES" %in% names(df)) df <- significant_gsea_terms(df)
+  if (!nrow(df)) return(df)
   df <- df[order(df$p.adjust, df$pvalue), , drop = FALSE]
   df <- utils::head(df, show_category)
   df$Description_label <- make_enrich_display_labels(df)
@@ -1221,23 +1223,37 @@ plot_enrich_bidirectional_barplot_pdf <- function(up_result, down_result, filena
   }
   df$SignedFoldEnrichment <- ifelse(df$Direction == "UP", df$FoldEnrichment, -df$FoldEnrichment)
   df <- df[order(df$Direction, abs(df$FoldEnrichment), decreasing = TRUE), , drop = FALSE]
-  labels <- make.unique(wrap_term_labels(df$Description_label, width = 42, max_lines = 2), sep = " · ")
+  both_sides <- any(df$SignedFoldEnrichment < 0) && any(df$SignedFoldEnrichment > 0)
+  labels <- make.unique(wrap_term_labels(df$Description_label,
+    width = if (both_sides) 40 else 64, max_lines = 2), sep = " · ")
   df$Term <- factor(labels, levels = labels[order(df$SignedFoldEnrichment)])
   fill_col <- if (fill_by == "pvalue") "log10_pvalue" else "log10_padj"
   fill_name <- if (fill_by == "pvalue") "-log10(P)" else "-log10(adj. P)"
 
+  max_fold <- max(abs(df$SignedFoldEnrichment))
+  # Anchor inside each bar near zero. Long labels may use the same row's
+  # whitespace beyond a short bar; the quantitative bar length never changes.
+  df$LabelX <- sign(df$SignedFoldEnrichment) * pmin(abs(df$SignedFoldEnrichment) * 0.15, max_fold * 0.015)
+  df$LabelHjust <- ifelse(df$SignedFoldEnrichment >= 0, 0, 1)
+  x_limits <- max_fold * c(if (any(df$SignedFoldEnrichment < 0)) -1.08 else 0,
+                          if (any(df$SignedFoldEnrichment > 0)) 1.08 else 0)
+
   p <- ggplot2::ggplot(df, ggplot2::aes(x = SignedFoldEnrichment, y = Term, fill = .data[[fill_col]])) +
     ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#333333") +
-    ggplot2::geom_col(width = 0.78, alpha = 0.78, color = "white", linewidth = 0.25) +
+    ggplot2::geom_col(width = 0.78, alpha = 0.45, color = "white", linewidth = 0.25) +
+    ggplot2::geom_text(
+      ggplot2::aes(x = LabelX, label = Term, hjust = LabelHjust),
+      size = 2.55, color = "#222222", lineheight = 0.92, show.legend = FALSE
+    ) +
     ggplot2::scale_fill_distiller(palette = "PuOr", direction = -1, name = fill_name) +
     ggplot2::scale_x_continuous(
-      labels = function(x) abs(x),
-      expand = ggplot2::expansion(mult = c(0.08, 0.08))
+      limits = x_limits, labels = function(x) abs(x),
+      expand = ggplot2::expansion(mult = c(0, 0))
     ) +
     ggplot2::labs(x = "Fold Enrichment", y = NULL, title = title) +
     theme_publication(base_size = 8) +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 6.8, color = "black", lineheight = 0.92),
+      axis.text.y = ggplot2::element_blank(),
       axis.ticks.y = ggplot2::element_blank(),
       axis.title = ggplot2::element_text(size = 8),
       axis.text.x = ggplot2::element_text(size = 7.5, color = "black"),
@@ -1297,45 +1313,59 @@ plot_comparecluster_dotplot_pdf <- function(compare_result, filename, title, sho
 }
 
 plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_category = 20, width = 7.2, height = 6.2) {
-  df <- as.data.frame(gsea_result)
-  if (nrow(df) == 0 || !"NES" %in% colnames(df)) {
-    message("Skipping GSEA NES barplot: no significant terms for ", title)
+  audit <- audit_gsea_table(gsea_result)
+  df <- significant_gsea_terms(audit$table)
+  if (nrow(df) == 0) {
+    message("Skipping GSEA NES barplot: no valid terms pass the BH FDR cutoff for ", title)
     return(invisible(NULL))
   }
-  if (!"p.adjust" %in% colnames(df)) df$p.adjust <- df$pvalue
   df <- df[order(df$p.adjust, -abs(df$NES)), , drop = FALSE]
   df <- utils::head(df, show_category)
   # Preserve every term while filling missing labels and disambiguating shared
   # descriptions with IDs.
   df$Description_label <- make_enrich_display_labels(df)
-  df$Direction <- ifelse(df$NES >= 0, "Activated", "Suppressed")
-  wrapped_terms <- make.unique(wrap_term_labels(df$Description_label, width = 44, max_lines = 2), sep = " · ")
+  df$Direction <- ifelse(df$NES >= 0, "Positive NES", "Negative NES")
+  both_sides <- any(df$NES < 0) && any(df$NES > 0)
+  wrapped_terms <- make.unique(wrap_term_labels(df$Description_label,
+    width = if (both_sides) 40 else 64, max_lines = 2), sep = " · ")
   df$Description_wrapped <- factor(wrapped_terms, levels = wrapped_terms[order(df$NES)])
   max_nes <- max(abs(df$NES), na.rm = TRUE)
-  df$LabelX <- df$NES + ifelse(df$NES >= 0, max_nes * 0.035, -max_nes * 0.035)
+  df$LabelX <- sign(df$NES) * pmin(abs(df$NES) * 0.15, max_nes * 0.015)
+  df$LabelHjust <- ifelse(df$NES >= 0, 0, 1)
+  # Keep FDR in a separate outer column so it cannot collide with terms on
+  # short bars. A symmetric two-sided scale reserves equal label space.
+  df$FDRX <- ifelse(df$NES >= 0, 1, -1) * max_nes * 1.18
+  x_limits <- max_nes * c(if (any(df$NES < 0)) -1.55 else 0,
+                         if (any(df$NES >= 0)) 1.55 else 0)
   df$FDRLabel <- ifelse(df$p.adjust < 0.001,
                         paste0("FDR=", formatC(df$p.adjust, format = "e", digits = 1)),
                         paste0("FDR=", formatC(df$p.adjust, format = "f", digits = 3)))
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = NES, y = Description_wrapped, fill = Direction)) +
     ggplot2::geom_vline(xintercept = 0, linewidth = 0.35, color = "#2F2F2F") +
-    ggplot2::geom_col(width = 0.76, alpha = 0.88, color = "white", linewidth = 0.25) +
+    ggplot2::geom_col(width = 0.76, alpha = 0.45, color = "white", linewidth = 0.25) +
     ggplot2::geom_text(
-      ggplot2::aes(x = LabelX, label = FDRLabel,
-                   hjust = ifelse(NES >= 0, -0.05, 1.05)),
-      size = 2.8, color = "#222222", inherit.aes = TRUE
+      ggplot2::aes(x = LabelX, label = Description_wrapped, hjust = LabelHjust),
+      size = 2.55, color = "#222222", lineheight = 0.92, show.legend = FALSE
     ) +
-    ggplot2::scale_fill_manual(values = c("Activated" = "#C8473E", "Suppressed" = "#3778A8")) +
-    ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0.25, 0.25))) +
-    ggplot2::labs(x = "Normalized enrichment score (NES)", y = NULL, title = title) +
+    ggplot2::geom_text(
+      ggplot2::aes(x = FDRX, label = FDRLabel, hjust = LabelHjust),
+      size = 2.55, color = "#222222", show.legend = FALSE
+    ) +
+    ggplot2::scale_fill_manual(values = c("Positive NES" = "#C8473E", "Negative NES" = "#3778A8")) +
+    ggplot2::scale_x_continuous(limits = x_limits, expand = ggplot2::expansion(mult = c(0, 0))) +
+    ggplot2::labs(x = "Normalized enrichment score (NES)", y = NULL, title = title,
+      subtitle = sprintf("%d valid / %d table rows; %d pass BH FDR <= %g",
+        audit$summary$valid_terms, audit$summary$table_rows,
+        audit$summary$significant_terms, audit$summary$fdr_cutoff)) +
     theme_publication(base_size = 8) +
     ggplot2::theme(
-      axis.text.y = ggplot2::element_text(size = 6.8, color = "black", lineheight = 0.92),
+      axis.text.y = ggplot2::element_blank(),
       axis.ticks.y = ggplot2::element_blank(),
       axis.title = ggplot2::element_text(size = 8),
       axis.text.x = ggplot2::element_text(size = 7.5, color = "black"),
       plot.title = ggplot2::element_text(size = 9, hjust = 0, face = "bold"),
-      legend.position = "right",
+      legend.position = "bottom",
       legend.title = ggplot2::element_text(size = 7.5, face = "bold"),
       legend.text = ggplot2::element_text(size = 7)
     )
@@ -1344,16 +1374,25 @@ plot_gsea_nes_barplot_pdf <- function(gsea_result, filename, title, show_categor
 }
 
 plot_gsea_suite_pdf <- function(gsea_result, prefix, title_prefix, show_category = 15) {
-  if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) {
-    message("Skipping GSEA plot suite: no significant terms for ", title_prefix)
+  audit <- audit_gsea_table(gsea_result)
+  significant <- significant_gsea_terms(audit$table)
+  if (!nrow(significant)) {
+    message("Skipping GSEA plot suite: ", audit$summary$valid_terms,
+            " valid terms; 0 pass BH FDR <= ", audit$summary$fdr_cutoff, " for ", title_prefix)
     return(invisible(NULL))
   }
-  plot_enrich_dotplot(gsea_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot"),
+  overview_label <- sprintf("%d valid; %d pass BH FDR <= %g",
+    audit$summary$valid_terms, audit$summary$significant_terms, audit$summary$fdr_cutoff)
+  # enrichplot reads the result slot directly; exclude unusable/non-significant
+  # rows before calling its dotplot/ridgeplot methods.
+  original_result <- gsea_result
+  if (inherits(gsea_result, "gseaResult")) gsea_result@result <- significant else gsea_result <- significant
+  plot_enrich_dotplot(gsea_result, paste0(prefix, "_dotplot.pdf"), paste(title_prefix, "Dotplot", overview_label, sep = "\n"),
                       show_category = show_category, x_metric = "nes")
-  plot_gsea_nes_barplot_pdf(gsea_result, paste0(prefix, "_NES_barplot.pdf"), paste(title_prefix, "NES"), show_category = show_category)
+  plot_gsea_nes_barplot_pdf(original_result, paste0(prefix, "_NES_barplot.pdf"), paste(title_prefix, "NES"), show_category = show_category)
   try({
     p_ridge <- enrichplot::ridgeplot(gsea_result, showCategory = show_category) +
-      ggplot2::labs(title = paste(title_prefix, "Ridgeplot")) +
+      ggplot2::labs(title = paste(title_prefix, "Ridgeplot"), subtitle = overview_label) +
       ggplot2::scale_y_discrete(labels = function(x) wrap_term_labels(x, width = 46)) +
       theme_publication(base_size = 8) +
       ggplot2::theme(
@@ -1385,12 +1424,12 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
                                        pvalue_table = FALSE,
                                        base_family = NULL) {
   if (is.null(gsea_result) || nrow(as.data.frame(gsea_result)) == 0) {
-    message("Skipping single-term GSEA figure: no significant terms")
+    message("Skipping single-term GSEA figure: no returned terms")
     return(invisible(NULL))
   }
-  gsea_df <- as.data.frame(gsea_result)
+  gsea_df <- audit_gsea_table(gsea_result)$table
   if (is.character(gene_set_id)) {
-    term_stats <- gsea_df[gsea_df$ID == gene_set_id, , drop = FALSE]
+    term_stats <- gsea_df[!is.na(gsea_df$ID) & gsea_df$ID == gene_set_id, , drop = FALSE]
   } else if (is.numeric(gene_set_id)) {
     term_stats <- gsea_df[gene_set_id, , drop = FALSE]
   } else {
@@ -1401,24 +1440,24 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
     return(invisible(NULL))
   }
 
+  if (term_stats$result_status[[1]] == "unusable") {
+    message("Skipping single-term GSEA figure: ", term_stats$result_issue[[1]])
+    return(invisible(NULL))
+  }
   nes <- term_stats$NES[[1]]
   pval <- term_stats$pvalue[[1]]
   padj <- term_stats$p.adjust[[1]]
-  term_desc <- term_stats$Description[[1]]
+  term_desc <- make_enrich_display_labels(term_stats)[[1]]
 
-  # Synthetic or sparse data can yield NA NES/p-values for a term (e.g. unbalanced
-  # gene-level statistics). Such terms can't be plotted meaningfully; skip instead
-  # of erroring on `if (nes >= 0)` or downstream gseaplot2 calls.
-  if (is.na(nes) || length(nes) == 0) {
-    message("Skipping single-term GSEA figure (NA NES) for: ", term_desc)
-    return(invisible(NULL))
-  }
 
   fmt_p <- function(x) {
     x <- as.numeric(x)
     ifelse(is.na(x), "NA", ifelse(x < 0.001, sprintf("%.2e", x), sprintf("%.4f", x)))
   }
-  stats_text <- sprintf("NES = %.3f | p = %s | adj p = %s", nes, fmt_p(pval), fmt_p(padj))
+  stats_text <- sprintf("NES = %.3f | p = %s | BH FDR = %s | %s at FDR <= %g",
+    nes, fmt_p(pval), fmt_p(padj),
+    if (term_stats$significant[[1]]) "significant" else "not significant",
+    term_stats$fdr_cutoff[[1]])
 
   colors_pos <- list(es = "#b2182b", heatmap_low = "#f4a582", heatmap_high = "#ca0020")
   colors_neg <- list(es = "#2166ac", heatmap_low = "#92c5de", heatmap_high = "#0571b0")
@@ -1431,7 +1470,7 @@ plot_gsea_term_figure_pdf <- function(gsea_result, gene_set_id,
     if (!is.null(contrast_label)) subtitle_parts <- paste0(contrast_label, "\n", subtitle_parts)
     subtitle_text <- subtitle_parts
   } else {
-    subtitle_text <- subtitle
+    subtitle_text <- paste(subtitle, stats_text, sep = "\n")
   }
 
   p <- enrichplot::gseaplot2(gsea_result, geneSetID = gene_set_id, pvalue_table = pvalue_table, color = cols$es, title = "")
@@ -1512,15 +1551,15 @@ plot_gsea_term_figures_from_df <- function(gsea_result, term_df,
     stop("term_df must contain 'ID' or 'Description' column")
   }
   if (!id_col %in% colnames(term_df)) id_col <- "Description"
-  gsea_df <- as.data.frame(gsea_result)
+  gsea_df <- significant_gsea_terms(gsea_result)
 
   for (i in seq_len(nrow(term_df))) {
     term_id <- term_df[[id_col]][[i]]
     if (id_col == "Description") {
       term_id <- gsea_df$ID[match(term_id, gsea_df$Description)]
     }
-    if (is.na(term_id)) next
-    term_desc <- gsea_df$Description[match(term_id, gsea_df$ID)]
+    if (is.na(term_id) || !term_id %in% gsea_df$ID) next
+    term_desc <- make_enrich_display_labels(gsea_df)[match(term_id, gsea_df$ID)]
     safe_name <- gsub("[^a-zA-Z0-9_-]", "_", tolower(term_desc))
     filename <- file.path(outdir, paste0(prefix, "_", safe_name, ".pdf"))
     # A single degenerate term (e.g. too few genes on a small dataset) yields an
@@ -1765,6 +1804,9 @@ plot_theme_dotheatmap_from_results <- function(result_map,
                                               comparison_col = "comparison",
                                               width = 7.2,
                                               height = NULL) {
+  result_map <- lapply(result_map, function(obj) {
+    if ("NES" %in% names(as.data.frame(obj))) significant_gsea_terms(obj) else obj
+  })
   df <- build_multi_comparison_enrich_df(
     result_map,
     comparison_col = comparison_col,

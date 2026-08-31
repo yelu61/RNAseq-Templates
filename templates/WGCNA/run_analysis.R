@@ -64,6 +64,8 @@ if (is.na(lib_dir) || !dir.exists(lib_dir)) {
   }
 }
 cat("RNAseq_lib  :", normalizePath(lib_dir), "\n\n")
+source(file.path(lib_dir, "run_utils.R"))
+assert_fresh_run_dir(dirname(OUTDIR), output_dirs = OUTDIR)
 
 # ---- Load libraries -----------------------------------------------------------
 if (!requireNamespace("WGCNA", quietly = TRUE)) {
@@ -186,6 +188,8 @@ net <- blockwiseModules(
 )
 moduleColors <- labels2colors(net$colors)
 MEs <- orderMEs(net$MEs)
+# blockwiseModules uses numeric eigengene labels; exports use module colors.
+colnames(MEs) <- paste0("ME", labels2colors(as.integer(sub("^ME", "", colnames(MEs)))))
 
 write.csv(data.frame(gene = colnames(datExpr), module = moduleColors),
           file.path(OUTDIR, "WGCNA_gene_modules.csv"), row.names = FALSE)
@@ -207,11 +211,16 @@ if (ncol(trait_numeric) == 0) {
        "varying numeric or categorical ",
        "trait (besides '", SAMPLE_COLUMN, "') to correlate modules against.")
 }
-moduleTraitCor <- cor(MEs, trait_numeric, use = "p")
-moduleTraitP <- corPvalueStudent(moduleTraitCor, nrow(datExpr))
+moduleTraitCor <- stats::cor(MEs, trait_numeric, use = "pairwise.complete.obs")
+moduleTraitN <- crossprod(!is.na(as.matrix(MEs)), !is.na(as.matrix(trait_numeric)))
+moduleTraitP <- matrix(NA_real_, nrow(moduleTraitCor), ncol(moduleTraitCor),
+                      dimnames = dimnames(moduleTraitCor))
+valid_pairs <- moduleTraitN > 2 & is.finite(moduleTraitCor)
+moduleTraitP[valid_pairs] <- corPvalueStudent(moduleTraitCor[valid_pairs], moduleTraitN[valid_pairs])
 
 write.csv(moduleTraitCor, file.path(OUTDIR, "Module_trait_correlation.csv"))
 write.csv(moduleTraitP, file.path(OUTDIR, "Module_trait_pvalue.csv"))
+write.csv(moduleTraitN, file.path(OUTDIR, "Module_trait_n_samples.csv"))
 
 plot_wgcna_module_trait_heatmap_pdf(
   moduleTraitCor, moduleTraitP, file.path(OUTDIR, "Module_trait_heatmap.pdf")
@@ -227,14 +236,15 @@ if (!is.null(TARGET_MODULES)) all_modules <- intersect(all_modules, TARGET_MODUL
 hub_list <- list()
 for (mod in all_modules) {
   mod_genes <- gene_module$gene[gene_module$module == mod]
-  ME <- MEs[[paste0("ME", mod)]]
-  kME <- cor(datExpr[, mod_genes, drop = FALSE], ME, use = "p")
+  ME <- MEs[, paste0("ME", mod), drop = FALSE]
+  kME <- stats::cor(datExpr[, mod_genes, drop = FALSE], ME, use = "pairwise.complete.obs")
   hub <- data.frame(gene = mod_genes, module = mod, kME = as.numeric(kME)) %>%
     dplyr::arrange(dplyr::desc(abs(kME)))
   hub_list[[mod]] <- hub
   write.csv(hub, file.path(OUTDIR, paste0("Hub_genes_", mod, ".csv")), row.names = FALSE)
 }
-write.csv(dplyr::bind_rows(hub_list), file.path(OUTDIR, "Hub_genes_all_modules.csv"), row.names = FALSE)
+write.csv(dplyr::bind_rows(c(list(data.frame(gene = character(), module = character(), kME = numeric())), hub_list)),
+          file.path(OUTDIR, "Hub_genes_all_modules.csv"), row.names = FALSE)
 
 # =============================================================================
 # 9. Save results, summary, session info
@@ -242,7 +252,7 @@ write.csv(dplyr::bind_rows(hub_list), file.path(OUTDIR, "Hub_genes_all_modules.c
 # Targeted save so visualize_results.R can re-plot the dendrogram / module-trait
 # heatmap / hub tables without re-running blockwiseModules.
 save(net, MEs, moduleColors, datExpr, traits, trait_numeric, moduleTraitCor,
-     moduleTraitP, sft, soft_power, all_modules, hub_list,
+     moduleTraitP, moduleTraitN, sft, soft_power, all_modules, hub_list,
      NETWORK_TYPE, POWER_VECTOR, MIN_MODULE_SIZE, MERGE_CUT_HEIGHT,
      SAMPLE_COLUMN, GROUP_COLUMN,
      file = file.path(OUTDIR, "WGCNA_results.Rdata"))
@@ -286,6 +296,7 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
   } else {
     report_path <- tryCatch(
       render_analysis_report(outdir = RUN_ROOT, report_file = file.path(RUN_ROOT, "RNAseq_report.html"),
+                             template = file.path(dirname(normalizePath(lib_dir)), "reports", "analysis_report.qmd"),
                              params = list(title = REPORT_TITLE, author = Sys.info()[["user"]])),
       error = function(e) { message("HTML report failed: ", conditionMessage(e)); NULL }
     )
@@ -296,7 +307,7 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
 write_template_run_manifest(
   run_dir = RUN_ROOT, config_path = config_path, input_file = EXPR_FILE,
   config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
-  envir = globalenv()
+  envir = globalenv(), input_files = c(traits = TRAIT_FILE)
 )
 
 cat("\n========================================\n")

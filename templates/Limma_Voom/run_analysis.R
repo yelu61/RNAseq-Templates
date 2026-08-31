@@ -62,6 +62,9 @@ if (is.na(lib_dir) || !dir.exists(lib_dir)) {
 }
 cat("RNAseq_lib  :", normalizePath(lib_dir), "\n\n")
 
+source(file.path(lib_dir, "run_utils.R"))
+assert_fresh_run_dir(OUTDIR)
+
 # ---- Load libraries -----------------------------------------------------------
 species_org_db <- if (SPECIES == "human") "org.Hs.eg.db" else "org.Mm.eg.db"
 if (!requireNamespace(species_org_db, quietly = TRUE)) {
@@ -80,7 +83,7 @@ species_org   <- get(species_org_db)
 organism_code <- if (SPECIES == "human") "hsa" else "mmu"
 
 for (f in c("plot_utils.R", "io_utils.R", "data_utils.R", "deg_utils.R",
-            "enrichment_utils.R", "limma_voom_utils.R", "report_utils.R", "run_utils.R")) {
+            "enrichment_utils.R", "limma_voom_utils.R", "report_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
@@ -204,12 +207,12 @@ for (comp_name in names(res_list)) {
   gsea_go   <- run_go_gsea(entrez_ranked, org_db = species_org)
   gsea_kegg <- run_kegg_gsea(entrez_ranked, organism = organism_code)
   if (!is.null(gsea_go)) {
-    write.csv(as.data.frame(gsea_go), file.path(OUTDIR, "2-GSEA", paste0("GO_GSEA_", comp_name, ".csv")), row.names = FALSE)
+    write_gsea_tables(gsea_go, file.path(OUTDIR, "2-GSEA", paste0("GO_GSEA_", comp_name, ".csv")))
     plot_gsea_suite_pdf(gsea_go, file.path(OUTDIR, "3-Visualization", paste0("GO_GSEA_", comp_name)), paste("GO GSEA", comp_name))
     go_gsea_map[[comp_name]] <- gsea_go
   }
   if (!is.null(gsea_kegg)) {
-    write.csv(as.data.frame(gsea_kegg), file.path(OUTDIR, "2-GSEA", paste0("KEGG_GSEA_", comp_name, ".csv")), row.names = FALSE)
+    write_gsea_tables(gsea_kegg, file.path(OUTDIR, "2-GSEA", paste0("KEGG_GSEA_", comp_name, ".csv")))
     plot_gsea_suite_pdf(gsea_kegg, file.path(OUTDIR, "3-Visualization", paste0("KEGG_GSEA_", comp_name)), paste("KEGG GSEA", comp_name))
     kegg_gsea_map[[comp_name]] <- gsea_kegg
   }
@@ -247,8 +250,8 @@ for (comp_name in names(res_list)) {
   ggo   <- go_gsea_map[[comp_name]]
   gkegg <- kegg_gsea_map[[comp_name]]
 
-  if (!is.null(ggo) && nrow(as.data.frame(ggo)) > 0) {
-    ggo_df <- as.data.frame(ggo)
+  if (!is.null(ggo)) {
+    ggo_df <- significant_gsea_terms(ggo)
     ggo_df <- ggo_df[order(ggo_df$p.adjust, -abs(ggo_df$NES)), ]
     top_terms <- rbind(utils::head(ggo_df[ggo_df$NES > 0, ], 3),
                        utils::head(ggo_df[ggo_df$NES < 0, ], 3))
@@ -256,8 +259,8 @@ for (comp_name in names(res_list)) {
       outdir = file.path(single_term_outdir, paste0("GO_", comp_name)),
       contrast_label = comp_name, prefix = "gseaplot2_GO")
   }
-  if (!is.null(gkegg) && nrow(as.data.frame(gkegg)) > 0) {
-    gkegg_df <- as.data.frame(gkegg)
+  if (!is.null(gkegg)) {
+    gkegg_df <- significant_gsea_terms(gkegg)
     gkegg_df <- gkegg_df[order(gkegg_df$p.adjust, -abs(gkegg_df$NES)), ]
     top_terms <- rbind(utils::head(gkegg_df[gkegg_df$NES > 0, ], 3),
                        utils::head(gkegg_df[gkegg_df$NES < 0, ], 3))
@@ -317,6 +320,7 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
   } else {
     report_path <- tryCatch(
       render_analysis_report(outdir = OUTDIR, report_file = file.path(OUTDIR, "RNAseq_report.html"),
+                             template = file.path(dirname(normalizePath(lib_dir)), "reports", "analysis_report.qmd"),
                              params = list(title = REPORT_TITLE, author = Sys.info()[["user"]])),
       error = function(e) { message("HTML report failed: ", conditionMessage(e)); NULL }
     )
@@ -326,6 +330,8 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
 
 write_template_run_manifest(
   run_dir = OUTDIR, config_path = config_path, input_file = INPUT_FILE,
+  input_files = c(annotation_db = AnnotationDbi::dbfile(species_org),
+                  kegg_reference = NA_character_),
   config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
   envir = globalenv()
 )

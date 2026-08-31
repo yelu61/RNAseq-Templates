@@ -1,0 +1,21 @@
+00: 3-Visualization/DEG_raw_vs_shrunken_summary_barplot.pdf | nonblank first page
+01: 3-Visualization/DEG_threshold_summary_barplot.pdf | nonblank first page
+02: 3-Visualization/Filter_retention_by_sample.pdf | nonblank first page
+03: 3-Visualization/Heatmap_top1000_variable_genes.pdf | nonblank first page
+04: 3-Visualization/Heatmap_topDEGs.pdf | nonblank first page
+05: 3-Visualization/ORA_directional_summary_barplot.pdf | nonblank first page
+06: 3-Visualization/ORA_threshold_summary_barplot.pdf | nonblank first page
+07: 3-Visualization/PCA_plot.pdf | nonblank first page
+08: 3-Visualization/Raw_count_distribution_boxplot.pdf | nonblank first page
+09: 3-Visualization/Sample_QC_metrics.pdf | nonblank first page
+10: 3-Visualization/Sample_correlation_heatmap_raw_counts.pdf | nonblank first page
+11: 3-Visualization/Sample_distance_heatmap.pdf | nonblank first page
+12: 3-Visualization/Volcano_Treatment_vs_Control_standard.pdf | nonblank first page
+13: 3-Visualization/strict/GO_ORA_DOWN_Treatment_vs_Control_barplot.pdf | nonblank first page
+14: 3-Visualization/strict/GO_ORA_DOWN_Treatment_vs_Control_dotplot.pdf | nonblank first page
+15: 3-Visualization/strict/GO_ORA_DOWN_Treatment_vs_Control_emapplot.pdf | nonblank first page
+16: 3-Visualization/strict/GO_ORA_Treatment_vs_Control_barplot.pdf | nonblank first page
+17: 3-Visualization/strict/GO_ORA_Treatment_vs_Control_dotplot.pdf | nonblank first page
+18: 3-Visualization/strict/GO_ORA_Treatment_vs_Control_emapplot.pdf | nonblank first page
+19: 3-Visualization/strict/GO_ORA_bidirectional_Treatment_vs_Control.pdf | nonblank first page
+PASS: 20 PDFs have nonempty, renderable, nonblank first pages.

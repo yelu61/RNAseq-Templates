@@ -7,6 +7,7 @@
 #'
 #' @param perm Number of permutations
 #' @param QN Perform quantile normalization or not (TRUE/FALSE)
+#' @param mixture_scale "linear", "log2" (without a pseudocount), or legacy "auto".
 #' @import utils
 #' @importFrom preprocessCore normalize.quantiles
 #' @importFrom stats sd
@@ -22,7 +23,10 @@
 #'   data(mixed_expr)
 #'   results <- cibersort(sig_matrix = LM22, mixture_file = mixed_expr)
 #' }
-cibersort <- function(sig_matrix, mixture_file, perm = 0, QN = TRUE){
+cibersort <- function(sig_matrix, mixture_file, perm = 0, QN = TRUE,
+                     mixture_scale = c("auto", "linear", "log2")){
+
+  mixture_scale <- match.arg(mixture_scale)
 
   #read in data
   if (is.character(sig_matrix)) {
@@ -41,13 +45,16 @@ cibersort <- function(sig_matrix, mixture_file, perm = 0, QN = TRUE){
 
 
   #order
-  X <- X[order(rownames(X)),]
-  Y <- Y[order(rownames(Y)),]
+  X <- X[order(rownames(X)), , drop = FALSE]
+  Y <- Y[order(rownames(Y)), , drop = FALSE]
 
   P <- perm #number of permutations
 
-  #anti-log if max < 50 in mixture file
-  if(max(Y) < 50) {Y <- 2^Y}
+  # Preserve the legacy heuristic only for direct callers that have not
+  # declared their scale. The template wrapper always supplies linear data.
+  if (mixture_scale == "log2" || (mixture_scale == "auto" && max(Y) < 50)) {
+    Y <- 2^Y
+  }
 
   #quantile normalization of mixture file
   if(QN == TRUE){
@@ -66,9 +73,9 @@ cibersort <- function(sig_matrix, mixture_file, perm = 0, QN = TRUE){
   Xgns <- row.names(X)
   Ygns <- row.names(Y)
   YintX <- Ygns %in% Xgns
-  Y <- Y[YintX,]
+  Y <- Y[YintX, , drop = FALSE]
   XintY <- Xgns %in% row.names(Y)
-  X <- X[XintY,]
+  X <- X[XintY, , drop = FALSE]
 
   #standardize sig matrix
   X <- (X - mean(X)) / sd(as.vector(X))
@@ -86,7 +93,7 @@ cibersort <- function(sig_matrix, mixture_file, perm = 0, QN = TRUE){
   output <- matrix()
   itor <- 1
   mixtures <- dim(Y)[2]
-  pval <- 9999
+  pval <- NA_real_ # No permutation p-value is available when perm = 0.
 
   #iterate through mixtures
   while (itor <= mixtures) {
@@ -123,8 +130,8 @@ cibersort <- function(sig_matrix, mixture_file, perm = 0, QN = TRUE){
 
   #return matrix object containing all results
   obj <- rbind(header,output)
-  obj <- obj[,-1]
-  obj <- obj[-1,]
+  obj <- obj[, -1, drop = FALSE]
+  obj <- obj[-1, , drop = FALSE]
   obj <- matrix(as.numeric(unlist(obj)),nrow=nrow(obj))
   rownames(obj) <- colnames(Y)
   colnames(obj) <- c(colnames(X),"P-value","Correlation","RMSE")

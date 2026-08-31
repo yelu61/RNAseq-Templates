@@ -324,3 +324,81 @@ test_that("theme dot-heatmap caps unsafe PDF dimensions", {
   )
   expect_true(file.exists(outfile) && file.info(outfile)$size > 0)
 })
+
+test_that("GSEA overview plots require valid FDR-significant terms", {
+  df <- data.frame(ID = c("unusable", "nonsig"), Description = c("bad", "ranked"),
+    NES = c(NA, 2), pvalue = c(NA, 0.001), p.adjust = c(NA, 0.2))
+  root <- tempfile()
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE))
+  expect_null(suppressMessages(plot_gsea_suite_pdf(df, file.path(root, "GSEA"), "test")))
+  expect_null(suppressMessages(plot_gsea_nes_barplot_pdf(df, file.path(root, "NES.pdf"), "test")))
+  expect_equal(nrow(prepare_enrich_df(df)), 0)
+  expect_length(list.files(root), 0)
+})
+
+test_that("GSEA NES plots label sign and FDR rather than pathway activation", {
+  df <- data.frame(ID = c("sig", "nonsig", NA), Description = c("signal", "ranked", "lost"),
+    NES = c(-2, 3, 4), pvalue = c(0.001, 0.001, 0.001), p.adjust = c(0.01, 0.2, 0.01))
+  file <- tempfile(fileext = ".pdf")
+  on.exit(unlink(file))
+  p <- plot_gsea_nes_barplot_pdf(df, file, "test")
+  expect_equal(p$data$ID, "sig")
+  expect_equal(p$data$Direction, "Negative NES")
+  expect_match(p$labels$subtitle, "2 valid / 3 table rows; 1 pass BH FDR")
+  expect_gt(file.info(file)$size, 1000)
+})
+
+test_that("bidirectional ORA labels start inside unchanged bars for either direction", {
+  up <- make_enrich_df()
+  up$FoldEnrichment <- c(8, 0.08, 4, 3, 2)
+  up$Description[2] <- paste(rep("long pathway description", 5), collapse = " ")
+  down <- up
+  down$FoldEnrichment <- down$FoldEnrichment / 10
+  for (pair in list(list(up, down), list(up, NULL), list(NULL, down))) {
+    file <- tempfile(fileext = ".pdf")
+    p <- plot_enrich_bidirectional_barplot_pdf(pair[[1]], pair[[2]], file, "layout")
+    built <- ggplot2::ggplot_build(p)
+    bars <- built$data[[2]]
+    labels <- built$data[[3]]
+    expect_equal(nrow(labels), nrow(p$data))
+    expect_true(all(abs(labels$x) > 0 & abs(labels$x) < abs(bars$x)))
+    expect_equal(sign(labels$x), sign(bars$x))
+    expect_equal(labels$hjust, ifelse(bars$x >= 0, 0, 1))
+    expected <- c(if (!is.null(pair[[1]])) pair[[1]]$FoldEnrichment,
+                  if (!is.null(pair[[2]])) -pair[[2]]$FoldEnrichment)
+    expect_equal(sort(bars$x), sort(expected))
+    expect_s3_class(p$theme$axis.text.y, "element_blank")
+    expect_true(any(grepl("\n", as.character(labels$label), fixed = TRUE)))
+    expect_gt(file.info(file)$size, 1000)
+    unlink(file)
+  }
+})
+
+test_that("GSEA term labels and FDR occupy separate positions without changing NES", {
+  df <- data.frame(ID = paste0("set", 1:4),
+    Description = c("positive term", "A long pathway name that spans two lines next to a very short bar",
+                    "negative term", "Another long pathway name for a short negative bar"),
+    NES = c(3, 0.06, -2, -0.04), pvalue = c(1e-20, .001, .002, .003),
+    p.adjust = c(1e-18, .01, .02, .03))
+  for (rows in list(1:4, 1:2, 3:4)) {
+    file <- tempfile(fileext = ".pdf")
+    p <- plot_gsea_nes_barplot_pdf(df[rows, ], file, "layout")
+    built <- ggplot2::ggplot_build(p)
+    bars <- built$data[[2]]
+    labels <- built$data[[3]]
+    fdr <- built$data[[4]]
+    expect_equal(sort(bars$x), sort(df$NES[rows]))
+    expect_true(all(abs(labels$x) > 0 & abs(labels$x) < abs(bars$x)))
+    expect_equal(sign(labels$x), sign(bars$x))
+    expect_equal(labels$hjust, ifelse(bars$x >= 0, 0, 1))
+    expect_true(all(abs(fdr$x) > abs(bars$x)))
+    expect_equal(sign(fdr$x), sign(bars$x))
+    expect_true(all(grepl("FDR=", fdr$label, fixed = TRUE)))
+    expect_equal(nrow(labels), length(rows))
+    expect_equal(nrow(fdr), length(rows))
+    expect_s3_class(p$theme$axis.text.y, "element_blank")
+    expect_gt(file.info(file)$size, 1000)
+    unlink(file)
+  }
+})

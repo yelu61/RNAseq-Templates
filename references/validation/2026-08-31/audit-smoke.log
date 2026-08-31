@@ -1,0 +1,354 @@
+========================================
+RNAseq-Templates Demo Smoke Test
+Working directory: /private/tmp/rnaseq-freeze-audit.KpMlS7 
+RNAseq_lib: /private/tmp/rnaseq-freeze-audit.KpMlS7/RNAseq_lib 
+========================================
+
+
+
+using ntop=500 top features by variance
+Too few points to calculate an ellipse
+Too few points to calculate an ellipse
+Fontconfig error: No writable cache directories
+estimating size factors
+estimating dispersions
+gene-wise dispersion estimates
+mean-dispersion relationship
+final dispersion estimates
+fitting model and testing
+Processing DESeq2 contrast: Treatment_vs_Control (Treatment vs Control)
+using 'ashr' for LFC shrinkage. If used in published research, please cite:
+    Stephens, M. (2016) False discovery rates: a new deal. Biostatistics, 18:2.
+    https://doi.org/10.1093/biostatistics/kxw041
+  Threshold           Comparison pvalue_column p_cutoff              lfc_column
+1    strict Treatment_vs_Control          padj     0.01      log2FoldChange_raw
+2  standard Treatment_vs_Control          padj     0.05      log2FoldChange_raw
+3     loose Treatment_vs_Control          padj     0.10      log2FoldChange_raw
+4    strict Treatment_vs_Control          padj     0.01 log2FoldChange_shrunken
+5  standard Treatment_vs_Control          padj     0.05 log2FoldChange_shrunken
+6     loose Treatment_vs_Control          padj     0.10 log2FoldChange_shrunken
+  lfc_strategy log2fc_cutoff UP DOWN Total
+1          raw           1.5 20   19    39
+2          raw           1.0 42   45    87
+3          raw           0.5 73   75   148
+4     shrunken           1.5 20   19    39
+5     shrunken           1.0 42   45    87
+6     shrunken           0.5 73   75   148
+            Comparison tested_genes pvalue_non_na pvalue_lt_0.05 padj_non_na
+1 Treatment_vs_Control         5972          5905            555        5796
+  padj_lt_0.05 abs_raw_lfc_gt_0_5 abs_raw_lfc_gt_1 abs_raw_lfc_gt_1_5
+1           87               2875             1298                591
+  abs_raw_lfc_gt_2 abs_shrunken_lfc_gt_0_5 abs_shrunken_lfc_gt_1
+1              262                     323                   154
+  abs_shrunken_lfc_gt_1_5 abs_shrunken_lfc_gt_2 strict_pvalue_raw_total
+1                      70                    34                     243
+  strict_pvalue_raw_up strict_pvalue_raw_down strict_pvalue_shrunken_total
+1                  118                    125                           70
+  strict_pvalue_shrunken_up strict_pvalue_shrunken_down strict_padj_raw_total
+1                        37                          33                    39
+  strict_padj_raw_up strict_padj_raw_down strict_padj_shrunken_total
+1                 20                   19                         39
+  strict_padj_shrunken_up strict_padj_shrunken_down standard_pvalue_raw_total
+1                      20                        19                       552
+  standard_pvalue_raw_up standard_pvalue_raw_down
+1                    282                      270
+  standard_pvalue_shrunken_total standard_pvalue_shrunken_up
+1                            154                          77
+  standard_pvalue_shrunken_down standard_padj_raw_total standard_padj_raw_up
+1                            77                      87                   42
+  standard_padj_raw_down standard_padj_shrunken_total standard_padj_shrunken_up
+1                     45                           87                        42
+  standard_padj_shrunken_down loose_pvalue_raw_total loose_pvalue_raw_up
+1                          45                    853                 436
+  loose_pvalue_raw_down loose_pvalue_shrunken_total loose_pvalue_shrunken_up
+1                   417                         322                      161
+  loose_pvalue_shrunken_down loose_padj_raw_total loose_padj_raw_up
+1                        161                  148                73
+  loose_padj_raw_down loose_padj_shrunken_total loose_padj_shrunken_up
+1                  75                       148                     73
+  loose_padj_shrunken_down
+1                       75
+Warning messages:
+1: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use `linewidth` instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+2: The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
+ℹ Please use the `linewidth` argument instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+Fontconfig error: No writable cache directories
+'select()' returned 1:many mapping between keys and columns
+Warning message:
+In clusterProfiler::bitr(symbols, fromType = "SYMBOL", toType = "ENTREZID",  :
+  0.02% of input gene IDs are fail to map...
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+There were 13 warnings (use warnings() to see them)
+'select()' returned 1:many mapping between keys and columns
+Scale for y is already present.
+Adding another scale for y, which will replace the existing scale.
+Picking joint bandwidth of 0.317
+GSEA overview saved for GSEA GO - Treatment_vs_Control; create one running curve per explicitly selected term with plot_gsea_term_figures_from_df().
+Warning messages:
+1: In clusterProfiler::bitr(symbols, fromType = "SYMBOL", toType = "ENTREZID",  :
+  0.02% of input gene IDs are fail to map...
+2: In prepare_gsea_inputs(geneList, scoreType, exponent) :
+  There are ties in the preranked stats (0.32% of the list). The order of those tied genes will be arbitrary, which may produce unexpected results.
+3: In gsea(geneList = geneList, gene_sets = geneSets, weight = weight,  :
+  There were 2028 pathways for which P-values were not calculated properly due to unbalanced gene-level statistic values. For such pathways pvalue, NES and log2err are set to NA. You can try to increase nPermSimple.
+4: In calculate_qvalue(gsea_res$pvalue) :
+  Invalid p-values detected (NA, non-finite, <0, or >1). qvalue will be computed on valid p-values only.
+5: In enrichit::gsea_gson(geneList = geneList, exponent = exponent,  :
+  NA values detected in gene set IDs. Replacing with string 'NA'.
+6: In enrichit::gsea_gson(geneList = geneList, exponent = exponent,  :
+  Duplicate gene set IDs detected: NA... (Total 1). Unique suffixes added.
+RNA-seq Analysis Summary (Demo Smoke Test)
+Species: mouse | Samples: 6 | Genes: 5972
+Comparisons: 1 | Thresholds: 3
+
+========================================
+General demo smoke test PASSED.
+All expected output files were generated.
+========================================
+
+----------------------------------------
+>>> Running: demo_RNAseq_General/run_demo.R 
+----------------------------------------
+   - Low-count filter: count >= 10 in at least 3 samples
+   - Genes after filtering: 5972
+
+2. Differential Expression Default Threshold: standard (padj < 0.05 & |log2FoldChange_raw| > 1)
+   - Treatment_vs_Control: 87 DEGs (Up: 42, Down: 45)
+
+3. Output Files
+   - ./0-Config/analysis_config_used.R
+   - ./1-DEG/ (all-gene, threshold, diagnostics, Excel, Rdata)
+   - ./2-GSEA/ (ORA/GSEA/GSVA/TF results)
+   - ./3-Visualization/GSEA/ (overview, running curves, theme maps)
+   - ./3-Visualization/SingleGene/ (single-gene expression plots)
+   - ./3-Visualization/ (QC, DEG, ORA and other PDF figures)
+
+========================================
+
+========================================
+RNAseq_General analysis COMPLETE.
+Outputs: 1-DEG/  2-GSEA/  3-Visualization/  Analysis_summary.txt  run_manifest.csv
+========================================
+
+========================================
+General CLI demo PASSED (drove templates/General/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_General/RNAseq_General_Output 
+======================================== 
+>>> OK: demo_RNAseq_General/run_demo.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_limma_voom/run_demo.R 
+----------------------------------------
+   - Samples: 6
+   - Groups: Control, Treatment
+   - Batch covariate: none
+   - Genes after filtering: 5971
+
+2. Differential Expression (padj < 0.05 & |log2FC| > 0.5)
+   - Treatment_vs_Control: 0 DEGs (Up: 0, Down: 0)
+
+3. Output Files
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/1-DEG (per-comparison DEG tables, results Rdata)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/2-GSEA (GO/KEGG ORA + GSEA tables)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output/3-Visualization (volcano, heatmap, ORA/GSEA, theme maps)
+
+========================================
+
+========================================
+RNAseq_Limma_Voom analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output 
+========================================
+
+========================================
+limma-voom demo PASSED (drove templates/Limma_Voom/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_limma_voom/RNAseq_limma_voom_Output 
+======================================== 
+>>> OK: demo_RNAseq_limma_voom/run_demo.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_WGCNA/run_demo.R 
+----------------------------------------
+      - saddlebrown: 39 genes
+      - salmon: 101 genes
+      - skyblue: 45 genes
+      - steelblue: 38 genes
+      - tan: 104 genes
+      - turquoise: 257 genes
+      - violet: 36 genes
+      - white: 48 genes
+      - yellow: 134 genes
+
+3. Output Files
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output/5-WGCNA (WGCNA_network.rds, gene-module + module-trait tables, hub-gene CSVs, PDFs, results Rdata)
+
+========================================
+
+========================================
+RNAseq_WGCNA analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output/5-WGCNA 
+========================================
+
+========================================
+WGCNA demo PASSED (drove templates/WGCNA/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output 
+======================================== 
+>>> OK: demo_RNAseq_WGCNA/run_demo.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_TME/regenerate_demo_data.R 
+----------------------------------------
+Wrote 6000 genes x 6 samples to examples/demo_RNAseq_TME/0-Data/counts.tsv 
+Marker genes present: 24 / 24  
+>>> OK: demo_RNAseq_TME/regenerate_demo_data.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_TME/run_demo.R 
+----------------------------------------
+   - Samples: 6
+   - Groups: Control, Treatment
+   - TME genes after prep: 6000
+
+2. Methods Run
+   - ESTIMATE (native): yes
+   - IOBR (none)
+   - Native CIBERSORT: no
+   - ssGSEA signatures scored: 26
+
+3. Output Files
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/4-TME (TPM matrix, ESTIMATE/IOBR/CIBERSORT tables, ssGSEA, all PDFs, tme_results.Rdata)
+
+========================================
+
+========================================
+RNAseq_TME analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output 
+========================================
+
+========================================
+TME deconvolution demo PASSED (drove templates/TME/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output 
+======================================== 
+>>> OK: demo_RNAseq_TME/run_demo.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_TimeCourse/regenerate_demo_data.R 
+----------------------------------------
+Wrote 3000 genes x 12 samples across 4 time points
+Pattern genes: 2400 | flat: 600  
+>>> OK: demo_RNAseq_TimeCourse/regenerate_demo_data.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_TimeCourse/run_demo.R 
+----------------------------------------
+   - Core genes (acore >= 0.7): 2441
+   - Clusters with ORA: 0
+
+3. Time-point vs Baseline DEG (baseline = Day0; padj < 0.05 & |log2FC| > 0.5)
+   - time_Day14_vs_Day0: 1160 DEGs (Up: 492, Down: 668)
+   - time_Day21_vs_Day0: 2090 DEGs (Up: 1192, Down: 898)
+   - time_Day7_vs_Day0: 1254 DEGs (Up: 601, Down: 653)
+
+4. Output Files
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TimeCourse/RNAseq_TimeCourse_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TimeCourse/RNAseq_TimeCourse_Output/1-DEG_Timepoint (time-point DEG tables)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TimeCourse/RNAseq_TimeCourse_Output/3-Visualization (volcano, DEG summary, theme maps)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TimeCourse/RNAseq_TimeCourse_Output/5-TimeCourse (mean expression, Mfuzz clusters/trends, ORA, results Rdata)
+
+========================================
+
+========================================
+RNAseq_TimeCourse analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TimeCourse/RNAseq_TimeCourse_Output 
+========================================
+
+========================================
+TimeCourse demo PASSED (drove templates/TimeCourse/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TimeCourse/RNAseq_TimeCourse_Output 
+======================================== 
+>>> OK: demo_RNAseq_TimeCourse/run_demo.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_TCGA_GEO/regenerate_demo_data.R 
+----------------------------------------
+Wrote 5000 genes x 24 samples
+Tumor: 18 Normal: 6 
+Survival gene MKI67 present: TRUE 
+Events (deaths): 9  
+>>> OK: demo_RNAseq_TCGA_GEO/regenerate_demo_data.R 
+
+----------------------------------------
+>>> Running: demo_RNAseq_TCGA_GEO/run_demo.R 
+----------------------------------------
+2. Differential Expression (padj < 0.05 & |log2FC| > 0.5)
+   - Tumor_vs_Normal: 641 DEGs (Up: 326, Down: 315)
+
+3. Survival
+   - Survival samples: 18 (events: 9)
+   - Genes tested: MKI67
+
+4. Output Files
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/1-DEG (DESeq2 table, results Rdata)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/2-GSEA (GO/KEGG ORA + GSEA tables)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/3-Visualization (volcano, expression boxplots, ORA/GSEA suites, ThemeEnrichment/)
+   - /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output/6-Survival (clinical_clean.csv, KM + Cox forest figures, Cox/clinical-KM tables)
+
+========================================
+
+========================================
+RNAseq_TCGA_GEO analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output 
+========================================
+
+========================================
+TCGA-GEO demo (local-file mode) PASSED (drove templates/TCGA_GEO/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_TCGA_GEO/RNAseq_TCGA_GEO_Output 
+======================================== 
+>>> OK: demo_RNAseq_TCGA_GEO/run_demo.R 
+
+========================================
+All demo smoke tests PASSED (General + limma-voom + WGCNA + TME + TimeCourse + TCGA-GEO).
+========================================

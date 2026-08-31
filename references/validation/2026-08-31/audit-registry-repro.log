@@ -1,0 +1,38 @@
+CASE 1: auxiliary metadata changes at the same path
+                            before                              after 
+"d58d175ebf1ad854c2f883f08b193668" "56a514ba80721d3182af00a813e9fec4" 
+ run_id                        input_md5               analysis_signature
+ before 537d5aac69b430446008c0ca058f793c cbf79dea218aeef56562bf90f28b4cd4
+  after 537d5aac69b430446008c0ca058f793c cbf79dea218aeef56562bf90f28b4cd4
+ duplicate_of
+             
+       before
+REPRODUCED: changed scientific metadata is nevertheless marked duplicate.
+
+CASE 2: online runs with absent primary-input checksum
+  run_id input_md5 duplicate_of
+ online1        NA             
+ online2        NA      online1
+R nzchar(NA): TRUE 
+REPRODUCED: missing input checksums are nevertheless grouped as duplicate.
+
+No repository files were changed. Temporary data will be removed.
+R version 4.6.1 (2026-06-24)
+Platform: aarch64-apple-darwin23
+Running under: macOS Tahoe 26.6.2
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
+
+locale:
+[1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8
+
+time zone: Asia/Shanghai
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+loaded via a namespace (and not attached):
+[1] compiler_4.6.1 tools_4.6.1   

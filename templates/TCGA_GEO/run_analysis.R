@@ -67,6 +67,9 @@ if (is.na(lib_dir) || !dir.exists(lib_dir)) {
 }
 cat("RNAseq_lib  :", normalizePath(lib_dir), "\n\n")
 
+source(file.path(lib_dir, "run_utils.R"))
+assert_fresh_run_dir(OUTDIR)
+
 # ---- Load libraries -----------------------------------------------------------
 species_org_db <- if (SPECIES == "human") "org.Hs.eg.db" else "org.Mm.eg.db"
 if (!requireNamespace(species_org_db, quietly = TRUE)) {
@@ -86,7 +89,7 @@ species_org   <- get(species_org_db)
 organism_code <- if (SPECIES == "human") "hsa" else "mmu"
 
 for (f in c("plot_utils.R", "deg_utils.R", "enrichment_utils.R", "tcga_utils.R",
-            "survival_utils.R", "geo_utils.R", "data_utils.R", "report_utils.R", "run_utils.R")) {
+            "survival_utils.R", "geo_utils.R", "data_utils.R", "report_utils.R")) {
   source(file.path(lib_dir, f))
 }
 theme_set(theme_publication())
@@ -409,11 +412,11 @@ if (isTRUE(TUMOR_NORMAL_DESIGN) && !is.null(res_df)) {
   gsea_go   <- run_go_gsea(entrez_ranked, org_db = species_org)
   gsea_kegg <- run_kegg_gsea(entrez_ranked, organism = organism_code)
   if (!is.null(gsea_go)) {
-    write.csv(as.data.frame(gsea_go), file.path(gsea_dir, "GO_GSEA_Tumor_vs_Normal.csv"), row.names = FALSE)
+    write_gsea_tables(gsea_go, file.path(gsea_dir, "GO_GSEA_Tumor_vs_Normal.csv"))
     plot_gsea_suite_pdf(gsea_go, file.path(viz_dir, "GO_GSEA_Tumor_vs_Normal"), "GO GSEA")
   }
   if (!is.null(gsea_kegg)) {
-    write.csv(as.data.frame(gsea_kegg), file.path(gsea_dir, "KEGG_GSEA_Tumor_vs_Normal.csv"), row.names = FALSE)
+    write_gsea_tables(gsea_kegg, file.path(gsea_dir, "KEGG_GSEA_Tumor_vs_Normal.csv"))
     plot_gsea_suite_pdf(gsea_kegg, file.path(viz_dir, "KEGG_GSEA_Tumor_vs_Normal"), "KEGG GSEA")
   }
 
@@ -451,7 +454,7 @@ if (isTRUE(TUMOR_NORMAL_DESIGN) && !is.null(res_df)) {
   single_term_outdir <- file.path(theme_outdir, "single_term_gsea")
   dir.create(single_term_outdir, showWarnings = FALSE, recursive = TRUE)
   if (!is.null(gsea_go) && nrow(as.data.frame(gsea_go)) > 0) {
-    ggo_df <- as.data.frame(gsea_go)
+    ggo_df <- significant_gsea_terms(gsea_go)
     ggo_df <- ggo_df[order(ggo_df$p.adjust, -abs(ggo_df$NES)), ]
     top_terms <- rbind(utils::head(ggo_df[ggo_df$NES > 0, ], 3),
                        utils::head(ggo_df[ggo_df$NES < 0, ], 3))
@@ -460,7 +463,7 @@ if (isTRUE(TUMOR_NORMAL_DESIGN) && !is.null(res_df)) {
       contrast_label = "Tumor vs Normal", prefix = "gseaplot2_GO")
   }
   if (!is.null(gsea_kegg) && nrow(as.data.frame(gsea_kegg)) > 0) {
-    gkegg_df <- as.data.frame(gsea_kegg)
+    gkegg_df <- significant_gsea_terms(gsea_kegg)
     gkegg_df <- gkegg_df[order(gkegg_df$p.adjust, -abs(gkegg_df$NES)), ]
     top_terms <- rbind(utils::head(gkegg_df[gkegg_df$NES > 0, ], 3),
                        utils::head(gkegg_df[gkegg_df$NES < 0, ], 3))
@@ -529,6 +532,7 @@ if (isTRUE(GENERATE_HTML_REPORT)) {
   } else {
     report_path <- tryCatch(
       render_analysis_report(outdir = OUTDIR, report_file = file.path(OUTDIR, "RNAseq_report.html"),
+                             template = file.path(dirname(normalizePath(lib_dir)), "reports", "analysis_report.qmd"),
                              params = list(title = REPORT_TITLE, author = Sys.info()[["user"]])),
       error = function(e) { message("HTML report failed: ", conditionMessage(e)); NULL }
     )
@@ -541,8 +545,21 @@ manifest_input <- if (isTRUE(DOWNLOAD_FROM_GDC) || isTRUE(DOWNLOAD_FROM_GEO)) {
 } else {
   LOCAL_COUNTS_FILE
 }
+manifest_inputs <- character(0)
+if (!isTRUE(DOWNLOAD_FROM_GDC) && !isTRUE(DOWNLOAD_FROM_GEO)) {
+  manifest_inputs <- c(clinical = LOCAL_CLINICAL_FILE)
+  if (!is.null(LOCAL_TPM_FILE)) manifest_inputs <- c(manifest_inputs, tpm = LOCAL_TPM_FILE)
+}
+if (isTRUE(DOWNLOAD_FROM_GDC) && !is.null(GENE_ID_MAP_FILE)) {
+  manifest_inputs <- c(manifest_inputs, gene_annotation = GENE_ID_MAP_FILE)
+}
+if (isTRUE(TUMOR_NORMAL_DESIGN)) {
+  manifest_inputs <- c(manifest_inputs, annotation_db = AnnotationDbi::dbfile(species_org),
+                       kegg_reference = NA_character_)
+}
 write_template_run_manifest(
   run_dir = OUTDIR, config_path = config_path, input_file = manifest_input,
+  input_files = manifest_inputs,
   config_objects = config_objects, lib_dir = lib_dir, runner_file = file_arg,
   envir = globalenv()
 )

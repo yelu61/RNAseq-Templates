@@ -48,7 +48,7 @@ undo_log_expr <- function(expr, is_log = TRUE, log_base = 2) {
 # Validate that an expression matrix is suitable for TME deconvolution.
 # Checks: numeric, non-negative, rownames present.
 # Warns when most rownames look like Ensembl IDs rather than gene symbols.
-validate_tme_input <- function(expr) {
+validate_tme_input <- function(expr, check_symbols = TRUE) {
   if (is.null(expr)) stop("Expression matrix is NULL.")
   if (!is.matrix(expr) && !is.data.frame(expr)) {
     stop("Expression matrix must be a matrix or data.frame.")
@@ -64,10 +64,11 @@ validate_tme_input <- function(expr) {
     stop("Expression matrix must contain numeric values only.")
   }
   if (anyNA(expr)) stop("Expression matrix contains missing values.")
+  if (any(!is.finite(as.matrix(expr)))) stop("Expression matrix must contain finite values.")
   if (any(expr < 0, na.rm = TRUE)) stop("Expression matrix contains negative values.")
 
   ensembl_fraction <- mean(grepl("^(ENS|ENSMUS|ENSMUST|ENSG)", rnames, ignore.case = TRUE))
-  if (ensembl_fraction > 0.5) {
+  if (isTRUE(check_symbols) && ensembl_fraction > 0.5) {
     warning("Rownames look like Ensembl IDs. TME deconvolution methods expect gene symbols (e.g. HGNC or MGI symbols).")
   }
 
@@ -99,6 +100,121 @@ deduplicate_expression_by_symbol <- function(expr, symbol_col = NULL) {
   expr <- expr[keep, , drop = FALSE]
   rownames(expr) <- symbols[keep]
   expr
+}
+
+# Calculate TPM over the full counted feature universe, before ID mapping or
+# DEG/biotype filtering. Feature IDs must uniquely identify the matching length.
+build_tme_tpm <- function(raw_annot, gene_column, count_columns,
+                          sample_names = count_columns, length_column = NULL,
+                          start_column = "gene_start", end_column = "gene_end",
+                          length_unit = "bp") {
+  ids <- as.character(raw_annot[[gene_column]])
+  if (length(ids) != nrow(raw_annot) || anyNA(ids) || any(!nzchar(ids)) || anyDuplicated(ids)) {
+    stop("TME requires non-empty, unique feature IDs; use a stable gene ID column before symbol mapping.")
+  }
+  if (length(count_columns) != length(sample_names)) stop("Count columns and sample names must have equal lengths.")
+  counts <- as.matrix(raw_annot[, count_columns, drop = FALSE])
+  mode(counts) <- "numeric"
+  rownames(counts) <- ids
+  colnames(counts) <- sample_names
+  validate_count_matrix(counts)
+  lengths <- extract_gene_lengths(raw_annot, id_col = gene_column,
+                                   length_col = length_column, start_col = start_column,
+                                   end_col = end_column, length_unit = length_unit)
+  counts_to_tpm(counts, lengths)
+}
+
+# Preserve the native-species matrix separately from human-reference inputs.
+# Default ortholog mapping uses local babelgene data in every production entry
+# point. An explicitly supplied legacy biomaRt cache retains its existing path.
+prepare_tme_inputs <- function(expr, species = c("human", "mouse"), is_log = FALSE,
+                                need_human = TRUE, ortholog_cache = NULL, outdir = NULL,
+                                native_symbols = NULL) {
+  species <- match.arg(species)
+  expr <- as.data.frame(undo_log_expr(expr, is_log = is_log), check.names = FALSE)
+  validate_tme_input(expr, check_symbols = FALSE)
+  ids <- rownames(expr)
+  wrong_species <- if (species == "mouse") grepl("^ENSG[0-9]+", ids) else grepl("^ENSMUSG[0-9]+", ids)
+  if (any(wrong_species)) stop("Ensembl IDs do not match SPECIES.")
+  symbols <- if (is.null(native_symbols)) ids else unname(native_symbols[ids])
+  source <- rep(if (is.null(native_symbols)) "input_symbol" else "input_annotation", length(ids))
+  # Unannotated gene_name fields may themselves contain Ensembl placeholders.
+  annotation_ids <- ifelse(grepl("^ENS(MUS)?G[0-9]+", symbols), symbols, ids)
+  needs_annotation <- (is.na(symbols) | !nzchar(symbols) | grepl("^ENS(MUS)?G[0-9]+", symbols)) &
+    grepl("^ENS(MUS)?G[0-9]+", annotation_ids)
+  if (any(needs_annotation)) {
+    converted <- convert_gene_ids(annotation_ids[needs_annotation], from = "ensembl", to = "symbol", species = species)
+    symbols[needs_annotation] <- converted$converted
+    source[needs_annotation] <- paste(.get_org_db_name(species), utils::packageVersion(.get_org_db_name(species)))
+  }
+  mapping <- data.frame(input_id = ids, native_symbol = symbols,
+                         human_symbol = NA_character_, source = source, stringsAsFactors = FALSE)
+  keep <- !is.na(symbols) & nzchar(symbols)
+  if (!any(keep)) stop("No native gene symbols mapped from the input IDs.")
+  if (any(!keep)) warning("Unmapped native identifiers dropped: ", sum(!keep), call. = FALSE)
+  ordered <- order(rowMeans(expr), decreasing = TRUE)
+  ordered <- ordered[keep[ordered]]
+  retained <- ordered[!duplicated(symbols[ordered])]
+  mapping$native_retained <- seq_along(ids) %in% retained
+  native <- deduplicate_expression_by_symbol(cbind(expr[keep, , drop = FALSE],
+                                                   .symbol = symbols[keep]), symbol_col = ".symbol")
+  human <- NULL
+  if (isTRUE(need_human)) {
+    if (species == "human") {
+      human <- native
+      mapping$human_symbol <- symbols
+    } else if (!is.null(ortholog_cache)) {
+      human <- convert_mouse_symbols_to_human(native, ortholog_cache = ortholog_cache)
+      cached <- readRDS(ortholog_cache)$mapping
+      mapping$human_symbol <- vapply(toupper(symbols), function(symbol) {
+        hits <- unique(cached$hgnc_symbol[!is.na(cached$mgi_symbol) & cached$mgi_symbol == symbol])
+        hits <- hits[!is.na(hits) & nzchar(hits)]
+        if (length(hits)) paste(hits, collapse = ";") else NA_character_
+      }, character(1))
+      mapping$source <- paste(mapping$source, "biomaRt_cache", normalizePath(ortholog_cache), sep = "; ")
+    } else {
+      orthologs <- convert_gene_ids(rownames(native), from = "symbol", to = "human_symbol", species = "mouse")
+      mapped <- orthologs$converted
+      names(mapped) <- toupper(orthologs$id)
+      mapping$human_symbol <- unname(mapped[toupper(symbols)])
+      mapping$source <- paste(mapping$source, paste0("babelgene ", utils::packageVersion("babelgene")), sep = "; ")
+      usable <- !is.na(mapped) & nzchar(mapped)
+      if (!any(usable)) stop("No mouse-to-human orthologs mapped for the requested human-reference methods.")
+      if (any(!usable)) warning("Unmapped orthologs dropped from human-reference input: ", sum(!usable), call. = FALSE)
+      human <- deduplicate_expression_by_symbol(cbind(native[usable, , drop = FALSE],
+                                                      .symbol = unname(mapped[usable])), symbol_col = ".symbol")
+    }
+  }
+  coverage <- data.frame(stage = c("input_features", "native_symbols", "human_symbols"),
+                          genes = c(nrow(expr), nrow(native), if (is.null(human)) 0L else nrow(human)),
+                          species = c(species, species, "human"), stringsAsFactors = FALSE)
+  if (!is.null(outdir)) {
+    dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+    utils::write.csv(mapping, file.path(outdir, "TME_gene_mapping.csv"), row.names = FALSE)
+    utils::write.csv(coverage, file.path(outdir, "TME_input_coverage.csv"), row.names = FALSE)
+    utils::write.csv(native, file.path(outdir, "TPM_native_symbols.csv"))
+    if (!is.null(human)) utils::write.csv(human, file.path(outdir, "TPM_human_symbols.csv"))
+  }
+  list(native = native, human = human, mapping = mapping, coverage = coverage)
+}
+
+# Human immune signatures produce enrichment scores, not cell fractions.
+run_tme_ssgsea <- function(expr, gene_sets = immune_gene_sets, outdir = NULL) {
+  validate_tme_input(expr)
+  lookup <- stats::setNames(rownames(expr), toupper(rownames(expr)))
+  sets <- lapply(gene_sets, function(x) unique(unname(lookup[intersect(toupper(x), names(lookup))])))
+  coverage <- data.frame(signature = names(sets), input_genes = lengths(gene_sets),
+                          matched_genes = lengths(sets), used = lengths(sets) >= 2,
+                          species = "human", algorithm = "ssGSEA", row.names = NULL)
+  sets <- sets[lengths(sets) >= 2]
+  scores <- if (length(sets)) GSVA::gsva(
+    GSVA::ssgseaParam(as.matrix(expr), sets, minSize = 2, maxSize = Inf, normalize = TRUE),
+    verbose = FALSE) else NULL
+  if (!is.null(outdir)) {
+    utils::write.csv(coverage, file.path(outdir, "ssGSEA_signature_coverage.csv"), row.names = FALSE)
+    if (!is.null(scores)) utils::write.csv(scores, file.path(outdir, "ssGSEA_immune_scores.csv"))
+  }
+  list(scores = scores, gene_sets = sets, coverage = coverage)
 }
 
 # Query mouse->human orthologs for the given (already upper-case) MGI symbols,
@@ -356,6 +472,13 @@ run_iobr_deconvolution <- function(expr, methods = c("cibersort", "epic", "xcell
       id_col <- intersect(c("ID", "Sample", "Samples", "sample"), colnames(res))[1]
       if (is.na(id_col)) id_col <- colnames(res)[1]
       colnames(res)[colnames(res) == id_col] <- id_column
+      # Record the actual reference used by modern IOBR, not an assumption
+      # based on a filename. If it cannot be retrieved, comparison is disabled.
+      if (method == "cibersort" && exists("load_data", asNamespace("IOBR"), inherits = FALSE)) {
+        attr(res, "cibersort_signature") <- tryCatch(
+          as.matrix(get("load_data", asNamespace("IOBR"))("lm22")),
+          error = function(e) NULL)
+      }
       results[[method]] <- res
     }
   }
@@ -792,8 +915,8 @@ read_cibersort_signature <- function(signature_file) {
 
 # Run the bundled native CIBERSORT implementation on a prepared expression
 # matrix. The expression matrix should have gene symbols as rownames and
-# non-log normalized values (TPM/FPKM-like). Use prepare_tme_expression() first
-# if the input is log-scaled and/or mouse data that needs ortholog conversion.
+# non-log normalized values (TPM/FPKM-like). Native mouse references require
+# MGI symbols; do not convert that branch to human orthologs.
 run_native_cibersort <- function(expr,
                                   signature_file = .default_cibersort_signature("human"),
                                   cibersort_script = .default_cibersort_script(),
@@ -810,8 +933,8 @@ run_native_cibersort <- function(expr,
   expr <- as.data.frame(expr, check.names = FALSE)
   validate_tme_input(expr)
 
-  # Native CIBERSORT expects non-log data. It performs its own anti-log when
-  # max(expr) < 50, but being explicit here avoids surprises.
+  # is_log denotes log2(TPM+1). Invert exactly once, then disable the native
+  # engine's legacy max<50 heuristic with its explicit linear contract.
   expr <- undo_log_expr(expr, is_log = is_log, log_base = 2)
   expr <- as.data.frame(expr, check.names = FALSE)
   validate_tme_input(expr)
@@ -833,6 +956,11 @@ run_native_cibersort <- function(expr,
   }
 
   sig <- read_cibersort_signature(signature_file)
+  common_genes <- intersect(rownames(expr), rownames(sig))
+  if (length(common_genes) <= ncol(sig)) {
+    stop("Insufficient native CIBERSORT reference overlap: ", length(common_genes),
+         " genes for ", ncol(sig), " cell types. Check species, gene symbols and reference.")
+  }
   if (verbose) {
     message("Signature matrix: ", nrow(sig), " genes x ", ncol(sig), " cell types")
   }
@@ -846,8 +974,11 @@ run_native_cibersort <- function(expr,
   }
   cibersort_fn <- get("cibersort", envir = cibersort_env)
 
+  if (!"mixture_scale" %in% names(formals(cibersort_fn))) {
+    stop("This CIBERSORT script lacks the explicit mixture_scale contract. Use the updated bundled script.")
+  }
   res_mat <- cibersort_fn(sig_matrix = sig, mixture_file = as.matrix(expr),
-                          perm = perm, QN = QN)
+                          perm = perm, QN = QN, mixture_scale = "linear")
 
   # Convert to tidy data.frame
   res_df <- as.data.frame(res_mat, stringsAsFactors = FALSE)
@@ -859,11 +990,33 @@ run_native_cibersort <- function(expr,
   for (col in numeric_cols) {
     res_df[[col]] <- as.numeric(res_df[[col]])
   }
+  attr(res_df, "reference_coverage") <- data.frame(
+    reference = if (is.character(signature_file)) normalizePath(signature_file) else "supplied_matrix",
+    input_genes = nrow(expr), reference_genes = nrow(sig), matched_genes = length(common_genes),
+    reference_fraction = length(common_genes) / nrow(sig), cell_types = ncol(sig),
+    input_scale = "linear", stringsAsFactors = FALSE)
 
   if (verbose) {
     message("Native CIBERSORT completed for ", nrow(res_df), " samples.")
   }
   res_df
+}
+
+# Automatic comparison is an implementation check only: identical human
+# references, scale handling and quantile-normalization settings must agree.
+# IOBR CIBERSORT retains a max(input)<50 anti-log heuristic.
+cibersort_comparison_compatible <- function(species, native_signature, iobr_signature,
+                                             native_qn = FALSE, iobr_arrays = FALSE,
+                                             input_max = NULL) {
+  if (!identical(species, "human") || is.null(iobr_signature) ||
+      length(input_max) != 1L || !is.finite(input_max) || input_max < 50 ||
+      !identical(isTRUE(native_qn), isTRUE(iobr_arrays))) return(FALSE)
+  native <- read_cibersort_signature(native_signature)
+  iobr <- as.matrix(iobr_signature)
+  if (!setequal(rownames(native), rownames(iobr)) ||
+      !setequal(colnames(native), colnames(iobr))) return(FALSE)
+  isTRUE(all.equal(native[rownames(iobr), colnames(iobr), drop = FALSE], iobr,
+                   tolerance = 0, check.attributes = FALSE))
 }
 
 # Align native and IOBR CIBERSORT result tables and compute per-cell-type

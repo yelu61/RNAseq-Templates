@@ -127,6 +127,10 @@ if (isTRUE(DO_HUB)) {
   if (is.null(datExpr) || is.null(MEs) || is.null(moduleColors)) {
     message("  Skipped: datExpr/MEs/moduleColors not found in the saved results.")
   } else {
+    # Older result bundles saved numeric names despite color-based hub lookup.
+    if (all(grepl("^ME[0-9]+$", colnames(MEs)))) {
+      colnames(MEs) <- paste0("ME", labels2colors(as.integer(sub("^ME", "", colnames(MEs)))))
+    }
     mods <- unique(moduleColors[moduleColors != "grey"])
     if (!is.null(HUB_MODULES)) mods <- intersect(mods, HUB_MODULES)
     if (length(mods) == 0) {
@@ -137,9 +141,8 @@ if (isTRUE(DO_HUB)) {
       gene_module <- data.frame(gene = colnames(datExpr), module = moduleColors)
       for (mod in mods) {
         mod_genes <- gene_module$gene[gene_module$module == mod]
-        ME <- MEs[[paste0("ME", mod)]]
-        if (is.null(ME)) next
-        kME <- cor(datExpr[, mod_genes, drop = FALSE], ME, use = "p")
+        ME <- MEs[, paste0("ME", mod), drop = FALSE]
+        kME <- stats::cor(datExpr[, mod_genes, drop = FALSE], ME, use = "pairwise.complete.obs")
         hub <- data.frame(gene = mod_genes, module = mod, kME = as.numeric(kME)) %>%
           dplyr::arrange(dplyr::desc(abs(kME)))
         if (!is.null(HUB_TOP_N)) hub <- utils::head(hub, HUB_TOP_N)

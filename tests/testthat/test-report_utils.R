@@ -281,3 +281,35 @@ test_that("report honors the declared primary threshold for detailed DEG tables"
   expect_false(grepl("StandardGene", html, fixed = TRUE))
   unlink(outdir, recursive = TRUE)
 })
+
+test_that("GSEA report excludes unidentified/nonfinite terms and labels nonsignificant ranks", {
+  root <- tempfile()
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE))
+  df <- data.frame(ID = c("positive", "negative", "partial", NA, "bad_probability"),
+    Description = c("ranked positive", NA, "partial", "lost ID", "bad"),
+    NES = c(2, -1, Inf, 3, 2), pvalue = c(0.001, 0.01, 0.01, 0.001, 0.01),
+    p.adjust = c(0.2, 0.3, 0.01, 0.01, 2))
+  # A large legacy table containing entirely blank rows must not inflate counts.
+  df <- rbind(df, df[rep(NA_integer_, 10000), ])
+  write.csv(df, file.path(root, "GSEA_GO_case.csv"), row.names = FALSE)
+  result <- gsea_report_tables(root, "case")
+  expect_equal(result$summary$table_rows, 10005)
+  expect_equal(result$summary$valid_terms, 2)
+  expect_equal(result$summary$significant_terms, 0)
+  expect_setequal(result$terms$ID, c("positive", "negative"))
+  expect_true(all(result$terms$Significance == "not significant"))
+  expect_equal(result$terms$Term[result$terms$ID == "negative"], "negative")
+})
+
+test_that("all-NA GSEA tables remain visible as unusable in report summaries", {
+  root <- tempfile()
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE))
+  write.csv(data.frame(ID = NA, NES = NA, pvalue = NA, p.adjust = NA),
+            file.path(root, "GSEA_GO_case.csv"), row.names = FALSE)
+  result <- gsea_report_tables(root, "case")
+  expect_equal(result$summary$unusable_rows, 1)
+  expect_equal(result$summary$significant_terms, 0)
+  expect_null(result$terms)
+})

@@ -11,8 +11,25 @@ a `config.R` + `run_analysis.R` + `visualize_results.R` runner under
 helper modules have unit tests. `tools/notebook_to_runner.R` converts a
 notebook's parameter cell into a `config.R` + runner draft.
 
-**Current release: v0.11.0** (see [CHANGELOG.md](CHANGELOG.md)). The `v0.11.x`
+**Current version: v0.11.1** (see [CHANGELOG.md](CHANGELOG.md)). The `v0.11.x`
 line is feature-frozen and in maintenance mode.
+
+The [freeze audit](references/FREEZE_AUDIT.md) records the original defects,
+maintenance corrections and post-fix validation. No new analysis modules were
+added. Project-level scientific acceptance and environment restoration remain
+separate from backend acceptance.
+
+- [x] Correct WGCNA module/eigengene mapping, hub uniqueness and missing-trait sample counts.
+- [x] Route human/mouse native CIBERSORT against matching original-species references.
+- [x] Use actual ssGSEA and gate native/IOBR comparisons on matching reference and preprocessing.
+- [x] Record auxiliary/reference checksums and runtime signatures; unknown/old manifests cannot prove duplicates.
+- [x] Reject reused run directories before output writes across all six runners.
+- [x] Apply limma `MIN_SAMPLE_FRAC` with documented edgeR-only compatibility mode.
+- [x] Preserve GSEA test identities and quality, filter on actual overlap and separate FDR significance from ranking.
+- [ ] For each real project, verify its restorable environment and the optional/network paths it actually needs.
+
+Historical affected outputs must be recomputed or explicitly superseded; never
+rewrite old run bundles or infer scientific approval from a passing test suite.
 
 ## Completed
 

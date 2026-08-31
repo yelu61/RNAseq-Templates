@@ -53,10 +53,14 @@ expected_files <- file.path(outdir_abs, c(
   "0-Config/analysis_config_used.R",
   "1-DEG/DEG_threshold_summary.csv",
   "1-DEG/DEG_results.Rdata",
+  "2-GSEA/GSEA_GO_Treatment_vs_Control.csv",
+  "2-GSEA/GSEA_GO_Treatment_vs_Control_quality.csv",
   "3-Visualization/PCA_plot.pdf",
   "Analysis_summary.txt",
   "sessionInfo.txt",
-  "run_manifest.csv"
+  "run_manifest.csv",
+  "run_inputs.csv",
+  "run_runtime.csv"
 ))
 missing_files <- expected_files[!file.exists(expected_files)]
 if (length(missing_files) > 0) {
@@ -68,9 +72,21 @@ stopifnot(
   nrow(manifest) == 1,
   manifest$status[[1]] == "completed",
   manifest$role[[1]] == "repro_check",
+  manifest$manifest_schema_version[[1]] == 2L,
+  !manifest$inputs_complete[[1]], # online KEGG references are not snapshotted
   grepl("^[0-9a-f]{32}$", manifest$input_md5[[1]]),
   grepl("^[0-9a-f]{32}$", manifest$analysis_signature[[1]]),
   grepl("^[0-9a-f]{32}$", manifest$backend_signature[[1]])
+)
+
+gsea <- read.csv(file.path(outdir_abs, "2-GSEA/GSEA_GO_Treatment_vs_Control.csv"))
+quality <- read.csv(file.path(outdir_abs, "2-GSEA/GSEA_GO_Treatment_vs_Control_quality.csv"))
+stopifnot(
+  nrow(gsea) > 0L, !anyNA(gsea$ID), !anyDuplicated(gsea$ID),
+  quality$table_rows == nrow(gsea),
+  quality$significant_terms == sum(gsea$significant),
+  all(gsea$input_overlap >= 10 & gsea$input_overlap <= 500),
+  all(gsea$p.adjust[gsea$significant] <= quality$fdr_cutoff)
 )
 
 cat("\n========================================\n")

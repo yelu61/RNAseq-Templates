@@ -1,0 +1,46 @@
+Read-only QC of saved General GSEA tables
+Run: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_General/RNAseq_General_Output 
+
+File: GSEA_GO_Treatment_vs_Control.csv 
+ rows all_fields_NA ID_NA NES_NA finite_NES_pvalue_padj
+ 2337          2028  2028   2028                    309
+ identifiable_finite_rows identifiable_finite_BH_lt_0_05 min_finite_padj
+                      309                              0       0.1117972
+Naive base-R p.adjust<0.05 subsetting yields 2028 rows because NA logical indices create NA rows.
+
+Versions in the inspecting local environment
+R: R version 4.6.1 (2026-06-24) 
+clusterProfiler 4.20.0 
+enrichit 0.2.0 
+DOSE 4.6.0 
+
+Local dependency-source inspection
+Excerpt of installed enrichit::gsea_gson:
+  1 function (geneList, gson, weight = NULL, nPerm = 1000, exponent = 1, 
+  2     minGSSize = 10, maxGSSize = 500, pvalueCutoff = 0.05, pAdjustMethod = "BH", 
+  3     method = "multilevel", adaptive = FALSE, minPerm = 101, maxPerm = 1e+05, 
+  4     pvalThreshold = 0.1, verbose = TRUE, ...) 
+ 40     }
+ 41     gsea_res$p.adjust <- p.adjust(gsea_res$pvalue, method = pAdjustMethod)
+ 42     gsea_res$qvalue <- calculate_qvalue(gsea_res$pvalue)
+ 43     if (!is.null(pvalueCutoff)) {
+ 44         gsea_res <- gsea_res[gsea_res$pvalue <= pvalueCutoff, 
+ 45             ]
+ 46     }
+ 64     other_cols <- setdiff(names(gsea_res), expected_cols)
+ 65     gsea_res <- gsea_res[, c(expected_cols, other_cols)]
+ 66     ids <- as.character(gsea_res$ID)
+ 67     if (any(is.na(ids))) {
+ 78     rownames(gsea_res) <- ids
+ 79     params <- list(pvalueCutoff = pvalueCutoff, nPerm = nPerm, 
+ 80         pAdjustMethod = pAdjustMethod, exponent = exponent, minGSSize = minGSSize, 
+ 81         maxGSSize = maxGSSize)
+Observed local implementation subsets using gsea_res$pvalue <= pvalueCutoff without an NA guard.
+This base-R subset turns untestable rows into all-NA rows and filters nominal P, not adjusted P.
+
+Interpretation limits
+These CSVs are nominal-P-filtered exports, not the full tested-pathway inventory.
+Do not use exported nrow as the number of significant or testable pathways.
+All-NA rows are not nonsignificant pathways; their identifiers are lost in the export.
+The finite top-ranked rows still require an explicit prespecified FDR threshold.
+No input, result, dependency or repository file was modified by this QC script.

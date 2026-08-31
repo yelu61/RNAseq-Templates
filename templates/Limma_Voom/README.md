@@ -49,12 +49,31 @@ run_manifest.csv                    inputs/config/code signatures + lifecycle
 
 ## When to use limma-voom vs the General (DESeq2) template
 
-Both answer "which genes differ between groups". Prefer **limma-voom** for
-larger sample sizes, when you want limma's empirical-Bayes moderation and
-flexible contrast/design matrices, or to stay consistent with a microarray-era
-workflow. Prefer **General (DESeq2)** for small-n studies where count-based
-dispersion shrinkage is more conservative, and when you want the multi-threshold
-DEG grid, GSVA, TME and TF options that the General runner ships with.
+Both answer "which genes differ between groups" from raw counts. Choose the
+method in the analysis plan, based on the study design and required workflow;
+sample count alone does not determine which method to use. This runner exposes
+group contrasts and an optional batch covariate, not every model supported by
+the underlying limma package. General additionally provides the multi-threshold
+DEG grid, GSVA, optional TME/TF and the standard HTML-report workflow.
+
+Genes must pass both edgeR's group-aware `filterByExpr(min.count = MIN_COUNT)`
+and the explicit raw-count rule: counts ≥ `MIN_COUNT` in at least
+`ceiling(MIN_SAMPLE_FRAC * total_samples)` samples. `MIN_SAMPLE_FRAC` is in
+`[0, 1]`; setting it to `0` keeps edgeR filtering alone. It is not edgeR's
+`min.prop`, which has a different role in large-group filtering; see the
+[edgeR reference manual](https://bioconductor.org/packages/release/bioc/manuals/edgeR/man/edgeR.pdf).
+
+**This fixes a previously ignored parameter and can change results.** The
+default `0.5` now enforces the configured total-sample fraction. In an
+unbalanced design, that can remove genes expressed only in a small group;
+set `0` when the study calls for edgeR's group-aware filtering alone, or to
+reproduce the previous filtering behavior. Record the choice before analysis
+and re-run downstream fitting and enrichment when filtering changes.
+
+The runner rejects existing native output artifacts before writing a new
+configuration snapshot. Completed runs also contain `run_inputs.csv` and
+`run_runtime.csv`; unknown references make a run ineligible for duplicate
+grouping. These files record provenance, not a restorable environment.
 
 ## Notes
 

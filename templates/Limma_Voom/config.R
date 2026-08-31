@@ -45,8 +45,10 @@ COMPARISONS    <- list(
 # ---- 1.5 Thresholds -----------------------------------------------------------
 DEG_PADJ_CUTOFF  <- 0.05
 DEG_LFC_CUTOFF   <- 0.5
-MIN_COUNT        <- 10             # keep genes with >= this many counts ...
-MIN_SAMPLE_FRAC  <- 0.5            # ... in at least this fraction of samples
+MIN_COUNT        <- 10             # edgeR min.count AND the raw-count threshold below
+MIN_SAMPLE_FRAC  <- 0.5            # raw counts >= MIN_COUNT in ceiling(frac * total samples)
+# Both filters must pass. Set MIN_SAMPLE_FRAC <- 0 for edgeR group-aware filtering
+# alone, especially when a small group may contain group-specific expression.
 
 # ---- 1.6 Output root -----------------------------------------------------------
 # "." = write the numbered run layout (1-DEG/ 2-GSEA/ 3-Visualization/) at the

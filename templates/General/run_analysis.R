@@ -89,6 +89,9 @@ if (is.na(lib_dir) || !dir.exists(lib_dir)) {
 }
 cat("RNAseq_lib  :", normalizePath(lib_dir), "\n\n")
 
+source(file.path(lib_dir, "run_utils.R"))
+assert_fresh_run_dir(invocation_dir)
+
 # ---- Load libraries -----------------------------------------------------------
 suppressPackageStartupMessages({
   library(DESeq2)
@@ -137,7 +140,7 @@ if (isTRUE(RUN_TME)) {
 
 for (f in c("plot_utils.R", "io_utils.R", "data_utils.R", "deg_utils.R",
             "enrichment_utils.R", "pathway_utils.R", "batch_utils.R", "design_utils.R",
-            "report_utils.R", "run_utils.R")) {
+            "report_utils.R")) {
   source(file.path(lib_dir, f))
 }
 # TME helpers are sourced later, only when RUN_TME is TRUE.
@@ -161,7 +164,7 @@ config_objects <- c(
   "custom_gene_sets", "KEY_GENES",
   "PAIRWISE_TEST_METHOD", "PAIRWISE_P_ADJUST_METHOD", "RUN_TF_ANALYSIS", "RUN_COMPARECLUSTER",
   "COMPARECLUSTER_ONTOLOGY", "EXPORT_EXCEL", "GENERATE_HTML_REPORT", "REPORT_TITLE", "SCAFFOLD_REPORT_INTERPRETATION",
-  "RUN_TME", "TME_GENE_LENGTH_COLUMN", "TME_GENE_LENGTH_UNIT", "TME_GENE_START_COL",
+  "RUN_TME", "TME_GENE_ID_COLUMN", "TME_GENE_LENGTH_COLUMN", "TME_GENE_LENGTH_UNIT", "TME_GENE_START_COL",
   "TME_GENE_END_COL", "RUN_TME_ESTIMATE", "RUN_TME_IOBR", "TME_IOBR_METHODS",
   "TME_IOBR_PERM", "RUN_TME_SSGSEA", "TME_ORTHOLOG_CACHE",
   "RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION"
@@ -446,13 +449,13 @@ for (comp_name in names(ranked_lists)) {
   entrezList <- make_entrez_ranked_list(ranked_lists[[comp_name]], org_db)
   if (length(entrezList) > 10) {
     ggo <- run_go_gsea(entrezList, org_db = org_db, ont = "ALL", min_size = 10, max_size = 500, p_cutoff = 0.05)
-    if (!is.null(ggo) && nrow(as.data.frame(ggo)) > 0) {
-      write.csv(as.data.frame(ggo), paste0("./2-GSEA/GSEA_GO_", comp_name, ".csv"), row.names = FALSE)
+    if (!is.null(ggo)) {
+      write_gsea_tables(ggo, paste0("./2-GSEA/GSEA_GO_", comp_name, ".csv"))
       plot_gsea_suite_pdf(ggo, file.path(gsea_overview_outdir, paste0("GSEA_GO_", comp_name)), paste("GSEA GO -", comp_name))
     }
     gkegg <- run_kegg_gsea(entrezList, organism = org_code, min_size = 10, max_size = 500, p_cutoff = 0.05)
-    if (!is.null(gkegg) && nrow(as.data.frame(gkegg)) > 0) {
-      write.csv(as.data.frame(gkegg), paste0("./2-GSEA/GSEA_KEGG_", comp_name, ".csv"), row.names = FALSE)
+    if (!is.null(gkegg)) {
+      write_gsea_tables(gkegg, paste0("./2-GSEA/GSEA_KEGG_", comp_name, ".csv"))
       plot_gsea_suite_pdf(gkegg, file.path(gsea_overview_outdir, paste0("GSEA_KEGG_", comp_name)), paste("GSEA KEGG -", comp_name))
     }
     gsea_results[[comp_name]] <- list(go = ggo, kegg = gkegg)
@@ -506,13 +509,13 @@ dir.create(single_term_outdir, showWarnings = FALSE, recursive = TRUE)
 for (comp_name in names(gsea_results)) {
   ggo <- gsea_results[[comp_name]]$go
   gkegg <- gsea_results[[comp_name]]$kegg
-  if (!is.null(ggo) && nrow(as.data.frame(ggo)) > 0) {
+  if (!is.null(ggo)) {
     ggo_df <- as.data.frame(ggo); ggo_df <- ggo_df[order(ggo_df$p.adjust, -abs(ggo_df$NES)), ]
     top_terms <- rbind(utils::head(ggo_df[ggo_df$NES > 0, ], 3), utils::head(ggo_df[ggo_df$NES < 0, ], 3))
     plot_gsea_term_figures_from_df(ggo, top_terms, outdir = file.path(single_term_outdir, paste0("GO_", comp_name)),
                                    contrast_label = comp_name, prefix = "gseaplot2_GO")
   }
-  if (!is.null(gkegg) && nrow(as.data.frame(gkegg)) > 0) {
+  if (!is.null(gkegg)) {
     gkegg_df <- as.data.frame(gkegg); gkegg_df <- gkegg_df[order(gkegg_df$p.adjust, -abs(gkegg_df$NES)), ]
     top_terms <- rbind(utils::head(gkegg_df[gkegg_df$NES > 0, ], 3), utils::head(gkegg_df[gkegg_df$NES < 0, ], 3))
     plot_gsea_term_figures_from_df(gkegg, top_terms, outdir = file.path(single_term_outdir, paste0("KEGG_", comp_name)),
@@ -690,26 +693,29 @@ if (isTRUE(RUN_TME)) {
   tme_outdir <- "4-TME"
   dir.create(tme_outdir, showWarnings = FALSE, recursive = TRUE)
 
-  # Build TPM from raw counts + gene lengths. VST cannot be inverted to TPM.
-  gene_lengths_kb <- extract_gene_lengths(
-    rawcount,
-    id_col = GENE_NAME_COL,
-    length_col = TME_GENE_LENGTH_COLUMN,
-    start_col = TME_GENE_START_COL,
-    end_col = TME_GENE_END_COL,
+  # Re-read the full input: DEG/biotype filtering must not alter TPM's denominator.
+  tme_raw <- read_count_table(INPUT_FILE, INPUT_FORMAT)
+  tme_id_col <- if (exists("TME_GENE_ID_COLUMN") && !is.null(TME_GENE_ID_COLUMN)) {
+    TME_GENE_ID_COLUMN
+  } else {
+    intersect(c("gene_id", "Geneid", GENE_NAME_COL), names(tme_raw))[1]
+  }
+  tme_count_cols <- detect_count_columns(tme_raw, GENE_NAME_COL, COUNT_COLS)
+  tme_count_cols <- tme_count_cols[match(colnames(countData), SAMPLE_NAMES)]
+  expr_tpm <- build_tme_tpm(
+    tme_raw, gene_column = tme_id_col, count_columns = tme_count_cols,
+    sample_names = colnames(countData), length_column = TME_GENE_LENGTH_COLUMN,
+    start_column = TME_GENE_START_COL, end_column = TME_GENE_END_COL,
     length_unit = TME_GENE_LENGTH_UNIT
   )
-  expr_tpm <- counts_to_tpm(countData, gene_lengths_kb)
-  expr_tpm <- expr_tpm[, colnames(countData), drop = FALSE]
-  write.csv(data.frame(gene_name = rownames(expr_tpm), expr_tpm, check.names = FALSE),
+  write.csv(data.frame(gene_id = rownames(expr_tpm), expr_tpm, check.names = FALSE),
             file.path(tme_outdir, "TPM_matrix.csv"), row.names = FALSE)
 
-  # Prepare (dedup; mouse->human ortholog conversion when SPECIES == "mouse").
-  # ortholog_cache makes repeat runs offline-deterministic (NULL = always online).
-  expr_tme <- prepare_tme_expression(as.data.frame(expr_tpm, check.names = FALSE),
-                                     is_log = FALSE, species = SPECIES,
-                                     ortholog_cache = TME_ORTHOLOG_CACHE, verbose = TRUE)
-  validate_tme_input(expr_tme)
+  tme_inputs <- prepare_tme_inputs(expr_tpm, species = SPECIES,
+    need_human = RUN_TME_ESTIMATE || RUN_TME_IOBR || RUN_TME_SSGSEA,
+    ortholog_cache = TME_ORTHOLOG_CACHE, outdir = tme_outdir,
+    native_symbols = setNames(as.character(tme_raw[[GENE_NAME_COL]]), as.character(tme_raw[[tme_id_col]])))
+  expr_tme <- tme_inputs$human
 
   tme_meta <- data.frame(sample = colnames(countData),
                          condition = as.character(colData[colnames(countData), "condition"]),
@@ -790,16 +796,10 @@ if (isTRUE(RUN_TME)) {
 
   # ---- ssGSEA immune signatures ----
   if (isTRUE(RUN_TME_SSGSEA)) {
-    expr_for_ssgsea <- as.data.frame(expr_tme, check.names = FALSE)
-    row_upper <- toupper(rownames(expr_for_ssgsea))
-    upper_to_real <- setNames(rownames(expr_for_ssgsea), row_upper)
-    gs <- lapply(immune_gene_sets, function(x) unique(upper_to_real[intersect(toupper(x), names(upper_to_real))]))
-    gs <- gs[lengths(gs) >= 2]
+    immune_scores <- run_tme_ssgsea(expr_tme, outdir = tme_outdir)
+    gs <- immune_scores$gene_sets
+    ssgsea_scores <- immune_scores$scores
     if (length(gs) > 0) {
-      params <- gsvaParam(as.matrix(expr_for_ssgsea), gs, kcdf = "Gaussian", minSize = 2, maxSize = Inf)
-      ssgsea_scores <- gsva(params, verbose = FALSE)
-      write.csv(ssgsea_scores, file.path(tme_outdir, "ssGSEA_immune_scores.csv"))
-
       score_df <- as.data.frame(t(ssgsea_scores)) %>% rownames_to_column("sample") %>%
         left_join(tme_meta, by = "sample")
       score_long <- score_df %>% pivot_longer(cols = names(gs), names_to = "signature", values_to = "score")
@@ -969,8 +969,19 @@ analysis_config_objects <- setdiff(config_objects, c(lifecycle_fields, presentat
 analysis_config <- stats::setNames(lapply(analysis_config_objects, function(obj) {
   if (exists(obj, inherits = TRUE)) get(obj, inherits = TRUE) else NULL
 }), analysis_config_objects)
+manifest_inputs <- c(annotation_db = AnnotationDbi::dbfile(org_db),
+                     kegg_reference = NA_character_)
+if (isTRUE(RUN_TME)) {
+  if (!is.null(TME_ORTHOLOG_CACHE)) {
+    manifest_inputs <- c(manifest_inputs, ortholog_cache = TME_ORTHOLOG_CACHE)
+  }
+  if (isTRUE(RUN_TME_IOBR)) manifest_inputs <- c(manifest_inputs, iobr_references = NA_character_)
+}
+# KEGG's online reference is not snapshotted by this runner; unknown references
+# deliberately prevent the registry from treating two runs as duplicates.
 write_run_manifest(
   run_dir = ".", config_path = config_path, input_file = INPUT_FILE,
+  input_files = manifest_inputs,
   analysis_config = analysis_config,
   role = RUN_ROLE, parent_run_id = PARENT_RUN_ID,
   retention = RUN_RETENTION, change_note = RUN_CHANGE_NOTE,

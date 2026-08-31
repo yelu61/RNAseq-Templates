@@ -1,0 +1,12 @@
+R version 4.6.1 (2026-06-24) 
+babelgene 22.9 
+Warning message:
+In convert_expression_rownames(expr, species = "mouse", target = "human_symbol") :
+  Unmapped gene identifiers dropped: 90
+Mouse reference rows: 511 
+Input genes before conversion: 511 
+Prepared human-symbol expression rows: 404 
+Native CIBERSORT case-sensitive overlap: 3 
+Overlapping IDs: F9,F10,F7 
+Case-insensitive overlap (diagnostic only): 349 
+REPRODUCED: prepared HGNC input is paired with the MGI reference.

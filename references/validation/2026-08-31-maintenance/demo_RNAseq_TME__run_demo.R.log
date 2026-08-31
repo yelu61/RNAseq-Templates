@@ -1,0 +1,53 @@
+========================================
+RNAseq_TME — run_analysis.R
+Working dir : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME 
+Config file : /private/var/folders/1k/_4d1xmz92p9cv5qjbggt1m8c0000gn/T/RtmpCLuH1x/filedb8e4d1f47b1.R 
+========================================
+
+RNAseq_lib  : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/RNAseq_lib 
+
+Computing TPM from raw integer counts for TME deconvolution.
+TPM matrix saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/4-TME/TPM_matrix.csv 
+Expression: 6000 genes x 6 samples
+
+  Control Treatment 
+        3         3 
+Native TME matrix: 6000 genes x 6 samples
+[1] "Merged dataset includes 322 genes (10090 mismatched)."
+[1] "1 gene set: StromalSignature  overlap= 10"
+[1] "2 gene set: ImmuneSignature  overlap= 14"
+ESTIMATE scores saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/4-TME/ESTIMATE_scores.csv 
+ssGSEA immune scores saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/4-TME/ssGSEA_immune_scores.csv 
+Fontconfig error: No writable cache directories
+========================================
+TME Deconvolution Analysis Summary
+========================================
+
+1. Data Overview
+   - Input mode: raw_counts
+   - Species: human
+   - Samples: 6
+   - Groups: Control, Treatment
+   - Native / human-reference genes: 6000 / 6000
+
+2. Methods Run
+   - ESTIMATE (native): yes
+   - IOBR (none)
+   - Native CIBERSORT: no
+   - ssGSEA signatures scored: 26
+
+3. Output Files
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output/4-TME (TPM matrix, ESTIMATE/IOBR/CIBERSORT tables, ssGSEA, all PDFs, tme_results.Rdata)
+
+========================================
+
+========================================
+RNAseq_TME analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output 
+========================================
+
+========================================
+TME deconvolution demo PASSED (drove templates/TME/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_TME/RNAseq_TME_Deconvolution_Output 
+========================================

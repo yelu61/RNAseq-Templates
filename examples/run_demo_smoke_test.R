@@ -231,8 +231,8 @@ for (comp_name in names(ranked_lists)) {
   entrezList <- make_entrez_ranked_list(ranked_lists[[comp_name]], org_db)
   if (length(entrezList) > 10) {
     ggo <- run_go_gsea(entrezList, org_db = org_db)
-    if (!is.null(ggo) && nrow(as.data.frame(ggo)) > 0) {
-      write.csv(as.data.frame(ggo), paste0("./2-GSEA/GSEA_GO_", comp_name, ".csv"), row.names = FALSE)
+    if (!is.null(ggo)) {
+      write_gsea_tables(ggo, paste0("./2-GSEA/GSEA_GO_", comp_name, ".csv"))
       plot_gsea_suite_pdf(ggo, paste0("./3-Visualization/GSEA_GO_", comp_name), paste("GSEA GO -", comp_name))
     }
   }

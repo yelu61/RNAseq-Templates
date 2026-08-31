@@ -1,0 +1,115 @@
+========================================
+RNAseq_WGCNA — run_analysis.R
+Working dir : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA 
+Config file : /private/var/folders/1k/_4d1xmz92p9cv5qjbggt1m8c0000gn/T/Rtmpa9tV7r/filedb0439ced58c.R 
+========================================
+
+RNAseq_lib  : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/RNAseq_lib 
+
+Allowing multi-threading with up to 2 threads.
+Expression: 5972 genes x 6 samples
+Fontconfig error: No writable cache directories
+WGCNA input: 6 samples x 2986 genes
+   Power SFT.R.sq   slope truncated.R.sq mean.k. median.k. max.k.
+1      1 1.61e-04  1.5400          0.963  1490.0    1490.0 1510.0
+2      2 1.68e-02  5.9700          0.943   896.0     896.0  924.0
+3      3 1.42e-06 -0.0268          0.788   599.0     596.0  638.0
+4      4 6.20e-03 -1.2100          0.720   429.0     426.0  474.0
+5      5 4.01e-02 -2.3600          0.693   323.0     320.0  371.0
+6      6 3.51e-02 -1.8700          0.692   253.0     249.0  302.0
+7      7 4.45e-02 -1.8400          0.717   203.0     200.0  252.0
+8      8 6.04e-02 -1.8900          0.723   167.0     164.0  215.0
+9      9 7.84e-02 -1.9400          0.741   140.0     138.0  187.0
+10    10 8.30e-02 -1.8400          0.760   119.0     117.0  165.0
+11    12 6.96e-02 -1.4400          0.773    89.6      87.7  133.0
+12    14 7.16e-02 -1.2900          0.784    69.9      68.3  111.0
+13    16 7.72e-02 -1.2000          0.788    56.2      54.8   94.3
+14    18 8.92e-02 -1.1900          0.782    46.2      45.0   81.9
+15    20 1.09e-01 -1.2300          0.786    38.7      37.7   72.1
+16    22 1.30e-01 -1.2700          0.788    32.9      32.0   64.3
+17    24 1.59e-01 -1.3300          0.801    28.4      27.5   57.8
+18    26 1.82e-01 -1.3700          0.812    24.7      23.9   52.4
+19    28 2.08e-01 -1.4200          0.823    21.7      21.0   47.9
+20    30 2.28e-01 -1.4500          0.822    19.3      18.5   44.0
+No automatic power estimate; using max scale-free fit power: 30
+Selected soft power: 30 
+moduleColors
+         black           blue          brown           cyan      darkgreen 
+           116            171            139            100             64 
+      darkgrey darkolivegreen     darkorange        darkred  darkturquoise 
+            55             33             52             71             58 
+         green    greenyellow         grey60      lightcyan     lightgreen 
+           126            106             95             96             89 
+   lightyellow        magenta   midnightblue         orange  paleturquoise 
+            87            115             96             55             36 
+          pink         purple            red      royalblue    saddlebrown 
+           116            109            119             80             39 
+        salmon        skyblue      steelblue            tan      turquoise 
+           101             45             38            104            257 
+        violet          white         yellow 
+            36             48            134 
+========================================
+WGCNA Analysis Summary
+========================================
+
+1. Data Overview
+   - Expression file: /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA/vsd_matrix.csv
+   - Trait file: /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA/colData.csv
+   - Samples used: 6
+   - Genes after MAD filter (quantile 0.5): 2986
+   - Trait columns modelled: 1
+
+2. Network
+   - Network type: signed
+   - Soft-threshold power: 30
+   - Min module size: 30 | merge cut height: 0.25
+   - Modules detected (incl. grey): 33
+      - black: 116 genes
+      - blue: 171 genes
+      - brown: 139 genes
+      - cyan: 100 genes
+      - darkgreen: 64 genes
+      - darkgrey: 55 genes
+      - darkolivegreen: 33 genes
+      - darkorange: 52 genes
+      - darkred: 71 genes
+      - darkturquoise: 58 genes
+      - green: 126 genes
+      - greenyellow: 106 genes
+      - grey60: 95 genes
+      - lightcyan: 96 genes
+      - lightgreen: 89 genes
+      - lightyellow: 87 genes
+      - magenta: 115 genes
+      - midnightblue: 96 genes
+      - orange: 55 genes
+      - paleturquoise: 36 genes
+      - pink: 116 genes
+      - purple: 109 genes
+      - red: 119 genes
+      - royalblue: 80 genes
+      - saddlebrown: 39 genes
+      - salmon: 101 genes
+      - skyblue: 45 genes
+      - steelblue: 38 genes
+      - tan: 104 genes
+      - turquoise: 257 genes
+      - violet: 36 genes
+      - white: 48 genes
+      - yellow: 134 genes
+
+3. Output Files
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output/0-Config/analysis_config_used.R
+   - /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output/5-WGCNA (WGCNA_network.rds, gene-module + module-trait tables, hub-gene CSVs, PDFs, results Rdata)
+
+========================================
+
+========================================
+RNAseq_WGCNA analysis COMPLETE.
+Outputs under: /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output/5-WGCNA 
+========================================
+
+========================================
+WGCNA demo PASSED (drove templates/WGCNA/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_WGCNA/RNAseq_WGCNA_Output 
+========================================

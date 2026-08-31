@@ -79,3 +79,13 @@ pages. Also inspect dense edge cases (long terms, many samples, many facets).
 Run the automated tests and notebook validation after any shared style change.
 Automated checks detect syntax, dimensions, and corrupt exports; they do not
 replace visual inspection.
+
+## Enrichment bar labels
+
+The default for ordinary ORA, bidirectional ORA and GSEA NES bars is to write
+the wrapped term at the zero-axis side **inside its bar direction**, without
+duplicating the term on the y axis. Preserve measured bar lengths. A long label
+on a very short bar may extend into that row's whitespace rather than distort
+the statistic or shrink text until unreadable. Positive/negative labels align
+outward from zero; GSEA FDR annotations must remain separate and unobstructed.
+Check both directions, one-sided results, short bars and long/duplicate labels.

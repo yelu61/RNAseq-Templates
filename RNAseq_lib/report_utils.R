@@ -543,3 +543,33 @@ read_csv_safe <- function(path, ...) {
   if (!file.exists(path)) return(NULL)
   tryCatch(utils::read.csv(path, stringsAsFactors = FALSE, ...), error = function(e) NULL)
 }
+
+# Report all saved rows, but rank only identifiable terms with finite statistics.
+# Counts refer to these files; older nominal-P-filtered tables do not establish
+# the complete tested family size.
+gsea_report_tables <- function(gsea_dir, contrast, n = 5) {
+  files <- c(GO = file.path(gsea_dir, paste0("GSEA_GO_", contrast, ".csv")),
+             KEGG = file.path(gsea_dir, paste0("GSEA_KEGG_", contrast, ".csv")))
+  summaries <- terms <- list()
+  for (db in names(files)) {
+    df <- read_csv_safe(files[[db]])
+    if (is.null(df)) next
+    audit <- audit_gsea_table(df)
+    summaries[[db]] <- cbind(Database = db, audit$summary)
+    df <- audit$table[audit$table$result_status != "unusable", , drop = FALSE]
+    pick <- function(x, direction) {
+      if (!nrow(x)) return(NULL)
+      x <- utils::head(x[order(x$p.adjust, -abs(x$NES)), , drop = FALSE], n)
+      label <- x$Description
+      missing <- is.na(label) | !nzchar(trimws(label))
+      label[missing] <- x$ID[missing]
+      data.frame(Database = db, Direction = direction, ID = x$ID, Term = label,
+                 NES = round(x$NES, 2), BH_FDR = signif(x$p.adjust, 3),
+                 Significance = ifelse(x$significant, "significant", "not significant"),
+                 stringsAsFactors = FALSE)
+    }
+    terms[[db]] <- rbind(pick(df[df$NES > 0, , drop = FALSE], "Positive NES"),
+                         pick(df[df$NES < 0, , drop = FALSE], "Negative NES"))
+  }
+  list(summary = do.call(rbind, summaries), terms = do.call(rbind, terms))
+}

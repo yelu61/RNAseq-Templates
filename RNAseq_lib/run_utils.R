@@ -1,7 +1,7 @@
 # Run-bundle provenance and registry helpers for RNAseq-Templates.
 
 .run_md5_file <- function(path) {
-  if (is.null(path) || length(path) != 1 || is.na(path) || !file.exists(path)) {
+  if (is.null(path) || length(path) != 1 || is.na(path) || !file.exists(path) || dir.exists(path)) {
     return(NA_character_)
   }
   unname(tools::md5sum(normalizePath(path, mustWork = TRUE))[[1]])
@@ -53,11 +53,85 @@
 }
 
 .run_backend_signature <- function(files = character(0), revision = NA_character_) {
-  files <- unique(normalizePath(files[file.exists(files)], mustWork = TRUE))
+  if (!length(files) || anyNA(vapply(files, .run_md5_file, character(1)))) return(NA_character_)
+  files <- unique(normalizePath(files, mustWork = TRUE))
   files <- sort(files)
   checksums <- if (length(files)) unname(tools::md5sum(files)) else character(0)
   names(checksums) <- if (length(files)) basename(files) else character(0)
   .run_md5_object(list(revision = revision, file_md5 = checksums))
+}
+
+# This inventory includes the primary matrix plus every declared auxiliary input
+# and file-backed reference. Unknown/downloaded references must be declared NA or
+# accompanied by inputs_complete = FALSE; omitted references cannot be inferred.
+.run_input_inventory <- function(input_file, input_files, run_dir) {
+  if (!is.null(input_file) && (!is.character(input_file) || length(input_file) != 1L)) {
+    stop("input_file must be one path or NA; use input_files for auxiliary files.")
+  }
+  if (is.null(input_files)) input_files <- character(0)
+  if (!is.character(input_files) || (length(input_files) &&
+      (is.null(names(input_files)) || anyNA(names(input_files)) ||
+       any(!nzchar(names(input_files))) || anyDuplicated(names(input_files)) ||
+       "primary" %in% names(input_files)))) {
+    stop("input_files must be a named character vector with unique roles; 'primary' is reserved.")
+  }
+  paths <- c(primary = if (is.null(input_file)) NA_character_ else unname(input_file), input_files)
+  checksums <- vapply(paths, .run_md5_file, character(1))
+  specified <- !is.na(paths) & nzchar(paths)
+  status <- ifelse(!specified, "unknown", ifelse(!file.exists(paths), "missing",
+                   ifelse(is.na(checksums), "unreadable", "present")))
+  data.frame(
+    role = names(paths),
+    path = vapply(paths, .run_relative_path, character(1), run_dir = run_dir),
+    md5 = unname(checksums), status = unname(status), stringsAsFactors = FALSE,
+    row.names = NULL
+  )
+}
+
+# Record loaded package versions, including GitHub revisions where available.
+# This is a runtime fingerprint, not a restorable environment or a checksum of
+# external services, system libraries, or reference data.
+.run_runtime_inventory <- function() {
+  packages <- sort(loadedNamespaces())
+  versions <- vapply(packages, function(package) as.character(getNamespaceVersion(package)), character(1))
+  revisions <- vapply(packages, function(package) {
+    description <- utils::packageDescription(package)
+    revision <- description$RemoteSha
+    if (is.null(revision)) revision <- description$GithubSHA1
+    if (is.null(revision)) "" else revision
+  }, character(1))
+  data.frame(
+    component = c("R", "platform", paste0("package:", packages)),
+    version = c(R.version$version.string, R.version$platform, unname(versions)),
+    source_revision = c("", "", unname(revisions)), stringsAsFactors = FALSE
+  )
+}
+
+# Call before creating output directories or writing the configuration snapshot.
+# Input data, config/scripts and an already-open run.log may be present. Reserved
+# native result directories are rejected even if the current run disables them.
+# output_dirs names explicit output paths (for example a custom WGCNA OUTDIR).
+assert_fresh_run_dir <- function(run_dir = ".", output_dirs = character(0)) {
+  existing_outputs <- output_dirs[file.exists(output_dirs) | dir.exists(output_dirs)]
+  if (length(existing_outputs)) {
+    stop("Refusing to reuse an existing analysis output directory: ",
+         paste(existing_outputs, collapse = ", "), "\nUse a new run_id.")
+  }
+  if (!dir.exists(run_dir)) {
+    if (file.exists(run_dir)) stop("Run path is not a directory: ", run_dir)
+    return(invisible(TRUE))
+  }
+  entries <- list.files(run_dir, all.files = TRUE, no.. = TRUE)
+  blocked <- grepl("^(0-Config$|[1-9][0-9]*-)", entries) |
+    entries %in% c("run_manifest.csv", "run_inputs.csv", "run_runtime.csv",
+                   "Analysis_summary.txt", "sessionInfo.txt", "RNAseq_report.html",
+                   "report_coverage_manifest.csv", "report_review_checklist.csv",
+                   "report_validation.csv", "report_interpretation", "report_assets")
+  if (any(blocked)) {
+    stop("Refusing to reuse a run directory containing analysis outputs: ", run_dir,
+         "\nUse a new run_id. Existing artifacts: ", paste(entries[blocked], collapse = ", "))
+  }
+  invisible(TRUE)
 }
 
 .run_relative_path <- function(path, run_dir) {
@@ -101,7 +175,9 @@ write_template_run_manifest <- function(run_dir,
                                         config_objects,
                                         lib_dir,
                                         runner_file,
-                                        envir = parent.frame()) {
+                                        envir = parent.frame(),
+                                        input_files = NULL,
+                                        inputs_complete = !is.null(input_files)) {
   lifecycle_fields <- c("RUN_ROLE", "PARENT_RUN_ID", "RUN_CHANGE_NOTE", "RUN_RETENTION")
   presentation_fields <- c("OUTDIR", "GENERATE_HTML_REPORT", "REPORT_TITLE",
                            "SCAFFOLD_REPORT_INTERPRETATION")
@@ -113,6 +189,8 @@ write_template_run_manifest <- function(run_dir,
     run_dir = run_dir,
     config_path = config_path,
     input_file = input_file,
+    input_files = input_files,
+    inputs_complete = inputs_complete,
     analysis_config = analysis_config,
     role = get("RUN_ROLE", envir = envir, inherits = TRUE),
     parent_run_id = get("PARENT_RUN_ID", envir = envir, inherits = TRUE),
@@ -140,7 +218,9 @@ write_run_manifest <- function(run_dir = ".",
                                status = "completed",
                                completed_at = Sys.time(),
                                backend_root = NULL,
-                               backend_files = character(0)) {
+                               backend_files = character(0),
+                               input_files = NULL,
+                               inputs_complete = !is.null(input_files)) {
   allowed_roles <- c("candidate", "canonical", "sensitivity", "repro_check", "superseded")
   allowed_retention <- c("full", "slim", "metadata_only")
   if (!role %in% allowed_roles) stop("Unsupported run role: ", role)
@@ -149,13 +229,31 @@ write_run_manifest <- function(run_dir = ".",
     stop("`analysis_config` must be a named list.")
   }
   if (!dir.exists(run_dir)) stop("Run directory not found: ", run_dir)
+  if (!is.logical(inputs_complete) || length(inputs_complete) != 1L || is.na(inputs_complete)) {
+    stop("inputs_complete must be TRUE or FALSE.")
+  }
 
   run_dir <- normalizePath(run_dir, mustWork = TRUE)
+  provenance_files <- file.path(run_dir, c("run_manifest.csv", "run_inputs.csv", "run_runtime.csv"))
+  if (any(file.exists(provenance_files))) stop("Refusing to overwrite existing run provenance in: ", run_dir)
+  inputs <- .run_input_inventory(input_file, input_files, run_dir)
+  inputs_complete <- inputs_complete && all(inputs$status == "present")
+  input_signature <- if (inputs_complete) {
+    checksums <- stats::setNames(inputs$md5, inputs$role)
+    .run_md5_object(checksums[sort(names(checksums))])
+  } else NA_character_
+  runtime <- .run_runtime_inventory()
+  runtime_signature <- .run_md5_object(runtime)
+  backend <- .run_git_state(backend_root)
+  backend_signature <- .run_backend_signature(backend_files, backend$revision)
+  config_md5 <- .run_md5_file(config_path)
+  utils::write.csv(inputs, provenance_files[[2]], row.names = FALSE, na = "")
+  utils::write.csv(runtime, provenance_files[[3]], row.names = FALSE, na = "")
   files <- list.files(run_dir, recursive = TRUE, full.names = TRUE, all.files = FALSE)
   files <- files[file.info(files)$isdir %in% FALSE]
   run_bytes <- sum(file.info(files)$size, na.rm = TRUE)
-  backend <- .run_git_state(backend_root)
   manifest <- data.frame(
+    manifest_schema_version = 2L,
     run_id = basename(run_dir),
     status = status,
     role = role,
@@ -164,12 +262,21 @@ write_run_manifest <- function(run_dir = ".",
     completed_at = format(as.POSIXct(completed_at), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
     input_file = .run_relative_path(input_file, run_dir),
     input_md5 = .run_md5_file(input_file),
+    input_manifest_file = "run_inputs.csv",
+    input_manifest_md5 = .run_md5_file(provenance_files[[2]]),
+    inputs_complete = inputs_complete,
+    input_signature = input_signature,
     config_file = .run_relative_path(config_path, run_dir),
-    config_md5 = .run_md5_file(config_path),
+    config_md5 = config_md5,
     analysis_signature = .run_md5_object(analysis_config[sort(names(analysis_config))]),
     backend_revision = backend$revision,
     backend_dirty = backend$dirty,
-    backend_signature = .run_backend_signature(backend_files, backend$revision),
+    backend_signature = backend_signature,
+    runtime_manifest_file = "run_runtime.csv",
+    runtime_signature = runtime_signature,
+    runtime_scope = "R_platform_loaded_packages",
+    duplicate_eligible = inputs_complete && !is.na(config_md5) &&
+      !is.na(backend_signature) && identical(status, "completed"),
     run_bytes = run_bytes,
     change_note = change_note,
     stringsAsFactors = FALSE
@@ -178,12 +285,13 @@ write_run_manifest <- function(run_dir = ".",
   invisible(manifest)
 }
 
-# Rebuild the project-level registry from per-run manifests. Exact duplicates
-# share the input, analysis and backend-code signatures. A full canonical run
-# is preferred as owner; other family members point to it through `duplicate_of`.
+# Rebuild the registry. Only complete schema-v2 provenance can be grouped by
+# declared inputs, analysis, backend code and recorded runtime. Matching these
+# signatures is not proof of byte-identical outputs; no pruning is automatic.
 build_run_registry <- function(runs_dir,
                                path = file.path(runs_dir, "RUN_REGISTRY.csv")) {
   if (!dir.exists(runs_dir)) stop("Runs directory not found: ", runs_dir)
+  runs_dir <- normalizePath(runs_dir, mustWork = TRUE)
   manifests <- list.files(runs_dir, pattern = "^run_manifest[.]csv$",
                           recursive = TRUE, full.names = TRUE)
   manifests <- manifests[dirname(manifests) != normalizePath(runs_dir, mustWork = TRUE)]
@@ -208,15 +316,21 @@ build_run_registry <- function(runs_dir,
   registry <- registry[order(registry$completed_at, registry$run_id), , drop = FALSE]
   rownames(registry) <- NULL
 
-  valid_key <- nzchar(registry$input_md5) & nzchar(registry$analysis_signature)
-  backend_key <- if ("backend_signature" %in% colnames(registry)) {
-    value <- as.character(registry$backend_signature)
-    value[is.na(value) | !nzchar(value)] <- "legacy_unknown_backend"
-    value
-  } else {
-    rep("legacy_unknown_backend", nrow(registry))
+  signature_columns <- c("input_md5", "input_signature", "config_md5",
+                         "analysis_signature", "backend_signature", "runtime_signature")
+  for (column in setdiff(c(signature_columns, "manifest_schema_version", "inputs_complete",
+                          "status", "role", "retention"), colnames(registry))) {
+    registry[[column]] <- NA
   }
-  keys <- paste(registry$input_md5, registry$analysis_signature, backend_key, sep = "::")
+  valid_key <- registry$manifest_schema_version %in% 2L &
+    registry$inputs_complete %in% TRUE & registry$status %in% "completed"
+  for (column in signature_columns) {
+    value <- as.character(registry[[column]])
+    valid_key <- valid_key & !is.na(value) & grepl("^[0-9a-f]{32}$", value)
+  }
+  registry$duplicate_eligible <- valid_key
+  keys <- paste(registry$input_signature, registry$analysis_signature,
+                registry$backend_signature, registry$runtime_signature, sep = "::")
   registry$duplicate_of <- ""
   role_rank <- match(registry$role,
                      c("canonical", "candidate", "sensitivity", "repro_check", "superseded"))

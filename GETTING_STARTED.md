@@ -2,6 +2,12 @@
 
 如果你会操作 Excel，就会使用这个 RNA-seq 分析模板。本指南面向**完全没有编程经验**的用户。
 
+本页是安装与教学演示指南，演示跑通不代表真实项目的统计设计已经通过审查。
+真实项目请优先遵循 [BEST_PRACTICES.md](BEST_PRACTICES.md) 的 CLI 流程，
+并检查 [当前冻结审计与使用限制](references/FREEZE_AUDIT.md)。
+当前维护版为 `v0.11.1`：旧版 WGCNA hub、小鼠 native CIBERSORT、TME ssGSEA
+及受影响 GSEA 结果应按审计迁移说明新建 run 重算，不覆盖历史输出。
+
 整个上手过程只有五步，先看一张图了解全貌：
 
 ```mermaid
@@ -65,8 +71,9 @@ TPM。
 
 真实项目中，推荐让 Skill 根据样本信息与研究背景生成项目配置，并优先
 使用 `templates/General/run_analysis.R` 完成可复现的标准运行。Notebook
-适合交互探索，但不要在 `notebooks/` 目录中直接生成结果；请指定独立的
-`analysis/runs/<run_id>/`，再把审阅后的表格、图和报告整理到 `results/`。
+适合交互探索，但不要在 `notebooks/` 目录中直接生成结果。CLI 产物放入
+`analysis/runs/<run_id>/`，完整 notebook 的探索产物放入
+`analysis/notebook_output/<analysis>/`；正式交付从经过审阅的 CLI run 整理到 `results/`。
 详见 [真实项目输出结构](references/PROJECT_OUTPUT_LAYOUT.md)。
 
 ---
@@ -103,19 +110,18 @@ TPM。
 ## 第二步：安装分析所需的所有 R 包
 
 1. 下载或克隆本仓库到电脑本地
-2. 在 RStudio 菜单点击 **File → Open Project...**，选择仓库文件夹
+2. 在 RStudio 中把工作目录设为仓库文件夹（**Session → Set Working Directory → Choose Directory...**）
 3. 在 RStudio 左下角找到 **Console** 面板（有一个 `>` 提示符）
 4. 复制粘贴下面这行代码，按回车：
 
 ```r
-Rscript install_dependencies.R
+source("install_dependencies.R")
 ```
 
-如果提示找不到 `Rscript`：
-- 在 RStudio Console 中输入：
+如果使用的是 **Terminal/终端** 而非 R Console，则输入：
 
-```r
-source("install_dependencies.R")
+```bash
+Rscript install_dependencies.R
 ```
 
 这会开始下载安装所有需要的包，**第一次可能需要 10-30 分钟**，请耐心等待，不要关闭 RStudio。
@@ -175,9 +181,9 @@ source("install_dependencies.R")
 
 ### 4.2 复制演示文件夹
 
-1. 在 RStudio 右下角 **Files** 面板中，右键点击 `examples/demo_RNAseq_General/`
-2. 选择 **Copy**，然后粘贴到你的项目文件夹（比如桌面新建一个文件夹）
-3. 把刚才准备好的表达矩阵和 metadata 文件放进 `0-Data/` 文件夹
+1. 教学探索时只复制 `notebooks/RNAseq_General.ipynb` 到项目的 `analysis/notebooks/`，不要复制已运行演示的全部输出。
+2. 准备空的 `analysis/notebook_output/<analysis>/`；在执行分析前明确设置并打印该工作目录，配置中的输入路径使用绝对路径。
+3. 原始表达矩阵与 metadata 保留在项目数据目录。General 不会仅因发现 `metadata.csv` 就自动读取分组；下一步的样本/分组向量必须按真实 metadata 填写并核对顺序。正式运行改用 BEST_PRACTICES 中的 CLI 入口。
 
 ### 4.3 修改参数
 

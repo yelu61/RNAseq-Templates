@@ -1,6 +1,8 @@
 # limma-voom differential expression helpers for bulk RNA-seq templates.
 
-# Build a DGEList, filter low counts, normalize, and run voom.
+# Build a DGEList, filter low counts, and normalize. The explicit raw-count
+# fraction is additional to edgeR's group-aware CPM/total-count filter; set it
+# to zero to use edgeR filtering alone (the behavior before this option worked).
 prepare_dge_for_voom <- function(counts, group = NULL,
                                   min_counts_per_sample = 10,
                                   min_sample_frac = 0.5,
@@ -8,11 +10,22 @@ prepare_dge_for_voom <- function(counts, group = NULL,
   if (!requireNamespace("edgeR", quietly = TRUE)) {
     stop("Package 'edgeR' is required for limma-voom workflow.")
   }
+  if (!is.numeric(min_sample_frac) || length(min_sample_frac) != 1L ||
+      !is.finite(min_sample_frac) || min_sample_frac < 0 || min_sample_frac > 1) {
+    stop("min_sample_frac must be a finite number in [0, 1].")
+  }
+  if (!is.numeric(min_counts_per_sample) || length(min_counts_per_sample) != 1L ||
+      !is.finite(min_counts_per_sample) || min_counts_per_sample < 0) {
+    stop("min_counts_per_sample must be a finite nonnegative number.")
+  }
   counts <- as.matrix(counts)
   mode(counts) <- "numeric"
 
   dge <- edgeR::DGEList(counts = counts, group = group)
   keep <- edgeR::filterByExpr(dge, min.count = min_counts_per_sample)
+  min_samples <- ceiling(min_sample_frac * ncol(counts))
+  keep <- keep & rowSums(counts >= min_counts_per_sample) >= min_samples
+  if (!any(keep)) stop("No genes remain after edgeR and sample-fraction filtering.")
   dge <- dge[keep, , keep.lib.sizes = FALSE]
   dge <- edgeR::calcNormFactors(dge, method = normalize_method)
   dge

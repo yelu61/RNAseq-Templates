@@ -46,9 +46,10 @@ GROUP_COLUMN  <- "condition"
 GROUP_LEVELS  <- NULL                      # NULL = infer from metadata order
 
 # ---- 1.3 Species ---------------------------------------------------------------
-# TME methods use human signatures, so mouse data are converted from MGI symbols
-# to HGNC symbols via babelgene/biomaRt (needs network). Keep the notebook guard.
+# Native CIBERSORT retains this species' symbols/reference. Human-reference
+# methods use a separate HGNC matrix (local babelgene by default for mouse).
 SPECIES       <- "human"                   # "human" or "mouse"
+ORTHOLOG_CACHE <- NULL                     # optional legacy biomaRt mapping cache
 
 # Optional custom group colors. If NULL, make_group_colors(GROUP_LEVELS) is used.
 # Example: GROUP_COLORS <- c("Control" = "#6F6F6F", "Treatment" = "#E07B54")
@@ -74,9 +75,10 @@ CIBERSORT_SIGNATURE <- NULL                # NULL = auto LM22 (human) / cibersor
 CIBERSORT_PERM      <- 1000
 CIBERSORT_QN        <- FALSE               # RNA-seq: FALSE; microarray: TRUE
 
-# When both native CIBERSORT and IOBR cibersort run, emit comparison tables and
-# PDFs (scatter + Bland-Altman) automatically.
+# Compare only human inputs with verified identical native/IOBR signatures and
+# matching QN settings. Mouse 25-class and human LM22 results are not equivalent.
 RUN_CIBERSORT_COMPARISON <- TRUE
+RUN_SSGSEA <- TRUE                         # human 28-cell signatures; enrichment scores, not fractions
 
 # ---- 1.7 Output root -------------------------------------------------------------
 # "." = write the numbered run layout (0-Config/ 4-TME/) at the project root.

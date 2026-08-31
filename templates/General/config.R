@@ -100,9 +100,10 @@ COMPARECLUSTER_ONTOLOGY <- "BP"   # "BP", "MF", "CC", or "ALL"
 # ---- 1.9b Tumor microenvironment (TME) deconvolution --------------------------
 # Deconvolution works on TPM (not the VST matrix used elsewhere), so it needs
 # per-gene lengths from your annotation. VST/rlog cannot be inverted to TPM and
-# is rejected. Mouse symbols are auto-converted to human orthologs via biomaRt
-# (requires network). Set RUN_TME <- FALSE to skip the whole block.
+# is rejected. Mouse human-reference inputs use local babelgene by default.
+# Set RUN_TME <- FALSE to skip the whole block.
 RUN_TME          <- FALSE
+TME_GENE_ID_COLUMN <- NULL        # NULL: prefer gene_id/Geneid, otherwise GENE_NAME_COL; IDs must be unique
 TME_GENE_LENGTH_COLUMN <- NULL    # column holding gene length; NULL = use start/end below
 TME_GENE_LENGTH_UNIT   <- "bp"    # "bp" or "kb" (only when TME_GENE_LENGTH_COLUMN is set)
 TME_GENE_START_COL     <- "gene_start"  # used when TME_GENE_LENGTH_COLUMN is NULL
@@ -116,7 +117,7 @@ TME_IOBR_PERM    <- 1000
 RUN_TME_SSGSEA   <- TRUE          # ssGSEA over 28 built-in immune signatures
 # Mouse->human ortholog mapping cache (.rds path). The first run queries biomaRt
 # online and writes the mapping here; later runs are offline-deterministic.
-# NULL = always query online (old behaviour).
+# NULL = use installed babelgene data offline, consistently with the TME runner.
 TME_ORTHOLOG_CACHE <- NULL        # e.g. file.path(PROJECT_ROOT, "data/processed/mouse_human_orthologs.rds")
 
 # ---- 1.10 Excel export --------------------------------------------------------

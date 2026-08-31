@@ -7,6 +7,45 @@ All notable changes to RNAseq-Templates are documented in this file.
 The `v0.11.x` line is feature-frozen. Future entries are limited to maintenance
 fixes unless a new development line is opened explicitly.
 
+## [0.11.1] - 2026-08-31
+
+### Fixed
+
+- WGCNA eigengenes now use module-color names; hub exports contain one true
+  gene/eigengene correlation per selected gene. Module-trait P values use
+  pairwise nonmissing sample counts, and empty selections retain table schemas.
+- TME computes TPM over the original feature universe before ID/ortholog
+  mapping, preserves native mouse symbols for the mouse signature, and shares
+  preparation/coverage exports between General and TME entry points.
+- Immune ssGSEA uses `ssgseaParam()` rather than the GSVA algorithm. Native
+  CIBERSORT handles one sample, reports unavailable permutation P values as NA,
+  and compares against IOBR only with matching human reference/preprocessing.
+- All six runners reject existing native outputs before writing config or
+  provenance. Schema-v2 manifests hash declared auxiliary/reference files,
+  record R/package runtime signatures, and exclude incomplete/old inventories
+  from duplicate grouping. Uncaptured online references remain explicitly unknown.
+- limma `MIN_SAMPLE_FRAC` now enforces the documented raw-count sample fraction
+  in addition to edgeR filtering; use zero for the previous edgeR-only behavior.
+- GSEA preserves tested term IDs and unavailable statistics, filters sets on
+  actual ranked-input overlap on the enrichit backend, and exports quality
+  counts. Automatic figures and report interpretation distinguish BH FDR
+  significance from descriptive ranking.
+
+- Standardized pathway term labels inside ordinary/bidirectional ORA and GSEA
+  NES bar directions, keeping true bar lengths and separate FDR annotations.
+
+### Documentation and validation
+
+- Updated the lifecycle guide, root documentation, template READMEs, parameter
+  and output contracts, and migration/freeze assessment. Retained the original
+  `v0.11.0` audit separately from the post-fix evidence.
+- Added correctness regressions for hub values, species routing, ssGSEA,
+  single-sample CIBERSORT, input/runtime provenance, directory protection,
+  filtering and GSEA integrity; see the freeze audit for executed results.
+- No new analysis module, global dependency upgrade, Git tag or hosted release
+  is implied. Historical affected analyses require a new run; environment
+  restoration and project scientific review are still project responsibilities.
+
 ## [0.11.0] - 2026-08-24
 
 ### Changed

@@ -10,6 +10,13 @@ runner is authoritative:
 3. Optional time-point-vs-baseline DESeq2 on raw counts (per-timepoint DEG tables
    + volcano + summary barplot).
 
+The current runner estimates pooled time effects, not treatment-specific
+trajectories: Mfuzz averages samples by time only, including across conditions
+if multiple conditions are present. For condition-specific clustering, prepare
+a separate, documented subset and run for each condition. It does not test
+`condition × time` interactions. See the [freeze audit](../../references/FREEZE_AUDIT.md)
+for the validated scope and remaining limitations.
+
 ## Files
 
 | File | Purpose |
@@ -76,6 +83,15 @@ The trend figure uses low-opacity within-cluster trajectories plus a weighted
 cluster centroid, avoiding Mfuzz's saturated rainbow default while retaining
 the underlying temporal heterogeneity.
 
+For production, follow the [fresh-run example](../../BEST_PRACTICES.md#1--reproducible-run).
+Point expression/metadata paths to the previous run or original inputs using
+absolute paths; do not copy old `1-DEG/` outputs into the new run root.
+
+The runner rejects existing native output artifacts before writing a new
+configuration snapshot. Completed runs also contain `run_inputs.csv` and
+`run_runtime.csv`; unknown references make a run ineligible for duplicate
+grouping. These files record provenance, not a restorable environment.
+
 ## Notes
 
 - `SPECIES` selects the OrgDb (`org.Hs.eg.db` / `org.Mm.eg.db`) for the Mfuzz
@@ -86,9 +102,15 @@ the underlying temporal heterogeneity.
   produces the time-point DEG, rather than aborting (mirrors the `RUN_TME`
   pattern in `templates/General/`).
 - A single-level `condition` column is dropped from the DESeq2 design (a
-  constant covariate breaks the model); multi-level conditions are included.
-- `SUBJECT_COL` (optional) enables a paired/repeated-measures design
-  (`~ subject + time`).
+  constant covariate breaks the model). Without `SUBJECT_COL`, a varying
+  condition is included additively (`~ condition + time`); otherwise the model
+  is `~ time`.
+- `SUBJECT_COL` (optional) selects the fixed-effect blocking design
+  `~ subject + time` when that column exists. This branch does not add a
+  separate condition term. Confirm the subject column and reported design
+  before accepting a repeated-measures analysis. The extracted contrasts are
+  time points versus baseline; this is not a general mixed-effects model or a
+  treatment-by-time interaction framework.
 - The shared HTML report (`reports/analysis_report.qmd`) is oriented to the
   General layout, so `GENERATE_HTML_REPORT` defaults to `FALSE` here; the wiring
   is present if you add a time-course-specific report template.

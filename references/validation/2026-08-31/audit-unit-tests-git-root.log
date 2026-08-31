@@ -1,0 +1,268 @@
+✔ | F W  S  OK | Context
+
+⠏ |          0 | batch_utils                                                    
+⠋ |          1 | batch_utils                                                    
+✔ |          6 | batch_utils [2.1s]
+
+⠏ |          0 | cli-paths                                                      
+✔ |         14 | cli-paths
+
+⠏ |          0 | data_utils                                                     
+⠹ |         33 | data_utils                                                     
+⠼ |         45 | data_utils                                                     
+✔ |         58 | data_utils
+
+⠏ |          0 | deg_utils                                                      
+⠹ |   2     11 | deg_utils                                                      
+⠼ |   3     12 | deg_utils                                                      
+✔ |   3     26 | deg_utils
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-deg_utils.R:93:3'): plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure
+`aes_string()` was deprecated in ggplot2 3.0.0.
+ℹ Please use tidy evaluation idioms with `aes()`.
+ℹ See also `vignette("ggplot2-in-packages")` for more information.
+ℹ The deprecated feature was likely used in the UpSetR package.
+  Please report the issue at <https://github.com/hms-dbmi/UpSetR/issues>.
+Backtrace:
+     ▆
+  1. ├─testthat::expect_invisible(...) at test-deg_utils.R:93:3
+  2. │ └─base::withVisible(call)
+  3. └─global plot_deg_upset_pdf(sets, outfile, title = "test")
+  4.   └─global save_pdf_device(...)
+  5.     └─draw()
+  6.       ├─base::print(...)
+  7.       └─UpSetR::upset(...)
+  8.         ├─base::suppressMessages(...)
+  9.         │ └─base::withCallingHandlers(...)
+ 10.         └─UpSetR:::Make_main_bar(...)
+ 11.           ├─ggplot2::ggplot(data = Main_bar_data, aes_string(x = "x", y = "freq"))
+ 12.           ├─ggplot2:::ggplot.default(...)
+ 13.           │ └─ggplot2:::validate_mapping(mapping)
+ 14.           │   └─S7::S7_inherits(mapping)
+ 15.           └─ggplot2::aes_string(x = "x", y = "freq")
+ 16.             └─ggplot2:::deprecate_warn0(...)
+
+Warning ('test-deg_utils.R:93:3'): plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure
+Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use `linewidth` instead.
+ℹ The deprecated feature was likely used in the UpSetR package.
+  Please report the issue at <https://github.com/hms-dbmi/UpSetR/issues>.
+Backtrace:
+     ▆
+  1. ├─testthat::expect_invisible(...) at test-deg_utils.R:93:3
+  2. │ └─base::withVisible(call)
+  3. └─global plot_deg_upset_pdf(sets, outfile, title = "test")
+  4.   └─global save_pdf_device(...)
+  5.     └─draw()
+  6.       ├─base::print(...)
+  7.       └─UpSetR::upset(...)
+  8.         └─UpSetR:::Make_matrix_plot(...)
+  9.           └─ggplot2::geom_line(...)
+ 10.             └─ggplot2::layer(...)
+ 11.               └─ggplot2:::deprecate_warn0(...)
+
+Warning ('test-deg_utils.R:93:3'): plot_deg_upset_pdf renders a non-empty PDF in a non-interactive closure
+The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
+ℹ Please use the `linewidth` argument instead.
+ℹ The deprecated feature was likely used in the UpSetR package.
+  Please report the issue at <https://github.com/hms-dbmi/UpSetR/issues>.
+Backtrace:
+     ▆
+  1. ├─testthat::expect_invisible(...) at test-deg_utils.R:93:3
+  2. │ └─base::withVisible(call)
+  3. └─global plot_deg_upset_pdf(sets, outfile, title = "test")
+  4.   └─global save_pdf_device(...)
+  5.     └─draw()
+  6.       ├─base::print(...)
+  7.       └─UpSetR::upset(...)
+  8.         └─UpSetR:::Make_size_plot(...)
+  9.           ├─ggplot2::theme(...)
+ 10.           │ └─ggplot2:::find_args(..., complete = NULL, validate = NULL)
+ 11.           │   └─base::mget(args, envir = env)
+ 12.           └─ggplot2::element_line(colour = "gray0", size = 0.3)
+ 13.             └─ggplot2:::deprecate_warn0("3.4.0", "element_line(size)", "element_line(linewidth)")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | design_utils                                                   
+✔ |          5 | design_utils
+
+⠏ |          0 | design-integration                                             
+✔ |         21 | design-integration
+
+⠏ |          0 | enrichment_utils                                               
+⠏ |   1      9 | enrichment_utils                                               
+⠸ |   5      9 | enrichment_utils                                               
+✔ |   8     11 | enrichment_utils [12.1s]
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-enrichment_utils.R:73:3'): run_go_gsea is reproducible with a fixed seed
+There were 3589 pathways for which P-values were not calculated properly due to unbalanced gene-level statistic values. For such pathways pvalue, NES and log2err are set to NA. You can try to increase nPermSimple.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:73:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+ 8.       └─enrichit::gsea(...)
+
+Warning ('test-enrichment_utils.R:73:3'): run_go_gsea is reproducible with a fixed seed
+Invalid p-values detected (NA, non-finite, <0, or >1). qvalue will be computed on valid p-values only.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:73:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+ 8.       └─enrichit:::calculate_qvalue(gsea_res$pvalue)
+
+Warning ('test-enrichment_utils.R:73:3'): run_go_gsea is reproducible with a fixed seed
+NA values detected in gene set IDs. Replacing with string 'NA'.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:73:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+
+Warning ('test-enrichment_utils.R:73:3'): run_go_gsea is reproducible with a fixed seed
+Duplicate gene set IDs detected: NA... (Total 1). Unique suffixes added.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:73:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+
+Warning ('test-enrichment_utils.R:74:3'): run_go_gsea is reproducible with a fixed seed
+There were 3589 pathways for which P-values were not calculated properly due to unbalanced gene-level statistic values. For such pathways pvalue, NES and log2err are set to NA. You can try to increase nPermSimple.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:74:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+ 8.       └─enrichit::gsea(...)
+
+Warning ('test-enrichment_utils.R:74:3'): run_go_gsea is reproducible with a fixed seed
+Invalid p-values detected (NA, non-finite, <0, or >1). qvalue will be computed on valid p-values only.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:74:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+ 8.       └─enrichit:::calculate_qvalue(gsea_res$pvalue)
+
+Warning ('test-enrichment_utils.R:74:3'): run_go_gsea is reproducible with a fixed seed
+NA values detected in gene set IDs. Replacing with string 'NA'.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:74:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+
+Warning ('test-enrichment_utils.R:74:3'): run_go_gsea is reproducible with a fixed seed
+Duplicate gene set IDs detected: NA... (Total 1). Unique suffixes added.
+Backtrace:
+    ▆
+ 1. └─global run_go_gsea(...) at test-enrichment_utils.R:74:3
+ 2.   ├─base::tryCatch(...)
+ 3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 6.   └─clusterProfiler::gseGO(...)
+ 7.     └─enrichit::gsea_gson(...)
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | geo_utils                                                      
+✔ |          5 | geo_utils
+
+⠏ |          0 | io_utils                                                       
+✔ |          8 | io_utils
+
+⠏ |          0 | limma-voom-utils                                               
+⠦ |          7 | limma-voom-utils                                               
+✔ |          8 | limma-voom-utils
+
+⠏ |          0 | narrative_utils                                                
+✔ |         21 | narrative_utils
+
+⠏ |          0 | notebook_to_runner                                             
+⠼ |         35 | notebook_to_runner                                             
+✔ |         68 | notebook_to_runner
+
+⠏ |          0 | pathway_utils                                                  
+⠏ |         10 | pathway_utils                                                  
+⠼ |         35 | pathway_utils                                                  
+⠴ |         36 | pathway_utils                                                  
+⠇ |         39 | pathway_utils                                                  
+✔ |         42 | pathway_utils [1.6s]
+
+⠏ |          0 | plot_utils                                                     
+⠸ |         34 | plot_utils                                                     
+⠙ |         62 | plot_utils                                                     
+⠼ |         65 | plot_utils                                                     
+⠏ |         80 | plot_utils                                                     
+⠙ |         92 | plot_utils                                                     
+✔ |         93 | plot_utils
+
+⠏ |          0 | report_utils                                                   
+⠹ |         43 | report_utils                                                   
+⠙ |         52 | report_utils                                                   
+⠼ |         55 | report_utils                                                   
+✔ |         56 | report_utils
+
+⠏ |          0 | run_utils                                                      
+⠙ |         22 | run_utils                                                      
+✔ |         24 | run_utils
+
+⠏ |          0 | run-review-notebook                                            
+✔ |         10 | run-review-notebook
+
+⠏ |          0 | survival_utils                                                 
+✔ |         19 | survival_utils
+
+⠏ |          0 | tcga_utils                                                     
+✔ |         14 | tcga_utils
+
+⠏ |          0 | timecourse_utils                                               0 genes excluded.
+0 genes excluded.
+
+⠋ |          1 | timecourse_utils                                               
+✔ |         17 | timecourse_utils
+
+⠏ |          0 | tme_utils                                                      
+⠹ |         13 | tme_utils                                                      
+⠏ |         30 | tme_utils                                                      
+⠸ |         34 | tme_utils                                                      
+⠇ |         39 | tme_utils                                                      
+⠇ |         49 | tme_utils                                                      
+⠧ |         58 | tme_utils                                                      
+⠇ |         59 | tme_utils                                                      
+✔ |         77 | tme_utils [1.4s]
+
+══ Results ═════════════════════════════════════════════════════════════════════
+Duration: 20.9 s
+
+[ FAIL 0 | WARN 11 | SKIP 0 | PASS 603 ]

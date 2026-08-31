@@ -1,0 +1,139 @@
+========================================
+RNAseq_General — run_analysis.R
+Working dir : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_General/RNAseq_General_Output 
+Config file : /private/var/folders/1k/_4d1xmz92p9cv5qjbggt1m8c0000gn/T/RtmpJzYJn0/filed62729b075ac.R 
+========================================
+
+Configuration loaded: 9 samples, 3 comparisons, default threshold = standard ( padj )
+RNAseq_lib  : /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/RNAseq_lib 
+
+Fontconfig error: No writable cache directories
+After QC/exclusion/filtering: 5972 genes x 6 samples
+using ntop=500 top features by variance
+Too few points to calculate an ellipse
+Too few points to calculate an ellipse
+Running DESeq2...
+estimating size factors
+estimating dispersions
+gene-wise dispersion estimates
+mean-dispersion relationship
+final dispersion estimates
+fitting model and testing
+Processing DESeq2 contrast: Treatment_vs_Control (Treatment vs Control)
+using 'ashr' for LFC shrinkage. If used in published research, please cite:
+    Stephens, M. (2016) False discovery rates: a new deal. Biostatistics, 18:2.
+    https://doi.org/10.1093/biostatistics/kxw041
+  Threshold           Comparison UP DOWN Total pvalue_column p_cutoff
+1    strict Treatment_vs_Control 20   19    39          padj     0.01
+2  standard Treatment_vs_Control 42   45    87          padj     0.05
+3     loose Treatment_vs_Control 73   75   148          padj     0.10
+          lfc_column log2fc_cutoff                                  definition
+1 log2FoldChange_raw           1.5 padj < 0.01 & abs(log2FoldChange_raw) > 1.5
+2 log2FoldChange_raw           1.0   padj < 0.05 & abs(log2FoldChange_raw) > 1
+3 log2FoldChange_raw           0.5  padj < 0.1 & abs(log2FoldChange_raw) > 0.5
+Warning messages:
+1: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use `linewidth` instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+2: The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
+ℹ Please use the `linewidth` argument instead.
+ℹ The deprecated feature was likely used in the EnhancedVolcano package.
+  Please report the issue to the authors. 
+Fontconfig error: No writable cache directories
+'select()' returned 1:many mapping between keys and columns
+Warning message:
+In clusterProfiler::bitr(symbols, fromType = "SYMBOL", toType = "ENTREZID",  :
+  0.02% of input gene IDs are fail to map...
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:many mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+'select()' returned 1:1 mapping between keys and columns
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG ORA skipped because enrichKEGG failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+There were 13 warnings (use warnings() to see them)
+'select()' returned 1:many mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns
+Skipping GSEA plot suite: 1513 valid terms; 0 pass BH FDR <= 0.05 for GSEA GO - Treatment_vs_Control
+Reading KEGG annotation online: "https://rest.kegg.jp/link/mmu/pathway"...
+KEGG GSEA skipped because analysis failed: cannot open the connection to 'https://rest.kegg.jp/link/mmu/pathway'
+Warning messages:
+1: In clusterProfiler::bitr(symbols, fromType = "SYMBOL", toType = "ENTREZID",  :
+  0.02% of input gene IDs are fail to map...
+2: In prepare_gsea_inputs(geneList, scoreType, exponent) :
+  There are ties in the preranked stats (0.32% of the list). The order of those tied genes will be arbitrary, which may produce unexpected results.
+3: In file(con, "r") :
+  URL 'https://rest.kegg.jp/link/mmu/pathway': status was 'Couldn't resolve host name'
+Warning message:
+In plot_theme_dotheatmap_from_results(go_gsea_map, filename = file.path(theme_outdir,  :
+  No enrichment terms to plot.
+========================================
+RNA-seq Analysis Summary Report
+========================================
+
+1. Data Overview
+   - Species: mouse
+   - Samples after optional QC exclusion: 6
+   - Samples manually excluded: None
+   - Groups after optional QC exclusion: Control, Treatment
+   - DESeq2 design: ~condition
+   - DEG p-value column (run-wide): padj
+   - Default-threshold p-value column: padj
+   - DEG log2FC column: log2FoldChange_raw
+   - GSEA rank column: stat
+   - Pairwise plot test: t.test with BH adjustment
+   - Low-count filter: count >= 10 in at least 3 samples
+   - Genes after filtering: 5972
+
+2. Differential Expression Default Threshold: standard (padj < 0.05 & |log2FoldChange_raw| > 1)
+   - Treatment_vs_Control: 87 DEGs (Up: 42, Down: 45)
+
+3. Output Files
+   - ./0-Config/analysis_config_used.R
+   - ./1-DEG/ (all-gene, threshold, diagnostics, Excel, Rdata)
+   - ./2-GSEA/ (ORA/GSEA/GSVA/TF results)
+   - ./3-Visualization/GSEA/ (overview, running curves, theme maps)
+   - ./3-Visualization/SingleGene/ (single-gene expression plots)
+   - ./3-Visualization/ (QC, DEG, ORA and other PDF figures)
+
+========================================
+
+========================================
+RNAseq_General analysis COMPLETE.
+Outputs: 1-DEG/  2-GSEA/  3-Visualization/  Analysis_summary.txt  run_manifest.csv
+========================================
+
+========================================
+General CLI demo PASSED (drove templates/General/run_analysis.R).
+Outputs saved to /private/tmp/rnaseq-freeze-validation-wzcdbmjg/repo/examples/demo_RNAseq_General/RNAseq_General_Output 
+========================================

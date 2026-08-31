@@ -1,0 +1,5 @@
+Quarto CLI not found; rendering rmarkdown twin instead: /private/tmp/rnaseq-freeze-audit.KpMlS7/reports/analysis_report.Rmd
+HTML report written to: /private/tmp/rnaseq-freeze-audit.KpMlS7/examples/demo_RNAseq_General/RNAseq_General_Output/RNAseq_report.html
+Error in validate_analysis_report(run_dir, report, publish = publish) : 
+  Report is not ready to publish: coverage_contract, scientific_review
+Execution halted

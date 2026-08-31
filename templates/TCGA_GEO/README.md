@@ -42,7 +42,7 @@ next to the script, the repo root via `rprojroot`, or `../RNAseq_lib`).
 |------|---------|---------|-------|
 | GDC download | `DOWNLOAD_FROM_GDC <- TRUE` | required | TCGAbiolinks `GDCquery`/`GDCdownload`/`GDCprepare`; assay auto-detected by name (`count|unstrand`, `tpm`). |
 | GEO download | `DOWNLOAD_FROM_GEO <- TRUE` | required | GEOquery SeriesMatrix via `GEO_ACCESSION`. |
-| **Local files** | both `FALSE` | **none** | Reads `LOCAL_COUNTS_FILE` / `LOCAL_TPM_FILE` / `LOCAL_CLINICAL_FILE`. Fully offline — this is what the demo uses. |
+| **Local files** | both `FALSE` | no cohort download | Reads `LOCAL_COUNTS_FILE` / `LOCAL_TPM_FILE` / `LOCAL_CLINICAL_FILE`, as in the demo. KEGG enrichment can still query online and be skipped when unavailable. |
 
 The GDC/GEO branches are gated behind `requireNamespace("TCGAbiolinks")` /
 `requireNamespace("GEOquery")` and stop with a clear message if the package (or
@@ -97,6 +97,11 @@ median-split KM, and the quartile-split KM (`stratify_by_quantile`) together,
 then §7.5's clinical KM, univariate Cox, and multivariate Cox follow. Genes
 absent from the expression matrix are skipped with `warning(...); next`
 (the notebook's tolerant behavior is preserved).
+
+The runner rejects existing native output artifacts before writing a new
+configuration snapshot. Completed runs also contain `run_inputs.csv` and
+`run_runtime.csv`; unknown references make a run ineligible for duplicate
+grouping. These files record provenance, not a restorable environment.
 
 ## Notes
 

@@ -62,6 +62,7 @@ cran_packages <- c(
   "ggrepel",        # volcano plot labels
   "data.table",     # used by notebooks and GEOquery
   "matrixStats",    # rowMads / rowSds in visualization
+  "testthat",       # regression test suite
   "jsonlite",       # notebook JSON validation
   "rprojroot",      # robust repository path discovery
   "rmarkdown",      # HTML report rendering (fallback when quarto CLI is absent)

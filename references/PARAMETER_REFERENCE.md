@@ -2,7 +2,9 @@
 
 本文件以 `templates/<Topic>/config.R` 的生产 runner 参数为准。Notebook
 用于交互探索，少数演示默认值可能不同；遇到差异时以对应 runner config
-和冻结的 `0-Config/analysis_config_used.R` 为事实来源。
+和 `0-Config/analysis_config_used.R` 启动配置为配置来源。启动快照早于配对公式、
+时间顺序等自动推断；实际模型查 `Analysis_summary.txt` / 保存的模型对象，最终
+样本查 `colData.csv` / QC，其他推断值查结果对象和日志，不把启动值当最终拟合值。
 
 ## General runner
 
@@ -29,7 +31,7 @@
 | `GSEA_RANK_COLUMN` | character | `"stat"` | GSEA 排序列 |
 | `PAIRWISE_P_ADJUST_METHOD` | character | `"BH"` | GSVA/单基因两两比较图的 P 值校正方法 |
 | `MIN_COUNT` | numeric | `10` | 低表达过滤阈值 |
-| `DESIGN_FORMULA` | formula | `~ condition` | DESeq2 设计公式；配对时改为 `~ PAIR_ID + condition` |
+| `DESIGN_FORMULA` | formula | `~ condition` | DESeq2 设计公式；设置 `PAIR_ID` 后 runner 覆盖为 `~ pair_id + condition`，不保留额外 batch 项 |
 | `RUN_TF_ANALYSIS` | logical | `FALSE` | 是否运行 DoRothEA/VIPER TF 活性分析 |
 | `RUN_COMPARECLUSTER` | logical | `TRUE` | 是否运行 compareCluster（≥3 组才有效） |
 | `EXPORT_EXCEL` | logical | `TRUE` | 是否输出 `1-DEG/DEG_results.xlsx` |
@@ -38,6 +40,9 @@
 | `SCAFFOLD_REPORT_INTERPRETATION` | logical | `FALSE` | 首次需要项目说明时设为 TRUE，创建不覆盖的 `report_interpretation/<section>.md` 注释骨架 |
 
 `p_column = "pvalue"` 的层只用于假设生成，不能作为项目主结论阈值；相应 ORA 必须由 adjusted-P 层或 GSEA/GSVA 等等级证据确认。
+
+`PAIR_ID` 与 `BATCH_VECTOR` 同时设置不代表模型同时调整了两者；以实际拟合的
+design 为准。需要配对加批次或交互项时，应单独审查项目模型。
 
 ## Limma_Voom runner
 
@@ -50,8 +55,8 @@
 | `COMPARISONS` | list | — | 同 General |
 | `DEG_PADJ_CUTOFF` | numeric | `0.05` | DEG 阈值 |
 | `DEG_LFC_CUTOFF` | numeric | `0.5` | DEG log2FC 阈值 |
-| `MIN_COUNT` | numeric | `10` | filterByExpr 最小 count |
-| `MIN_SAMPLE_FRAC` | numeric | `0.5` | filterByExpr 最小样本比例 |
+| `MIN_COUNT` | numeric | `10` | 同时用于 edgeR `filterByExpr(min.count)` 和附加过滤的原始 count 阈值 |
+| `MIN_SAMPLE_FRAC` | numeric | `0.5` | `[0,1]`：原始 count ≥ `MIN_COUNT` 的样本须达到 `ceiling(比例 × 总样本数)`，且通过 edgeR 过滤；`0` 仅使用 edgeR 组别感知过滤，复现旧版忽略此参数时的行为。修复会改变过滤结果；不平衡分组需避免误删小组特异基因 |
 
 ## TimeCourse runner
 
@@ -106,7 +111,7 @@
 | `SAMPLE_COLUMN` | character | `"sample"` | 样本名列 |
 | `GROUP_COLUMN` | character | `"condition"` | 分组列 |
 | `GROUP_LEVELS` | character vector/NULL | `NULL` | 分组水平顺序 |
-| `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；小鼠数据会经 `convert_expression_rownames()` 把 MGI symbol 转为 HGNC symbol 后再进行反卷积 |
+| `SPECIES` | character | `"human"` | `"human"` 或 `"mouse"`；native 小鼠 CIBERSORT 保留 MGI，人参考 ESTIMATE/IOBR/免疫 ssGSEA 另用 HGNC ortholog 分支 |
 | `GROUP_COLORS` | named character vector/NULL | `NULL` | 自定义分组颜色；NULL 时自动生成 |
 | `RUN_ESTIMATE` | logical | `TRUE` | 是否运行 native ESTIMATE |
 | `RUN_IOBR` | logical | `FALSE` | 是否运行 IOBR；首次运行可能下载方法参考数据，离线生产运行前需先完成缓存预检 |
@@ -116,9 +121,9 @@
 | `RUN_CIBERSORT` | logical | `FALSE` | 是否运行 native CIBERSORT（项目已内置 `references/CIBERSORT/` 资源） |
 | `CIBERSORT_SCRIPT` | character | `NULL`（自动定位） | native CIBERSORT 脚本路径；`NULL` 时从项目 git 根目录自动定位 `references/CIBERSORT/CIBERSORT.R` |
 | `CIBERSORT_SIGNATURE` | character | `NULL`（自动定位） | CIBERSORT signature 文件路径；`NULL` 时按 `SPECIES` 自动选择 `LM22.txt`（human）或 `cibersort_mouse_22.csv`（mouse） |
-| `CIBERSORT_PERM` | numeric | `1000` | CIBERSORT permutation 次数（native 与 IOBR 一致） |
+| `CIBERSORT_PERM` | numeric | `1000` | native CIBERSORT permutation 次数；0 时不估计 P 值，导出 NA；IOBR 次数独立配置 |
 | `CIBERSORT_QN` | logical | `FALSE` | RNA-seq 关闭分位数归一化；microarray 通常设为 TRUE |
-| `RUN_CIBERSORT_COMPARISON` | logical | `TRUE` | 当 `RUN_CIBERSORT` 与 `RUN_IOBR` 均含 `"cibersort"` 时，是否自动生成 native vs IOBR 对比表和 PDF（输出到 `OUTDIR`） |
+| `RUN_CIBERSORT_COMPARISON` | logical | `TRUE` | 仅 human、两个 CIBERSORT 均成功且实际参考矩阵/QN 一致时生成对比表和 PDF（输出到 `OUTDIR/4-TME`）；mouse 不做自动等价比较 |
 
 ### 各 TME 方法输入要求
 
@@ -162,5 +167,7 @@
 | `RUN_CHANGE_NOTE` | `""` | 与 parent 相比的唯一、简短变更原因 |
 | `RUN_RETENTION` | `"full"` | `full`、`slim` 或 `metadata_only`；模板仅记录，不自动清理 |
 
-所有生产 runner 在完成时写 `run_manifest.csv`。使用
-`Rscript tools/build_run_registry.R analysis/runs` 汇总并识别完全重复 run。
+所有生产 runner 在完成时写 `run_manifest.csv`、`run_inputs.csv` 和
+`run_runtime.csv`。使用 `Rscript tools/build_run_registry.R analysis/runs` 汇总。
+`duplicate_of` 仅标记完整 schema-v2 输入、分析、代码和运行环境签名相同的候选；
+缺失校验和、未留存的在线参考、旧版清单均不参与分组，不能据此自动删除。

@@ -80,9 +80,15 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 - `run_kegg_ora(symbols, org_db, universe, organism, ...)`
   KEGG over-representation analysis.
 - `run_go_gsea(entrez_list, org_db, ...)`
-  GO GSEA.
+  GO GSEA over sets meeting actual input-overlap limits; retains tested rows and BH FDR status.
 - `run_kegg_gsea(entrez_list, organism, ...)`
-  KEGG GSEA.
+  KEGG GSEA with the same quality contract; `p_cutoff` is the BH FDR threshold. Online reference retrieval remains a network dependency.
+- `audit_gsea_table(gsea_result, fdr_cutoff)`
+  Mark observed invalid IDs/statistics and count valid, unusable and significant terms.
+- `significant_gsea_terms(gsea_result, fdr_cutoff)`
+  Select valid BH-significant terms for automatic figures.
+- `write_gsea_tables(gsea_result, filename)`
+  Export the complete table and a companion `_quality.csv`, including zero-significant results.
 - `run_threshold_ora(res_list, threshold_grid, org_db, ...)`
   Multi-threshold ORA loop across comparisons.
 - `enrich_result_to_df(enrich_result)`
@@ -285,6 +291,14 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 
 ## `tme_utils.R` — TME deconvolution helpers
 
+- `build_tme_tpm(...)`
+  Compute TPM over the full uniquely identified feature universe before symbol collapse.
+- `prepare_tme_inputs(...)`
+  Keep native-species expression separate from optional human ortholog expression, exporting mapping and coverage.
+- `run_tme_ssgsea(...)`
+  Use `ssgseaParam(normalize = TRUE)` and report matched signature genes.
+- `cibersort_comparison_compatible(...)`
+  Gate native/IOBR comparison on matching species, reference and validated preprocessing.
 - `undo_log_expr(expr, is_log, log_base)`
   Reverse log transformation for TME tools that expect non-log input.
 - `validate_tme_input(expr)`
@@ -430,14 +444,16 @@ This catalog lists the helper functions in `RNAseq_lib/` grouped by file. Each e
 
 ## `run_utils.R` — run provenance and duplicate governance
 
+- `assert_fresh_run_dir(run_dir, output_dirs)`
+  Reject existing native outputs before config/provenance writes; not a concurrent-process lock.
 - `initialize_run_lifecycle(envir)`
   Supply backward-compatible lifecycle defaults for old configs and reject unsupported role/retention values.
 - `write_template_run_manifest(...)`
   Apply the shared manifest contract to any production runner while excluding presentation-only fields from its analysis signature.
 - `write_run_manifest(...)`
-  Write one run-local manifest with input/config checksums, analysis and backend-code signatures, git revision/dirty state, lifecycle role, parent, retention class and size.
+  Write schema-v2 provenance plus `run_inputs.csv` and `run_runtime.csv`; hash declared auxiliary/reference files and record loaded R/package versions. Unknown references must remain explicit.
 - `build_run_registry(runs_dir, path)`
-  Rebuild `RUN_REGISTRY.csv` across mixed manifest schema versions and mark exact input+analysis+code duplicates without deleting them.
+  Rebuild `RUN_REGISTRY.csv` across mixed schemas; only complete v2 input+analysis+code+runtime signatures can mark candidate duplicates. Never delete automatically.
 
 ## TME constants
 

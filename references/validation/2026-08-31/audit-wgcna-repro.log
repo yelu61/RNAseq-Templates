@@ -1,0 +1,14 @@
+R version 4.6.1 (2026-06-24) 
+WGCNA 1.74 
+     mergeCloseModules: less than two proper modules.
+      ..color levels are 1
+      ..there is nothing to merge.
+Eigengene columns: ME1 
+Module color: turquoise 
+Requested eigengene column: MEturquoise 
+Eigengene lookup returned NULL: TRUE 
+Expected hub rows: 60 
+Actual hub rows: 3600 
+Duplicated gene rows: 3540 
+Computed correlation dimensions: 60 x 60 
+REPRODUCED: hub export contains gene-gene correlations, not kME.
