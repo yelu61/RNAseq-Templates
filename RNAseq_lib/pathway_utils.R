@@ -109,25 +109,32 @@ pathway_group_comparison <- function(score_mat, group, group_levels = NULL,
                                      comparisons = NULL, method = "t.test",
                                      p_adjust_method = "BH",
                                      exact_permutation = FALSE,
-                                     include_effect_size = FALSE) {
+                                     include_effect_size = FALSE,
+                                     pair_id = NULL) {
   score_mat <- .validate_feature_matrix(score_mat, "score_mat")
   group <- .align_sample_vector(group, colnames(score_mat), "group")
+  if (!is.null(pair_id)) {
+    pair_id <- .align_sample_vector(pair_id, colnames(score_mat), "pair_id")
+  }
   if (!is.null(group_levels) && (anyNA(group_levels) || anyDuplicated(group_levels))) {
     stop("`group_levels` must contain unique, non-missing values.")
   }
   group <- factor(group, levels = group_levels %||% unique(group))
   if (anyNA(group)) stop("`group` contains values absent from `group_levels`.")
   long <- do.call(rbind, lapply(rownames(score_mat), function(pw) {
-    data.frame(Pathway = pw, sample = colnames(score_mat),
-               score = as.numeric(score_mat[pw, ]),
-               condition = group, stringsAsFactors = FALSE)
+    df <- data.frame(Pathway = pw, sample = colnames(score_mat),
+                     score = as.numeric(score_mat[pw, ]),
+                     condition = group, stringsAsFactors = FALSE)
+    if (!is.null(pair_id)) df$pair <- as.character(pair_id)
+    df
   }))
   rows <- list()
   for (pw in unique(long$Pathway)) {
     sub <- long[long$Pathway == pw, , drop = FALSE]
     tab <- pairwise_effect_table(sub, value_col = "score", group_col = "condition",
                                  comparisons = comparisons, method = method,
-                                 p_adjust_method = "none")
+                                 p_adjust_method = "none",
+                                 pair_col = if (is.null(pair_id)) NULL else "pair")
     if (nrow(tab) == 0) next
     tab$Pathway <- pw
     rows[[length(rows) + 1]] <- tab

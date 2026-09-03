@@ -204,3 +204,24 @@ test_that("pathway sensitivity and registry QC figures preserve full audit dimen
   expect_true(file.exists(tmp_registry) && file.info(tmp_registry)$size > 0)
   expect_equal(nrow(p2$data), 2)
 })
+
+test_that("pathway_group_comparison honours pair_id", {
+  score_mat <- matrix(c(1, 2, 3, 2, 3, 5), nrow = 1,
+                      dimnames = list("PW1", paste0("S", 1:6)))
+  group <- rep(c("Ctrl", "Treat"), each = 3)
+  pair_id <- c("P1", "P2", "P3", "P1", "P2", "P3")
+  out <- pathway_group_comparison(score_mat, group = group,
+                                  group_levels = c("Ctrl", "Treat"),
+                                  comparisons = list(c("Ctrl", "Treat")),
+                                  pair_id = pair_id)
+  expect_equal(out$p, stats::t.test(c(1, 2, 3), c(2, 3, 5), paired = TRUE)$p.value)
+})
+
+test_that("pathway_group_comparison validates pair_id alignment", {
+  score_mat <- matrix(1:6, nrow = 1, dimnames = list("PW1", paste0("S", 1:6)))
+  expect_error(
+    pathway_group_comparison(score_mat, group = rep(c("A", "B"), each = 3),
+                             pair_id = c("P1", "P2")),
+    "length"
+  )
+})

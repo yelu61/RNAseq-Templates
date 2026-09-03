@@ -589,12 +589,20 @@ if (!is.null(custom_gene_sets)) {
 
     # Machine-readable per-comparison GSVA statistics (p + BH p.adj + direction),
     # so pathway-level claims do not rest on group means / boxplot stars alone.
+    # Paired designs pass pair_id through so tests stay paired; batch is not
+    # modelled by these secondary tests (the DEG model handles it).
+    if (!is.null(BATCH_VECTOR)) {
+      warning("GSVA group comparisons use pairwise tests that do not model batch; ",
+              "interpret alongside the batch-adjusted DEG results.")
+    }
+    gsva_pair_id <- if (!is.null(PAIR_ID)) as.character(colData[colnames(gsva_scores_df), "pair_id"]) else NULL
     gsva_comp_pairs <- lapply(COMPARISONS, function(cp) c(cp[3], cp[2]))  # c(control, treat)
     gsva_stats <- tryCatch(
       pathway_group_comparison(gsva_scores,
                                group = as.character(colData[colnames(gsva_scores_df), "condition"]),
                                group_levels = GROUP_LEVELS, comparisons = gsva_comp_pairs,
-                               method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD),
+                               method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD,
+                               pair_id = gsva_pair_id),
       error = function(e) { message("GSVA group comparison skipped: ", conditionMessage(e)); NULL })
     if (!is.null(gsva_stats) && nrow(gsva_stats) > 0) {
       write.csv(gsva_stats, "./2-GSEA/GSVA_group_comparison.csv", row.names = FALSE)
@@ -611,17 +619,22 @@ if (!is.null(custom_gene_sets)) {
     sample_conditions <- data.frame(
       sample = colnames(gsva_scores_df),
       condition = factor(as.character(colData[colnames(gsva_scores_df), "condition"]), levels = GROUP_LEVELS))
+    if (!is.null(PAIR_ID)) {
+      sample_conditions$pair <- as.character(colData[colnames(gsva_scores_df), "pair_id"])
+    }
     gsva_long <- gsva_scores_df %>%
       as.data.frame() %>%
       mutate(Signature = rownames(gsva_scores_df)) %>%
       pivot_longer(cols = -Signature, names_to = "sample", values_to = "Score") %>%
       left_join(sample_conditions, by = "sample")
+    gsva_pair_col <- if (!is.null(PAIR_ID)) "pair" else NULL
     plot_group_boxplot_pdf(gsva_long, value_col = "Score", group_col = "condition", facet_col = "Signature",
                            comparisons = combn(GROUP_LEVELS, 2, simplify = FALSE),
                            method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD,
                            title = "GSVA Scores", ylab = "Score", group_colors = group_colors,
                            filename = "./3-Visualization/GSVA_boxplot.pdf", width = 12,
-                           height = 3 * ceiling(length(gs_for_gsva) / 2))
+                           height = 3 * ceiling(length(gs_for_gsva) / 2),
+                           pair_col = gsva_pair_col)
     dir.create("./3-Visualization/GSVA_boxplots", showWarnings = FALSE, recursive = TRUE)
     for (sig in unique(gsva_long$Signature)) {
       sig_data <- gsva_long %>% filter(Signature == sig)
@@ -630,7 +643,8 @@ if (!is.null(custom_gene_sets)) {
                                     method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD,
                                     title = sig, ylab = "GSVA Score", group_colors = group_colors,
                                     filename = file.path("./3-Visualization/GSVA_boxplots", paste0("GSVA_boxplot_", safe_plot_name(sig), ".pdf")),
-                                    width = 5.5, height = 6)
+                                    width = 5.5, height = 6,
+                                    pair_col = gsva_pair_col)
     }
   }
 }
@@ -638,6 +652,10 @@ if (!is.null(custom_gene_sets)) {
 # =============================================================================
 # 12. Single-gene expression plots
 # =============================================================================
+if (!is.null(BATCH_VECTOR) && length(KEY_GENES) > 0) {
+  warning("Single-gene plot statistics are pairwise tests that do not model batch; ",
+          "interpret alongside the batch-adjusted DEG results.")
+}
 single_gene_dir <- "./3-Visualization/SingleGene"
 dir.create(single_gene_dir, showWarnings = FALSE, recursive = TRUE)
 plot_gene_expression <- function(gene_name, vsd_mat_obj, dds_obj) {
@@ -646,13 +664,17 @@ plot_gene_expression <- function(gene_name, vsd_mat_obj, dds_obj) {
     sample = colnames(vsd_mat_obj),
     expression = as.numeric(vsd_mat_obj[gene_name, colnames(vsd_mat_obj)]),
     condition = as.character(colData(dds_obj)[colnames(vsd_mat_obj), "condition"]))
+  if (!is.null(PAIR_ID)) {
+    plot_data$pair <- as.character(colData(dds_obj)[colnames(vsd_mat_obj), "pair_id"])
+  }
   plot_data$condition <- factor(plot_data$condition, levels = GROUP_LEVELS)
   plot_group_bar_sem_pdf(plot_data, value_col = "expression", group_col = "condition",
                          comparisons = combn(GROUP_LEVELS, 2, simplify = FALSE),
                          method = PAIRWISE_TEST_METHOD, p_adjust_method = PAIRWISE_P_ADJUST_METHOD,
                          title = gene_name, ylab = "VST Expression", group_colors = group_colors,
                          filename = file.path(single_gene_dir, paste0("DEG_barplot_", gene_name, ".pdf")),
-                         width = 5.5, height = 6, y_from_zero = TRUE)
+                         width = 5.5, height = 6, y_from_zero = TRUE,
+                         pair_col = if (!is.null(PAIR_ID)) "pair" else NULL)
 }
 found_genes <- intersect(KEY_GENES, rownames(vsd_mat))
 write.csv(data.frame(gene = found_genes), file.path(single_gene_dir, "key_genes_plotted.csv"), row.names = FALSE)

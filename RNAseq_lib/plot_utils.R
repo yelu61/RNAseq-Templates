@@ -805,7 +805,8 @@ format_p_stars <- function(p) {
 }
 
 pairwise_effect_table <- function(data, value_col, group_col, comparisons = NULL,
-                                  facet_col = NULL, method = "t.test", p_adjust_method = "BH") {
+                                  facet_col = NULL, method = "t.test", p_adjust_method = "BH",
+                                  pair_col = NULL) {
   df <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
   if (is.null(comparisons)) {
     comparisons <- utils::combn(levels(factor(df[[group_col]])), 2, simplify = FALSE)
@@ -819,11 +820,26 @@ pairwise_effect_table <- function(data, value_col, group_col, comparisons = NULL
     if (!is.finite(value_span) || value_span == 0) value_span <- max(abs(value_range), na.rm = TRUE) * 0.1 + 1
     for (i in seq_along(comparisons)) {
       pair <- comparisons[[i]]
-      x1 <- sub_df[sub_df[[group_col]] == pair[1], value_col, drop = TRUE]
-      x2 <- sub_df[sub_df[[group_col]] == pair[2], value_col, drop = TRUE]
+      if (!is.null(pair_col)) {
+        # Paired mode: keep only complete pairs and test within-pair
+        # differences. A pair id duplicated within a group keeps its first
+        # occurrence; pairing structure should be validated upstream.
+        sub1 <- sub_df[sub_df[[group_col]] == pair[1], , drop = FALSE]
+        sub2 <- sub_df[sub_df[[group_col]] == pair[2], , drop = FALSE]
+        common_pairs <- intersect(as.character(sub1[[pair_col]]), as.character(sub2[[pair_col]]))
+        x1 <- sub1[match(common_pairs, as.character(sub1[[pair_col]])), value_col, drop = TRUE]
+        x2 <- sub2[match(common_pairs, as.character(sub2[[pair_col]])), value_col, drop = TRUE]
+      } else {
+        x1 <- sub_df[sub_df[[group_col]] == pair[1], value_col, drop = TRUE]
+        x2 <- sub_df[sub_df[[group_col]] == pair[2], value_col, drop = TRUE]
+      }
       if (length(stats::na.omit(x1)) < 2 || length(stats::na.omit(x2)) < 2) next
       p_val <- tryCatch({
-        if (method == "wilcox.test") stats::wilcox.test(x1, x2)$p.value else stats::t.test(x1, x2)$p.value
+        if (method == "wilcox.test") {
+          stats::wilcox.test(x1, x2, paired = !is.null(pair_col))$p.value
+        } else {
+          stats::t.test(x1, x2, paired = !is.null(pair_col))$p.value
+        }
       }, error = function(e) NA_real_)
       rows[[length(rows) + 1]] <- data.frame(
         group1 = pair[1],
@@ -903,7 +919,7 @@ plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_c
                                    title = NULL, ylab = NULL, group_colors = NULL,
                                    show_ns = TRUE, width = 7, height = 6,
                                    label_style = c("full", "stars"),
-                                   stat_table = NULL) {
+                                   stat_table = NULL, pair_col = NULL) {
   label_style <- match.arg(label_style)
   plot_data <- data
   plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(plot_data[[group_col]])))
@@ -911,7 +927,8 @@ plot_group_boxplot_pdf <- function(data, value_col, group_col, filename, facet_c
     pairwise_effect_table(
       plot_data, value_col = value_col, group_col = group_col,
       comparisons = comparisons, facet_col = facet_col,
-      method = method, p_adjust_method = p_adjust_method
+      method = method, p_adjust_method = p_adjust_method,
+      pair_col = pair_col
     )
   } else {
     .prepare_plot_stat_table(stat_table, plot_data, value_col, facet_col, label_style)
@@ -954,14 +971,15 @@ plot_group_violin_boxplot_pdf <- function(data, value_col, group_col, filename,
                                           ylab = NULL, group_colors = NULL,
                                           show_ns = FALSE, width = 5.8, height = 6,
                                           label_style = c("full", "stars"),
-                                          stat_table = NULL) {
+                                          stat_table = NULL, pair_col = NULL) {
   label_style <- match.arg(label_style)
   plot_data <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
   plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(data[[group_col]])))
   stat_tbl <- if (is.null(stat_table)) {
     pairwise_effect_table(
       plot_data, value_col = value_col, group_col = group_col,
-      comparisons = comparisons, method = method, p_adjust_method = p_adjust_method
+      comparisons = comparisons, method = method, p_adjust_method = p_adjust_method,
+      pair_col = pair_col
     )
   } else {
     .prepare_plot_stat_table(stat_table, plot_data, value_col, NULL, label_style)
@@ -1014,33 +1032,44 @@ plot_group_bar_sem_pdf <- function(data, value_col, group_col, filename,
                                    p_adjust_method = "BH",
                                    title = NULL, ylab = NULL, group_colors = NULL,
                                    show_ns = FALSE, width = 5.5, height = 6,
-                                   y_from_zero = TRUE) {
+                                   y_from_zero = TRUE, pair_col = NULL) {
   plot_data <- data[!is.na(data[[value_col]]) & !is.na(data[[group_col]]), , drop = FALSE]
   plot_data[[group_col]] <- factor(plot_data[[group_col]], levels = levels(factor(data[[group_col]])))
   if (is.null(comparisons)) {
     comparisons <- utils::combn(levels(plot_data[[group_col]]), 2, simplify = FALSE)
   }
 
-  stat_tbl <- tryCatch(
-    ggpubr::compare_means(
-      stats::as.formula(paste(value_col, "~", group_col)),
-      data = plot_data,
-      method = method,
-      comparisons = comparisons,
-      p.adjust.method = p_adjust_method
-    ),
-    error = function(e) data.frame()
-  )
-  if (nrow(stat_tbl) > 0) {
-    if (!"p.adj" %in% colnames(stat_tbl)) {
-      stat_tbl$p.adj <- stats::p.adjust(stat_tbl$p, method = p_adjust_method)
+  if (!is.null(pair_col)) {
+    # ggpubr::compare_means cannot do paired tests; use the paired-aware table
+    # so paired designs are not silently degraded to unpaired ones.
+    stat_tbl <- pairwise_effect_table(
+      plot_data, value_col = value_col, group_col = group_col,
+      comparisons = comparisons, method = method,
+      p_adjust_method = p_adjust_method, pair_col = pair_col
+    )
+    if (nrow(stat_tbl) > 0) stat_tbl$p.adj.format <- format_p_for_label(stat_tbl$p.adj)
+  } else {
+    stat_tbl <- tryCatch(
+      ggpubr::compare_means(
+        stats::as.formula(paste(value_col, "~", group_col)),
+        data = plot_data,
+        method = method,
+        comparisons = comparisons,
+        p.adjust.method = p_adjust_method
+      ),
+      error = function(e) data.frame()
+    )
+    if (nrow(stat_tbl) > 0) {
+      if (!"p.adj" %in% colnames(stat_tbl)) {
+        stat_tbl$p.adj <- stats::p.adjust(stat_tbl$p, method = p_adjust_method)
+      }
+      stat_tbl$p.adj.format <- format_p_for_label(stat_tbl$p.adj)
+      ymax <- max(plot_data[[value_col]], na.rm = TRUE)
+      ymin <- min(plot_data[[value_col]], na.rm = TRUE)
+      span <- ymax - ymin
+      if (!is.finite(span) || span == 0) span <- max(abs(plot_data[[value_col]]), na.rm = TRUE) * 0.1 + 1
+      stat_tbl$y.position <- ymax + span * (0.10 + (seq_len(nrow(stat_tbl)) - 1) * 0.12)
     }
-    stat_tbl$p.adj.format <- format_p_for_label(stat_tbl$p.adj)
-    ymax <- max(plot_data[[value_col]], na.rm = TRUE)
-    ymin <- min(plot_data[[value_col]], na.rm = TRUE)
-    span <- ymax - ymin
-    if (!is.finite(span) || span == 0) span <- max(abs(plot_data[[value_col]]), na.rm = TRUE) * 0.1 + 1
-    stat_tbl$y.position <- ymax + span * (0.10 + (seq_len(nrow(stat_tbl)) - 1) * 0.12)
   }
 
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .data[[group_col]], y = .data[[value_col]], fill = .data[[group_col]])) +

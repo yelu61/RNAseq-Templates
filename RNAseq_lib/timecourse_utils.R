@@ -253,6 +253,17 @@ run_timepoint_vs_baseline_deseq2 <- function(count_data, col_data, time_col = "t
     }
   }
 
+  # Result extraction only supports additive designs: every non-baseline time
+  # point vs baseline via Wald contrasts. Interaction designs (condition x
+  # time, LRT-style) are not implemented; refuse them explicitly instead of
+  # fitting the interaction model and silently extracting main-effect contrasts.
+  interaction_terms <- grep(":", attr(stats::terms(design_formula), "term.labels"), value = TRUE)
+  if (length(interaction_terms) > 0) {
+    stop("Interaction terms are not supported by timepoint-vs-baseline extraction: ",
+         paste(interaction_terms, collapse = ", "),
+         "\nUse an additive design (e.g. ~ condition + time). Condition x time questions require an LRT workflow that this template does not implement.")
+  }
+
   dds <- DESeq2::DESeqDataSetFromMatrix(
     countData = count_data,
     colData = col_data,

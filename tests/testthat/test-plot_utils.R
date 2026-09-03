@@ -405,3 +405,55 @@ test_that("GSEA term labels and FDR occupy separate positions without changing N
     unlink(file)
   }
 })
+
+test_that("pairwise_effect_table respects pairing when pair_col is given", {
+  df <- data.frame(
+    pair = rep(paste0("P", 1:5), times = 2),
+    condition = rep(c("Ctrl", "Treat"), each = 5),
+    score = c(1, 2, 3, 4, 5, 2, 3, 4, 5, 7),
+    stringsAsFactors = FALSE
+  )
+  out <- pairwise_effect_table(df, value_col = "score", group_col = "condition",
+                               comparisons = list(c("Ctrl", "Treat")), pair_col = "pair")
+  expect_equal(out$p, stats::t.test(df$score[1:5], df$score[6:10], paired = TRUE)$p.value)
+  expect_equal(out$delta, mean(df$score[6:10] - df$score[1:5]))
+})
+
+test_that("pairwise_effect_table drops incomplete pairs in paired mode", {
+  df <- data.frame(
+    pair = c("P1", "P2", "P3", "P1", "P2", "P4"),
+    condition = rep(c("Ctrl", "Treat"), each = 3),
+    score = c(1, 2, 3, 2, 4, 9),
+    stringsAsFactors = FALSE
+  )
+  out <- pairwise_effect_table(df, value_col = "score", group_col = "condition",
+                               comparisons = list(c("Ctrl", "Treat")), pair_col = "pair")
+  # Only P1 and P2 are complete pairs.
+  expect_equal(out$p, stats::t.test(c(1, 2), c(2, 4), paired = TRUE)$p.value)
+})
+
+test_that("pairwise_effect_table stays unpaired without pair_col", {
+  df <- data.frame(
+    pair = rep(paste0("P", 1:5), times = 2),
+    condition = rep(c("Ctrl", "Treat"), each = 5),
+    score = c(1, 2, 3, 4, 5, 2, 3, 4, 5, 7),
+    stringsAsFactors = FALSE
+  )
+  out <- pairwise_effect_table(df, value_col = "score", group_col = "condition",
+                               comparisons = list(c("Ctrl", "Treat")))
+  expect_equal(out$p, stats::t.test(df$score[1:5], df$score[6:10])$p.value)
+})
+
+test_that("plot_group_bar_sem_pdf renders with paired statistics", {
+  df <- data.frame(
+    pair = rep(paste0("P", 1:4), times = 2),
+    condition = rep(c("Ctrl", "Treat"), each = 4),
+    score = c(1, 2, 3, 4, 2, 3, 4, 6),
+    stringsAsFactors = FALSE
+  )
+  outfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(outfile), add = TRUE)
+  plot_group_bar_sem_pdf(df, value_col = "score", group_col = "condition",
+                         filename = outfile, pair_col = "pair")
+  expect_true(file.exists(outfile) && file.info(outfile)$size > 1000)
+})

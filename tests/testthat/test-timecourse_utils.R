@@ -58,3 +58,19 @@ test_that("summarize_mfuzz_clusters tallies cluster sizes", {
   expect_equal(out$n_genes[out$cluster == 2], 3)
   expect_equal(out$n_genes[out$cluster == 3], 1)
 })
+
+test_that("run_timepoint_vs_baseline_deseq2 rejects interaction designs explicitly", {
+  skip_if_not_installed("DESeq2")
+  counts <- matrix(c(10, 20, 15, 25, 30, 35, 40, 45), nrow = 2,
+                   dimnames = list(c("g1", "g2"), paste0("S", 1:4)))
+  col_data <- data.frame(
+    time = c("t0", "t1", "t0", "t1"),
+    condition = c("a", "a", "b", "b"),
+    row.names = paste0("S", 1:4)
+  )
+  expect_error(
+    run_timepoint_vs_baseline_deseq2(counts, col_data, time_col = "time",
+                                     design_formula = ~ condition * time),
+    "Interaction terms are not supported"
+  )
+})
