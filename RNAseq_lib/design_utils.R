@@ -2,6 +2,8 @@
 
 # Build colData with condition and optional pair ID for paired designs.
 make_paired_col_data <- function(sample_names, groups, group_levels, pair_id) {
+  pair_id <- align_to_sample_order(pair_id, sample_names, "PAIR_ID")
+  groups <- align_to_sample_order(groups, sample_names, "GROUPS")
   if (length(pair_id) != length(sample_names)) {
     stop("pair_id length (", length(pair_id), ") must equal SAMPLE_NAMES length (", length(sample_names), ").")
   }
@@ -63,12 +65,14 @@ formula_term_labels <- function(design_formula) {
 
 # Append a batch covariate column to colData so DESIGN_FORMULA can reference it.
 # Pairs with validate_batch_design(): that helper warns when the formula expects a
-# batch term, this one actually writes it. batch_vector must be sample-ordered to
-# match SAMPLE_NAMES / rownames(colData).
+# batch term, this one actually writes it. batch_vector is aligned to
+# rownames(colData) by name when named, otherwise positionally to match
+# SAMPLE_NAMES / rownames(colData).
 add_batch_col <- function(colData, batch_vector, batch_term = "batch") {
   if (is.null(batch_vector)) {
     return(colData)
   }
+  batch_vector <- align_to_sample_order(batch_vector, rownames(colData), "BATCH_VECTOR")
   if (nrow(colData) != length(batch_vector)) {
     stop("BATCH_VECTOR length (", length(batch_vector),
          ") does not match number of samples in colData (", nrow(colData), ").")

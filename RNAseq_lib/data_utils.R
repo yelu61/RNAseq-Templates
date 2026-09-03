@@ -536,7 +536,10 @@ counts_to_fpkm <- function(counts_mat, gene_lengths_kb) {
   if (any(library_size == 0)) {
     stop("Cannot compute FPKM: one or more samples have total count of zero.")
   }
-  fpkm <- counts_mat / lengths / (library_size / 1e6)
+  # Per-sample library sizes must divide columns; the double-transpose matches
+  # counts_to_tpm(). Plain `counts_mat / lengths / library_size` would recycle
+  # the sample-length vector down columns and corrupt every off-diagonal entry.
+  fpkm <- t(t(counts_mat / lengths) / (library_size / 1e6))
   fpkm
 }
 

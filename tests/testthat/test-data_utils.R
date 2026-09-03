@@ -357,3 +357,17 @@ test_that("collapse_by_symbol drops NA/empty symbols and works without extra", {
   expect_null(cc$extra)
   expect_equal(cc$n_out, 2)
 })
+
+test_that("counts_to_fpkm normalizes every sample by its own library size", {
+  counts <- matrix(c(100, 200, 300,
+                     400, 500, 600), nrow = 2, byrow = TRUE,
+                   dimnames = list(c("A", "B"), c("S1", "S2", "S3")))
+  lengths <- c(A = 1, B = 2)
+  fpkm <- counts_to_fpkm(counts, lengths)
+  lib <- colSums(counts)  # 500 700 900
+  expected <- t(t(counts / lengths) / (lib / 1e6))
+  expect_equal(unname(fpkm), unname(expected))
+  # Regression guard: plain vector division recycles library sizes down
+  # columns and only looks right on the diagonal of square matrices.
+  expect_equal(as.numeric(fpkm["B", "S1"]), 400 / 2 / (500 / 1e6))
+})

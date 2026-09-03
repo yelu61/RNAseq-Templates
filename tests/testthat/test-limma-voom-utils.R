@@ -106,3 +106,44 @@ test_that("run_voom contains plotting inside the requested PDF device", {
   expect_true(is.matrix(v$E))
   expect_true(file.exists(outfile) && file.info(outfile)$size > 1500)
 })
+
+test_that("run_limma_contrasts stops instead of silently skipping missing terms", {
+  skip_if_not_installed("edgeR")
+  skip_if_not_installed("limma")
+  counts <- matrix(
+    c(50, 55, 52, 100, 110, 105,
+      80, 75, 78, 40, 45, 42,
+      30, 32, 31, 60, 63, 61,
+      90, 88, 92, 95, 96, 94),
+    nrow = 4, byrow = TRUE,
+    dimnames = list(paste0("g", 1:4), paste0("s", 1:6))
+  )
+  group <- factor(rep(c("A", "B"), each = 3))
+  dge <- edgeR::calcNormFactors(edgeR::DGEList(counts = counts, group = group))
+  design <- make_group_design(group)
+  v <- limma::voom(dge, design = design, plot = FALSE)
+  expect_error(
+    run_limma_contrasts(v, design, list(c("Bad_vs_A", "Typo", "A"))),
+    "not found in design matrix"
+  )
+})
+
+test_that("run_limma_contrasts handles non-syntactic group names", {
+  skip_if_not_installed("edgeR")
+  skip_if_not_installed("limma")
+  counts <- matrix(
+    c(50, 55, 52, 100, 110, 105,
+      80, 75, 78, 40, 45, 42,
+      30, 32, 31, 60, 63, 61,
+      90, 88, 92, 95, 96, 94),
+    nrow = 4, byrow = TRUE,
+    dimnames = list(paste0("g", 1:4), paste0("s", 1:6))
+  )
+  group <- factor(rep(c("T-cell", "B cell"), each = 3))
+  dge <- edgeR::calcNormFactors(edgeR::DGEList(counts = counts, group = group))
+  design <- make_group_design(group)
+  v <- limma::voom(dge, design = design, plot = FALSE)
+  res <- run_limma_contrasts(v, design, list(c("T_vs_B", "T-cell", "B cell")))
+  expect_true("T_vs_B" %in% names(res))
+  expect_equal(nrow(res$T_vs_B), 4)
+})

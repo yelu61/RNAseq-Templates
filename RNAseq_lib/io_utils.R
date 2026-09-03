@@ -65,10 +65,53 @@ detect_count_columns <- function(rawcount, gene_name_col, count_cols = NULL, ann
   count_col_names
 }
 
+# Align a per-sample config vector to the sample order, by name when possible.
+#
+# Per-sample config vectors (GROUPS, BATCH_VECTOR, PAIR_ID, ...) are aligned to
+# the count columns positionally by contract. When such a vector carries names,
+# we can do better than trust: reorder it to match the samples exactly, which
+# turns an otherwise silent sample/annotation swap into either a correct
+# alignment or an explicit error. Unnamed vectors keep the positional contract
+# (callers still length-check them).
+align_to_sample_order <- function(value, sample_names, arg_name = "value") {
+  value_names <- names(value)
+  if (is.null(value_names)) {
+    return(value)
+  }
+  if (anyNA(value_names) || any(value_names == "") || anyDuplicated(value_names)) {
+    stop(arg_name, " has empty or duplicated names; named alignment requires unique non-empty names.")
+  }
+  missing_for_samples <- setdiff(sample_names, value_names)
+  unknown_names <- setdiff(value_names, sample_names)
+  if (length(missing_for_samples) > 0 || length(unknown_names) > 0) {
+    stop(arg_name, " is named but its names do not match the sample names.\n",
+         if (length(missing_for_samples) > 0)
+           paste0("No value for sample(s): ", paste(missing_for_samples, collapse = ", "), "\n"),
+         if (length(unknown_names) > 0)
+           paste0("Name(s) not among samples: ", paste(unknown_names, collapse = ", "), "\n"),
+         "Fix the names of ", arg_name, ", or drop them to fall back to positional order.")
+  }
+  aligned <- value[sample_names]
+  names(aligned) <- NULL
+  aligned
+}
+
 validate_sample_design <- function(sample_names, groups, group_levels, comparisons, count_col_names) {
   if (length(sample_names) != length(count_col_names)) {
     stop("SAMPLE_NAMES length (", length(sample_names), ") must equal count columns (", length(count_col_names), ").",
          "\nPlease check that SAMPLE_NAMES has one name for every sample column in your count table.")
+  }
+  # When SAMPLE_NAMES reuse the count column names (a common convention), any
+  # order discrepancy between the two is almost certainly a config mistake that
+  # would silently swap sample annotations, so fail loudly instead of aligning
+  # positionally.
+  shared_in_samples <- sample_names[sample_names %in% count_col_names]
+  shared_in_cols <- count_col_names[count_col_names %in% sample_names]
+  if (length(shared_in_samples) > 0 && !identical(unname(shared_in_samples), unname(shared_in_cols))) {
+    stop("SAMPLE_NAMES and the count columns share names but in a different order.",
+         "\nShared names in SAMPLE_NAMES order: ", paste(shared_in_samples, collapse = ", "),
+         "\nShared names in count column order: ", paste(shared_in_cols, collapse = ", "),
+         "\nThis would silently swap sample annotations. Reorder SAMPLE_NAMES/GROUPS to match the count columns.")
   }
   if (length(groups) != length(sample_names)) {
     stop("GROUPS length (", length(groups), ") must equal SAMPLE_NAMES length (", length(sample_names), ").",
@@ -202,6 +245,22 @@ build_count_matrix <- function(rawcount, gene_name_col, count_col_names, sample_
   rownames(count_data) <- count_data[[gene_name_col]]
   count_data[[gene_name_col]] <- NULL
   count_data$mean_count_for_dedup <- NULL
+  # Rename columns to clean sample names. When sample_names is a named vector
+  # whose names are the raw count column names, map by name instead of by
+  # position so the raw-column -> sample-name mapping is explicit and immune
+  # to ordering mistakes.
+  sn_names <- names(sample_names)
+  if (!is.null(sn_names)) {
+    if (anyNA(sn_names) || any(sn_names == "") || anyDuplicated(sn_names)) {
+      stop("names(SAMPLE_NAMES) must be unique and non-empty when provided.")
+    }
+    if (!setequal(sn_names, count_col_names)) {
+      stop("names(SAMPLE_NAMES) must match the count column names.",
+           "\nCount columns: ", paste(count_col_names, collapse = ", "),
+           "\nnames(SAMPLE_NAMES): ", paste(sn_names, collapse = ", "))
+    }
+    sample_names <- unname(sample_names[count_col_names])
+  }
   colnames(count_data) <- sample_names
   as.data.frame(count_data, check.names = FALSE)
 }
@@ -215,6 +274,7 @@ preview_count_matrix <- function(count_data, gene_name_col = "gene_name", n = 6)
 }
 
 make_col_data <- function(count_data, sample_names, groups, group_levels) {
+  groups <- align_to_sample_order(groups, colnames(count_data), "GROUPS")
   group <- factor(groups, levels = group_levels)
   data.frame(
     row.names = colnames(count_data),

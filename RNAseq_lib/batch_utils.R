@@ -7,6 +7,7 @@ plot_pca_by_batch_pdf <- function(vsd, batch_vec, filename,
   if (!requireNamespace("DESeq2", quietly = TRUE)) {
     stop("Package 'DESeq2' is required for PCA.")
   }
+  batch_vec <- align_to_sample_order(batch_vec, colnames(vsd), "BATCH_VECTOR")
   if (length(batch_vec) != ncol(vsd)) {
     stop("batch_vec length (", length(batch_vec), ") must match vsd samples (", ncol(vsd), ").")
   }
@@ -42,6 +43,10 @@ plot_pca_by_batch_pdf <- function(vsd, batch_vec, filename,
 summarize_pve_by_batch <- function(vsd, batch_vec, condition_vec = NULL, ntop = 500, npcs = 10) {
   if (!requireNamespace("DESeq2", quietly = TRUE)) {
     stop("Package 'DESeq2' is required.")
+  }
+  batch_vec <- align_to_sample_order(batch_vec, colnames(vsd), "BATCH_VECTOR")
+  if (!is.null(condition_vec)) {
+    condition_vec <- align_to_sample_order(condition_vec, colnames(vsd), "condition_vec")
   }
   if (length(batch_vec) != ncol(vsd)) {
     stop("batch_vec length must match vsd samples.")

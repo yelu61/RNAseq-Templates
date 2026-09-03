@@ -25,3 +25,37 @@ test_that("validate_batch_design checks sample length when provided", {
     "must equal SAMPLE_NAMES"
   )
 })
+
+test_that("add_batch_col aligns a named batch vector to colData rows", {
+  colData <- data.frame(condition = factor(c("A", "B")), row.names = c("S1", "S2"))
+  out <- add_batch_col(colData, c(S2 = "B2", S1 = "B1"))
+  expect_equal(as.character(out$batch), c("B1", "B2"))
+})
+
+test_that("add_batch_col stops when a named batch vector does not match samples", {
+  colData <- data.frame(condition = factor(c("A", "B")), row.names = c("S1", "S2"))
+  expect_error(add_batch_col(colData, c(S1 = "B1", S3 = "B2")), "do not match")
+})
+
+test_that("make_paired_col_data aligns named pair_id and groups by sample name", {
+  out <- make_paired_col_data(
+    sample_names = c("S1", "S2", "S3", "S4"),
+    groups = c(S2 = "Treat", S1 = "Ctrl", S4 = "Treat", S3 = "Ctrl"),
+    group_levels = c("Ctrl", "Treat"),
+    pair_id = c(S3 = "P2", S1 = "P1", S2 = "P1", S4 = "P2")
+  )
+  expect_equal(as.character(out$condition), c("Ctrl", "Treat", "Ctrl", "Treat"))
+  expect_equal(as.character(out$pair_id), c("P1", "P1", "P2", "P2"))
+})
+
+test_that("make_paired_col_data stops when a named pair_id does not match samples", {
+  expect_error(
+    make_paired_col_data(
+      sample_names = c("S1", "S2"),
+      groups = c("Ctrl", "Treat"),
+      group_levels = c("Ctrl", "Treat"),
+      pair_id = c(S1 = "P1", SX = "P1")
+    ),
+    "do not match"
+  )
+})

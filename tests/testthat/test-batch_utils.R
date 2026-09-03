@@ -29,3 +29,16 @@ test_that("summarize_pve_by_batch validates input length", {
   )
   expect_error(summarize_pve_by_batch(se, c("B1", "B2")), "length must match")
 })
+
+test_that("summarize_pve_by_batch aligns a named batch vector to sample order", {
+  skip_if_not_installed("DESeq2")
+  mat <- matrix(rnorm(20), nrow = 5, ncol = 4,
+                dimnames = list(paste0("g", 1:5), c("S2", "S1", "S4", "S3")))
+  se <- SummarizedExperiment::SummarizedExperiment(assays = list(counts = mat))
+  batch_named <- c(S1 = "B1", S2 = "B1", S3 = "B2", S4 = "B2")
+  expect_silent(summarize_pve_by_batch(se, batch_named, ntop = 5, npcs = 2))
+  expect_error(
+    summarize_pve_by_batch(se, c(S1 = "B1", S2 = "B1", S3 = "B2", SX = "B2"), ntop = 5, npcs = 2),
+    "do not match"
+  )
+})

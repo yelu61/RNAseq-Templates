@@ -27,6 +27,11 @@ BIOTYPE_FILTER <- "protein_coding" # biotype to keep
 COUNT_COLS     <- NULL             # NULL = auto-detect; or e.g. c(2:10)
 
 # ---- 1.3 Experimental Design -------------------------------------------------
+# Per-sample vectors below are matched to count columns POSITIONALLY: element i
+# belongs to the i-th count column. Keep them in the same order as your count
+# table columns. Safer alternative: give SAMPLE_NAMES/GROUPS/BATCH_VECTOR/
+# PAIR_ID names — named vectors are aligned by sample name, so ordering
+# mistakes become explicit errors instead of silent sample/annotation swaps.
 SAMPLE_NAMES   <- c("EM_LPS_1", "EM_LPS_2", "EM_LPS_3",
                     "LPS_1", "LPS_2", "LPS_3",
                     "blank_1", "blank_2", "blank_3")

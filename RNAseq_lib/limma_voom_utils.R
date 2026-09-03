@@ -80,12 +80,21 @@ run_limma_contrasts <- function(v, design, comparisons) {
     comp_name <- comp[1]
     treat <- comp[2]
     ctrl <- comp[3]
-    if (!all(c(treat, ctrl) %in% colnames(design))) {
-      warning("Contrast terms not found in design matrix: ", treat, ", ", ctrl)
-      next
+    missing_terms <- setdiff(c(treat, ctrl), colnames(design))
+    if (length(missing_terms) > 0) {
+      # A missing comparison is a config error, not a skippable condition:
+      # warning + next would silently drop it from the results.
+      stop("Contrast terms not found in design matrix for comparison '", comp_name, "': ",
+           paste(missing_terms, collapse = ", "),
+           "\nAvailable design columns: ", paste(colnames(design), collapse = ", "),
+           "\nCheck that COMPARISONS group names match GROUP_LEVELS exactly.")
     }
-    contrast <- limma::makeContrasts(contrasts = paste0(treat, "-", ctrl), levels = design)
-    fit2 <- limma::contrasts.fit(fit, contrast)
+    # Build the contrast vector programmatically instead of parsing a
+    # "treat-ctrl" string, so non-syntactic group names (e.g. "T-cell") work.
+    contrast_vec <- stats::setNames(rep(0, ncol(design)), colnames(design))
+    contrast_vec[treat] <- 1
+    contrast_vec[ctrl] <- -1
+    fit2 <- limma::contrasts.fit(fit, contrast_vec)
     fit2 <- limma::eBayes(fit2)
     top <- limma::topTable(fit2, number = Inf, adjust.method = "BH", sort.by = "p")
     top$gene_name <- rownames(top)

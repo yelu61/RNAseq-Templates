@@ -28,6 +28,10 @@ BIOTYPE_FILTER <- "protein_coding"
 COUNT_COLS     <- NULL             # NULL = auto-detect numeric columns
 
 # ---- 1.3 Experimental Design -------------------------------------------------
+# Per-sample vectors are matched to count columns POSITIONALLY (element i ->
+# i-th count column). Naming the vectors (names = sample names) instead makes
+# the pipeline align them by name, turning ordering mistakes into explicit
+# errors rather than silent sample swaps.
 SAMPLE_NAMES   <- c("Control_1", "Control_2", "Control_3",
                     "Treatment_1", "Treatment_2", "Treatment_3")
 GROUPS         <- c(rep("Control", 3), rep("Treatment", 3))
